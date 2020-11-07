@@ -1,0 +1,32 @@
+Installation Instructions
+=========================
+
+NETMORPH depends on the GNU system libraries and is written in standard
+C++, although compilation during development is done only with the
+g++/gcc GNU C++/C compilers.
+
+1. Extract the package netmorph-YYYYMMDD.tar.gz.
+   (YYYYMMDD specifies the creation date of the package.)
+
+   A directory netmorph-YYYYMMDD will be created that contains
+   the source files of NETMORPH.
+
+2. Run the installation script:
+   ./install.sh
+
+   Successful compilation results in the programs
+   netmorph and netmorph2D.
+
+At this point it is possible to use the netmorph programs to run
+simulations of network development. In order to perform evaluation
+of simulation results and to produce graphs of a resulting network
+and its statistical data, the following additional tools need to
+be installed:
+
+octave (http://www.octave.org/)
+xfig (http://www.xfig.org/)
+ImageMagick (http://www.imagemagick.org/)
+
+These are standard mathematics and graphics packages that are
+available through the package managers of all major Linux
+distributions.

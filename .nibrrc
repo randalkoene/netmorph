@@ -1,0 +1,69 @@
+# © Copyright 2008 Randal A. Koene <randalk@netmorph.org>
+# 
+# With design assistance from J. van Pelt & A. van Ooyen, and support
+# from the Netherlands Organization for Scientific Research (NWO)
+# Program Computational Life Sciences grant CLS2003 (635.100.005) and
+# from the EC Marie Curie Research and Training Network (RTN)
+# NEURoVERS-it 019247.
+
+# This file is part of NETMORPH.
+
+# NETMORPH is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+
+# NETMORPH is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+
+# You should have received a copy of the GNU General Public License
+# along with NETMORPH.  If not, see <http://www.gnu.org/licenses/>.
+
+# Default simulation constraints:
+days=21.0;
+
+approxproportionprincipal_neuron=0.0;
+approxproportioninterneuron=0.2;
+approxproportionpyramidal=0.8;
+approxproportionmultipolar_nonpyramidal=0.0;
+approxproportionuntyped_neuron=0.0;
+
+# Default 3D shape:
+shape=regions;
+regions=VI;
+VI.shape=disc;
+VI.neurons=1000;
+VI.minneuronseparation=16.0;
+VI.centerZ=-300;
+VI.shape.radius=500;
+VI.shape.thickness=30;
+
+electrodes=false;
+
+# Default initial lengths:
+Dgrowth_L0_min=0;
+Dgrowth_L0_max=0;
+Agrowth_L0_min=0;
+Agrowth_L0_max=0;
+
+# Default elongation:
+// ***This still needs work!
+all_axons.arbor_elongation_model=van_Pelt;
+all_axons.growth_nu0=0.0045995;
+all_axons.growth_F=0.74;
+all_apical_pyramidal_dendrites.arbor_elongation_model=van_Pelt;
+all_apical_pyramidal_dendrites.growth_nu0=0.0045995;
+all_apical_pyramidal_dendrites.growth_F=0.74;
+Amin_node_interval=1.0;
+Dmin_node_interval=1.0;
+
+# Default branching:
+// ***This still needs work!
+branchatinitlength=false;
+growthfunction=vanpelt;
+
+# Default output:
+outattr_show_progress=true;
+figattr_use_color=true;

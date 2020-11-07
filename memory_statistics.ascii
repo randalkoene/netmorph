@@ -1,0 +1,56 @@
+# Created by nibr diagnostic: memory statistics, Randal A. Koene
+# name: events
+# type: matrix
+# rows: 1
+# columns: 1
+212354
+# name: jiffies
+# type: matrix
+# rows: 1
+# columns: 2
+1229 2364
+# name: actualused
+# type: matrix
+# rows: 1
+# columns: 1
+2650112
+# name: numintervening
+# type: matrix
+# rows: 1
+# columns: 1
+5
+# name: intervening
+# type: matrix
+# rows: 1
+# columns: 1
+212992
+# name: total
+# type: matrix
+# rows: 1
+# columns: 1
+2496860
+# name: programsize
+# type: matrix
+# rows: 1
+# columns: 1
+2301952
+# name: fibre_segment
+# type: matrix
+# rows: 1
+# columns: 3
+692 41412 45056
+# name: Fig_element
+# type: matrix
+# rows: 1
+# columns: 3
+1714 134400 73728
+# name: Spatial_Segment_Subset
+# type: matrix
+# rows: 1
+# columns: 3
+55 19096 40960
+# name: synapse_structure
+# type: matrix
+# rows: 1
+# columns: 3
+0 0 0
