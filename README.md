@@ -15,7 +15,7 @@ Randal A. Koene
 NETMORPH is free software under the terms of the GNU General Public License
 and is made available via repository on Github at:
 
-???
+https://github.com/randalkoene/netmorph
 
 To obtain the software, you can clone the repository. Alternatively, you
 can download a compressed tar archive of the latest version:
