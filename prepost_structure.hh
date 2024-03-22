@@ -62,4 +62,7 @@ public:
 #endif
 };
 
+extern natural_schema_parent_set axons_most_specific_natural_set[];
+extern natural_schema_parent_set dendrites_most_specific_natural_set[];
+
 #endif

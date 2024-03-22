@@ -7,6 +7,11 @@ Connectivity by means of Neurite Growth and Synapse Formation Models
 (N)NETMORPH
 
 Randal A. Koene
+2008, 2009, 2011, 2024
+
+Note: This is the authoritative development branch in 2024, which
+      combines advances that were made in 2009 and 2011 by RK and
+      AC respectively.
 
 ========================================================================
 

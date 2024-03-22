@@ -36,6 +36,8 @@
 
 general_fibre_structure_parameters_interface general_fibre_structure_parameters;
 
+region_structure_initialization_ptr * structure_initialization_region_subset_schemas = NULL;
+
 nodegenesis_data * NodeGenesis_Data = NULL;
 
 const char fibre_structure_name[NUM_fs][9] = {
@@ -43,6 +45,9 @@ const char fibre_structure_name[NUM_fs][9] = {
   "dendrite"
 };
 fibre_structure_class_id parsing_fs_type = axon_fs; // Modify this wherever it is important to keep track (e.g. neuron::net_Txt())
+
+terminal_segment * most_recent_branch1_ts = NULL;
+terminal_segment * most_recent_branch2_ts = NULL;
 
 void general_fibre_structure_parameters_interface::parse_CLP(Command_Line_Parameters & clp) {
   int n;
@@ -73,12 +78,12 @@ bool fibre_segment::branch() {
   if (branch1) return false;
   DIAGNOSTIC_BEFORE_ALLOCATION(new_fibre_segment);
 #ifdef VECTOR3D
-  branch1 = new fibre_segment(*n,efd1);
-  branch2 = new fibre_segment(*n,efd2);
+  branch1 = new fibre_segment(*n,this,efd1);
+  branch2 = new fibre_segment(*n,this,efd2);
 #endif
 #ifdef VECTOR2D
-  branch1 = new fibre_segment(*n);
-  branch2 = new fibre_segment(*n);
+  branch1 = new fibre_segment(*n,this);
+  branch2 = new fibre_segment(*n,this);
 #endif
   DIAGNOSTIC_AFTER_ALLOCATION(new_fibre_segment,2,sizeof(*branch1));
   branch1->P0 = P1;
@@ -95,10 +100,10 @@ bool fibre_segment::turn() {
   if (branch1) return false;
   DIAGNOSTIC_BEFORE_ALLOCATION(new_fibre_segment);
 #ifdef VECTOR3D
-  branch1 = new fibre_segment(*n,efd);
+  branch1 = new fibre_segment(*n,this,efd);
 #endif
 #ifdef VECTOR2D
-  branch1 = new fibre_segment(*n);
+  branch1 = new fibre_segment(*n,this);
 #endif
   DIAGNOSTIC_AFTER_ALLOCATION(new_fibre_segment,1,sizeof(*branch1));
   branch1->P0 = P1;
@@ -114,10 +119,10 @@ fibre_segment * fibre_segment::continuation_node_to_branch() {
   if (branch1 && branch2) return NULL;
   DIAGNOSTIC_BEFORE_ALLOCATION(new_fibre_segment);
 #ifdef VECTOR3D
-  fibre_segment * newbranch = new fibre_segment(*n,efd);
+  fibre_segment * newbranch = new fibre_segment(*n,this,efd);
 #endif
 #ifdef VECTOR2D
-  fibre_segment * newbranch = new fibre_segment(*n);
+  fibre_segment * newbranch = new fibre_segment(*n,this);
 #endif
   DIAGNOSTIC_AFTER_ALLOCATION(new_fibre_segment,1,sizeof(*newbranch));
   newbranch->P0 = P1;
@@ -219,11 +224,13 @@ void fibre_segment::Collect_Data(fibre_collected_data & fcd) {
       fcd.nsb->netstats[axons_term_len_since_bifurcation].Collect_Data(fcd.lensincebifurcation);
       if (fcd.nsb->netstats[axons_cartratio_bifurcationtoterm].Collect()) fcd.nsb->netstats[axons_cartratio_bifurcationtoterm].Collect_Data(cartesian_to_fiber_ratio(fcd));
       if (fcd.nsb->netstats[axons_cartratio_somatoterm].Collect()) fcd.nsb->netstats[axons_cartratio_somatoterm].Collect_Data(soma_to_term_cartesian_to_fiber_ratio(fcd.lensincesoma));
+      if (fcd.nsb->netstats[axons_term_len_since_soma].Collect()) fcd.nsb->netstats[axons_term_len_since_soma].Collect_Data(fcd.lensincesoma);
     } else {
       fcd.nsb->netstats[dendrites_turns_between_bifurcations].Collect_Data((double) fcd.turnssincebifurcation);
       fcd.nsb->netstats[dendrites_term_len_since_bifurcation].Collect_Data(fcd.lensincebifurcation);
       if (fcd.nsb->netstats[dendrites_cartratio_bifurcationtoterm].Collect()) fcd.nsb->netstats[dendrites_cartratio_bifurcationtoterm].Collect_Data(cartesian_to_fiber_ratio(fcd));
       if (fcd.nsb->netstats[dendrites_cartratio_somatoterm].Collect()) fcd.nsb->netstats[dendrites_cartratio_somatoterm].Collect_Data(soma_to_term_cartesian_to_fiber_ratio(fcd.lensincesoma));
+      if (fcd.nsb->netstats[dendrites_term_len_since_soma].Collect()) fcd.nsb->netstats[dendrites_term_len_since_soma].Collect_Data(fcd.lensincesoma);
     }
     return; // also see terminal_segment::Collect_Data();
   }
@@ -232,7 +239,7 @@ void fibre_segment::Collect_Data(fibre_collected_data & fcd) {
       fcd.nsb->netstats[axons_len_between_bifurcations].Collect_Data(fcd.lensincebifurcation);
       fcd.nsb->netstats[axons_turns_between_bifurcations].Collect_Data((double) fcd.turnssincebifurcation);
       if (fcd.nsb->netstats[axons_cartratio_between_bifurcations].Collect()) fcd.nsb->netstats[axons_cartratio_between_bifurcations].Collect_Data(cartesian_to_fiber_ratio(fcd));
-      if (fcd.nsb->netstats[axon_seven_micron_branch_angles].Collect()) {
+      if (fcd.nsb->netstats[axons_seven_micron_branch_angles].Collect()) {
 	spatial p,b1, b2;
 	// [***INCOMPLETE] Implement the fiber_location() functions.
 	fiber_location(-7.0,p); // a location 7 micrometers before bifurcation
@@ -294,6 +301,19 @@ int fibre_segment::count_terminal_segments() {
   return res;
 }
 
+void fibre_segment::count_segment_types(unsigned long & continuation, unsigned long & bifurcation, unsigned long terminal) {
+  // Note that this function purposely does not initialize the return variables.
+  if (branch1) {
+    if (branch2) bifurcation++;
+    else continuation++;
+  } else {
+    if (branch2) continuation++;
+    else terminal++;
+  }
+  if (branch1) branch1->count_segment_types(continuation,bifurcation,terminal);
+  if (branch2) branch2->count_segment_types(continuation,bifurcation,terminal);
+}
+
 double fibre_segment::sum_of_intermediate_segment_lengths(network_statistics_data * internsd) {
   if (!has_daughters()) return 0.0; // this is a terminal segment
   double res = Length();
@@ -306,6 +326,37 @@ double fibre_segment::sum_of_intermediate_segment_lengths(network_statistics_dat
   if (branch1) res += branch1->sum_of_intermediate_segment_lengths(internsd);
   if (branch2) res += branch2->sum_of_intermediate_segment_lengths(internsd);
   return res;
+}
+
+void fibre_segment::move_add(spatial & addvec) {
+  P0 += addvec;
+  P1 += addvec;
+  if (branch1) branch1->move_add(addvec);
+  if (branch2) branch2->move_add(addvec);
+}
+
+void fibre_segment::fanin_rot() {
+#define FANIN_ANGLE_SLICE (M_PI/50.0)
+  P0.convert_to_spherical();
+  P0.set_Y(0.0);
+  P0.convert_from_spherical();
+  P1.convert_to_spherical();
+  P1.set_Y(0.0);
+#ifdef VECTOR3D
+  double phi = P1.Z();
+#endif
+#ifdef VECTOR2D
+  double phi = 0.0;
+#endif
+  P1.convert_from_spherical();
+  if ((net_fanin_histogram.collect) && (!branch1) && (!branch2)) {
+    unsigned int i = (int) (phi/FANIN_ANGLE_SLICE);
+    if (i>=50) i=49;
+    net_fanin_histogram.len[i] += (P1.len() - N()->Radius());
+    net_fanin_histogram.n[i]++;
+  }
+  if (branch1) branch1->fanin_rot();
+  if (branch2) branch2->fanin_rot();
 }
 
 //#define TEST_FIG_SIZES
@@ -353,6 +404,12 @@ Fig_Object * fibre_segment::net_Fig() {
     } else {
 #endif
       long X1(FIGSCALED(x1)), Y1(FIGSCALED(y1)), X2(FIGSCALED(x2)), Y2(FIGSCALED(y2));
+#define TESTPOSTMA
+#ifdef TESTPOSTMA
+#ifdef VECTOR3D
+      if ((X1==-20) && (Y1==-710) && (X2==-2422) && (Y2==-2441)) cout << "FOUND ERROR LINE GENERATION:\nP0=(" << P0.X() << ',' << P0.Y() << ',' << P0.Z() << "), P1=(" << P1.X() << ',' << P1.Y() << ',' << P1.Z() << ")\n";
+#endif
+#endif
       fibre_segment_fig = new Fig_Line(0,1,_figvar_connection_color,7,_figvar_connection_depth,-1,0.0,0,0,X1,Y1,X2,Y2);
 #ifdef INCLUDE_SIMPLE_FIBER_DIAMETER
     }
@@ -369,10 +426,12 @@ Fig_Object * fibre_segment::net_Fig() {
 Txt_Object * fibre_segment::bifurcationnode_net_Txt(long parentnodeindex) {
   // This fiber is followed by two daughter fibers after a bifurcation node.
   // Output data about the bifurcation node.
-  // Format: <node index>, <axon/dendrite>, <x>, <y>, <z>, <neuron label>, <parent node index>, <simulated creation time>
+  // Format: <node index>, <fiber segment label>, <axon/dendrite>, <x>, <y>, <z>, <neuron label>, <parent node index>, <simulated creation time>
   Txt_nodeindex++;
   long nodeindexcache = Txt_nodeindex; // To remember this after depth-first parse along one branch
   (*Txt_bifurcationnodelist) += String(Txt_nodeindex); // Txt_nodeindex is the index of this bifurcation node
+  (*Txt_bifurcationnodelist) += ',';
+  (*Txt_bifurcationnodelist) += String((long) this); // This is a memory location label that can be crossreferenced from synapse text output
   (*Txt_bifurcationnodelist) += ',';
   (*Txt_bifurcationnodelist) += fibre_structure_name[parsing_fs_type];
   double x=0.0, y=0.0, z=0.0;
@@ -383,7 +442,11 @@ Txt_Object * fibre_segment::bifurcationnode_net_Txt(long parentnodeindex) {
   (*Txt_bifurcationnodelist) += String((long) n);
   (*Txt_bifurcationnodelist) += ',';
   (*Txt_bifurcationnodelist) += String(parentnodeindex);
-  if (NodeGenesis_Data) (*Txt_bifurcationnodelist) += String(NodeGenesis_Data->find_t_genesis(branch1),",%f\n"); // same as that of branch2
+#ifdef INCLUDE_SIMPLE_FIBER_DIAMETER
+  (*Txt_bifurcationnodelist) += String(diameter,",%f");
+#endif
+  if (NodeGenesis_Data) (*Txt_bifurcationnodelist) += String(NodeGenesis_Data->find_t_genesis(branch1),",%f"); // same as that of branch2
+  (*Txt_bifurcationnodelist) += '\n';
   branch1->net_Txt(nodeindexcache);
   branch2->net_Txt(nodeindexcache);
   return NULL;
@@ -392,10 +455,12 @@ Txt_Object * fibre_segment::bifurcationnode_net_Txt(long parentnodeindex) {
 Txt_Object * fibre_segment::continuationnode_net_Txt(long parentnodeindex) {
   // This fiber is followed by a daughter fiber after a continuation node.
   // Output data about the continuation node.
-  // Format: <node index>, <axon/dendrite>, <x>, <y>, <z>, <neuron label>, <parent node index>, <simulated creation time>
+  // Format: <node index>, <fiber segment label>, <axon/dendrite>, <x>, <y>, <z>, <neuron label>, <parent node index>, <simulated creation time>
   Txt_nodeindex++;
   fibre_segment * fs = branch1; if (!fs) fs = branch2; // whichever continues the segment of fiber
   (*Txt_continuationnodelist) += String(Txt_nodeindex); // Txt_nodeindex is the index of this continuation node
+  (*Txt_continuationnodelist) += ',';
+  (*Txt_continuationnodelist) += String((long) this); // This is a memory location label that can be crossreferenced from synapse text output
   (*Txt_continuationnodelist) += ',';
   (*Txt_continuationnodelist) += fibre_structure_name[parsing_fs_type];
   double x=0.0, y=0.0, z=0.0;
@@ -406,7 +471,11 @@ Txt_Object * fibre_segment::continuationnode_net_Txt(long parentnodeindex) {
   (*Txt_continuationnodelist) += String((long) n);
   (*Txt_continuationnodelist) += ',';
   (*Txt_continuationnodelist) += String(parentnodeindex);
-  if (NodeGenesis_Data) (*Txt_continuationnodelist) += String(NodeGenesis_Data->find_t_genesis(fs),",%f\n");
+#ifdef INCLUDE_SIMPLE_FIBER_DIAMETER
+  (*Txt_continuationnodelist) += String(diameter,",%f");
+#endif
+  if (NodeGenesis_Data) (*Txt_continuationnodelist) += String(NodeGenesis_Data->find_t_genesis(fs),",%f");
+  (*Txt_continuationnodelist) += '\n';
   fs->net_Txt(Txt_nodeindex);
   return NULL;
 }
@@ -414,13 +483,15 @@ Txt_Object * fibre_segment::continuationnode_net_Txt(long parentnodeindex) {
 Txt_Object * fibre_segment::net_Txt(long parentnodeindex) {
   // It is easier for a fiber segment to determine type for a daughter
   // segment than for itself, so that is the way this function works.
-  // Format: <node index>, <axon/dendrite>, <x>, <y>, <z>, <neuron label>, <parent node index>, <simulated creation time>
+  // Format: <node index>, <fiber segment lable>, <axon/dendrite>, <x>, <y>, <z>, <neuron label>, <parent node index>, <simulated creation time>
   if ((branch1) && (branch2)) return bifurcationnode_net_Txt(parentnodeindex); // the fiber segment ends in a bifurcation node
   if ((branch1) || (branch2)) return continuationnode_net_Txt(parentnodeindex); // the fiber segment ends in a continuation node
   // This is a terminal fiber segment.
   // Output data about the growth cone.
   Txt_nodeindex++;
   (*Txt_terminalgrowthconelist) += String(Txt_nodeindex); // Txt_nodeindex is the index of this growth cone
+  (*Txt_terminalgrowthconelist) += ',';
+  (*Txt_terminalgrowthconelist) += String((long) this); // This is a memory location label that can be crossreferenced from synapse text output
   (*Txt_terminalgrowthconelist) += ',';
   (*Txt_terminalgrowthconelist) += fibre_structure_name[parsing_fs_type];
   double x=0.0, y=0.0, z=0.0;
@@ -431,9 +502,55 @@ Txt_Object * fibre_segment::net_Txt(long parentnodeindex) {
   (*Txt_terminalgrowthconelist) += String((long) n);
   (*Txt_terminalgrowthconelist) += ',';
   (*Txt_terminalgrowthconelist) += String(parentnodeindex);
-  if (NodeGenesis_Data) (*Txt_terminalgrowthconelist) += String(eq->T(),",%f\n"); // growth cone position at this time
+#ifdef INCLUDE_SIMPLE_FIBER_DIAMETER
+  (*Txt_terminalgrowthconelist) += String(diameter,",%f");
+#endif
+  if (NodeGenesis_Data) (*Txt_terminalgrowthconelist) += String(eq->T(),",%f"); // growth cone position at this time
+  (*Txt_terminalgrowthconelist) += '\n';
   return NULL;
 }
+
+VRML_Object * fibre_segment::net_VRML() {
+  spatial center, rotaxis;
+  double theta, len;
+  if (figattr_fibres_nobox || (fig_in_zoom(P0) && fig_in_zoom(P1))) {
+    X3D_cylinder_center(P0,P1,center);
+    if (X3D_SFrotation_to_vector(P0,P1,rotaxis,theta,len)) { // only show pieces of non-zero length
+      (*VRML_fiberlist) += "<Transform center='0 0 0' rotation='";
+      double x, y, z;
+#ifdef VECTOR2D
+      z = 0.0;
+#endif
+      rotaxis.get_all(x,y,z);
+      (*VRML_fiberlist) += String(x,"%.2f");
+      (*VRML_fiberlist) += String(y," %.2f");
+      (*VRML_fiberlist) += String(z," %.2f");
+      (*VRML_fiberlist) += String(theta," %.2f");
+      (*VRML_fiberlist) += "' translation='";
+      center.get_all(x,y,z);
+      (*VRML_fiberlist) += String(x,"%.2f");
+      (*VRML_fiberlist) += String(y," %.2f");
+      (*VRML_fiberlist) += String(z," %.2f");
+      (*VRML_fiberlist) += "'>\n<ProtoInstance name='NeuritePiece'>\n<fieldValue name='neuriteheight' value='";
+      (*VRML_fiberlist) += String(len,"%.2f");
+      (*VRML_fiberlist) += "'/>\n";
+      if (parsing_fs_type==axon_fs) (*VRML_fiberlist) += "<fieldValue name='neuritecolor' value='.8 .8 .0'/>\n";
+#ifdef INCLUDE_SIMPLE_FIBER_DIAMETER
+      (*VRML_fiberlist) += "<fieldValue name='neuriteradius' value='";
+      (*VRML_fiberlist) += String(diameter,"%.2f");
+      (*VRML_fiberlist) += "'/>\n";
+#endif
+      (*VRML_fiberlist) += "</ProtoInstance>\n</Transform>\n";
+      //    (*VRML_fiberlist) += "<Transform translation=''>\n";
+      // *** I can put spheres at the ends of the cylinders, but I can integrate this and all the transforms in the PROTO
+      //    (*VRML_fiberlist) += "</Transform>\n";
+    }
+  }
+  if (branch1) branch1->net_VRML();
+  if (branch2) branch2->net_VRML();
+  return NULL;
+}
+
 terminal_segment_ptr * fibre_structure::array_of_terminal_segments() {
   DIAGNOSTIC_BEFORE_ALLOCATION(new_fibre_segment);
   DIAGNOSTIC_AFTER_ALLOCATION(new_fibre_segment,terminalarraylength,-sizeof(terminal_segment_ptr));
@@ -483,14 +600,20 @@ void fibre_structure::batch_elongate() {
   usedarborelongationfraction = 0.0;
 #endif
 #ifdef TEST_FOR_NAN
-  PLL_LOOP_FORWARD(terminal_segment,TerminalSegments()->head(),1) {
+  terminal_segment * e_next = NULL; // Use this in case e self-destructs during the elongate() call (e.g. by branching in BESTLNN_pyramidal_AD_terminal_segment_elongation_model::elongate().
+  for (terminal_segment * e = TerminalSegments()->head(); (e); e = e_next) {
+    e_next = e->Next(); // cached for safety
     bool NANbefore = (e->TerminalSegment()->P0.X()==NAN);
     e->ElongationModel()->elongate(e);
     bool NANafter = (e->TerminalSegment()->P0.X()==NAN);
     if ((NANafter) && (!NANbefore)) { cout << "batch_elongate caused NAN\n"; cout.flush(); }
   }
 #else
-  PLL_LOOP_FORWARD(terminal_segment,TerminalSegments()->head(),1) e->ElongationModel()->elongate(e);
+  terminal_segment * e_next = NULL; // Use this in case e self-destructs during the elongate() call (e.g. by branching in BESTLNN_pyramidal_AD_terminal_segment_elongation_model::elongate().
+  for (terminal_segment * e = TerminalSegments()->head(); (e); e = e_next) {
+    e_next = e->Next(); // cached for safety
+    e->ElongationModel()->elongate(e);
+  }
 #endif
 #ifdef TESTING_ELONGATION_TOTAL
   if (usedarborelongationfraction<0.9999) cout << "TESTING_ELONGATION_TOTAL: Used arbor elongation fraction = " << usedarborelongationfraction << '\n';
@@ -506,6 +629,20 @@ double fibre_structure::sum_of_perturbed_expected_elongations() {
   return sum_l_i_cache;     
 }
 
+int fibre_structure::count_terminal_segments_in_PLL() {
+  int res = 0;
+  PLL_LOOP_FORWARD(fibre_structure,head(),1) res += e->count_terminal_segments();
+  return res;
+}
+
+void fibre_structure::move_add(spatial & addvec) {
+  this->fibre_segment::move_add(addvec);
+}
+
+void fibre_structure::fanin_rot() {
+  this->fibre_segment::fanin_rot();
+}
+
 Fig_Object * fibre_structure::net_Fig() {
   //cout << '('; cout.flush();
   DIAGNOSTIC_BEFORE_ALLOCATION(new_Fig_element);
@@ -513,6 +650,7 @@ Fig_Object * fibre_structure::net_Fig() {
   DIAGNOSTIC_AFTER_ALLOCATION(new_Fig_element,1,sizeof(Fig_Group));
   _figgroup = fibre_structure_fig;
   //  cout << "X(" << this << ")=" << x << ", Y=" << y << '\n';
+  _figvar_connection_color = colnum; // set display color per fiber structure
   this->fibre_segment::net_Fig();
   _figgroup = NULL;
   //cout << ')'; cout.flush();
@@ -521,9 +659,11 @@ Fig_Object * fibre_structure::net_Fig() {
 
 Txt_Object * fibre_structure::net_Txt() {
   // Output data bout the root point of the fiber structure.
-  // Format: <node index>, <axon/dendrite>, <x>, <y>, <z>, <neuron label>, <simulated creation time>
+  // Format: <node index>, <fiber segment label>, <axon/dendrite>, <x>, <y>, <z>, <neuron label>, <simulated creation time>
   Txt_nodeindex++;
   (*Txt_fiberrootlist) += String(Txt_nodeindex); // Txt_nodeindex is the index of this root node
+  (*Txt_fiberrootlist) += ',';
+  (*Txt_fiberrootlist) += String((long) this); // This is a memory location label that can be crossreferenced from synapse text output
   (*Txt_fiberrootlist) += ',';
   (*Txt_fiberrootlist) += fibre_structure_name[parsing_fs_type];
   double x=0.0, y=0.0, z=0.0;
@@ -580,65 +720,6 @@ void terminal_segment::Collect_Data(fibre_collected_data & fcd) {
 }
 #endif
 
-#ifdef LEGACY_BRANCHING_PROTOCOL
-/* The Legacy branching protocol is NOT the recommended standard protocol
-   of NETMORPH. */
-
-#ifdef VECTOR3D
-bool terminal_segment::branch(PLLRoot<terminal_segment> * prevts, spatial & acoords1, spatial & acoords2, extra_fibre_data & efd1, extra_fibre_data & efd2) {
-#endif
-#ifdef VECTOR2D
-bool terminal_segment::branch(PLLRoot<terminal_segment> * prevts, spatial & acoords1, spatial & acoords2) {
-#endif
-  // If prevts!=NULL then the terminal_segment object is maintained for
-  // possible further branches and is linked to prevts for clean-up
-  // outside the fibre_structure object.
-  // The fibre_segment coordinates for this terminal_segment are updated
-  // to correspond with the current angle and length of the terminal_segment
-  // before branching processes are done.
-  // The fibre_segment branches receive initial segment coordinates according
-  // to the end point of the parent fibre_segment (in the branch() function)
-  // and according to the initial angle1, angle2 and unit length (in the
-  // terminal_segment constructor for the two new terminal segments).
-  // Note that new terminal segments  are placed at the head of the list of
-  // terminal segments so that they are not processed as previously existing
-  // terminal segments when created during a looping growth function.
-  // The direction of a new terminal segments may need to be modified according
-  // to environment pressures. Here, this is dealt with in the constructor calls.
-
-  // create a branch in the structure
-  update_segment_vector();
-#ifdef VECTOR3D
-  if (!terminalsegment->branch(efd1,efd2)) return false;
-#endif
-#ifdef VECTOR2D
-  if (!terminalsegment->branch()) return false;
-#endif
-  // update the set of terminal segments
-  DIAGNOSTIC_BEFORE_ALLOCATION(new_fibre_segment);
-  terminal_segment * t1 = new terminal_segment(*arbor,*(terminalsegment->Branch1()),acoords1);
-  terminal_segment * t2 = new terminal_segment(*arbor,*(terminalsegment->Branch2()),acoords2);
-  Root()->link_after(t1); // Note: length_distirbution_eri_model depends on t2->Next() being the old first segment in the list.
-  Root()->link_after(t2);
-  DIAGNOSTIC_AFTER_ALLOCATION(new_fibre_segment,2,sizeof(terminal_segment));
-  if (dirmodel) dirmodel->handle_branching(*t1,*t2); // pass on the direction model
-  elmodel->handle_branching(*t1,*t2); // pass on the elongation model
-  // [***INCOMPLETE] In places such as this, I may have to set
-  // elmodel and dirmodel to NULL before remove(), just in case
-  // a destructor is defined that would clean those up if they
-  // were not propagated to a new terminal segment.
-  if (prevts) {
-    isolate();
-    prevts->link_before(this);
-  } else {
-    remove();
-    DIAGNOSTIC_AFTER_ALLOCATION(new_fibre_segment,-1,sizeof(terminal_segment));
-  }
-  return true;
-}
-
-#else // NOT(LEGACY_BRANCHING_PROTOCOL)
-
 // [***NOTE] This could become part of (a) the initialization of terminal segment specific elongaiton models if straightforward,
 //           or (b) the main function of a protocol-compliant Branch_Distribution model, either of which may be combined with
 //           a phenomenologically justified manner of selecting initial elongation rates after a bifurcation (as proposed by
@@ -660,15 +741,17 @@ double Distribute_Elongation(terminal_segment & ts1, terminal_segment & ts2, dou
   // with prop = 0 when X1 = 0. The only reason why we need to draw to random numbers here is to determine which daughter
   // branch receives the greater proportion. Even when nothing is distributed, a proportion value between 0 and 1 is returned.
   // [See TL#200709111456 and preceding entries.]
-  double X1 = X_branch.get_rand_real1();
+  // [UPDATE 20080522] This function now *adds* the remainder instead of setting it. This allows the distribution to be called in
+  // any relative order to other initialization tasks during branching (see TL#200805190817.1).
+  double X1 = X_branch.get_rand_real1(); // [***INCOMPLETE] The paper mentions use of a branch ratio PDF, PDF_br, here.
   if (distribute<=0.0) return X1;
   double X2 = X_branch.get_rand_real1();
   double X1plusX2 = X1+X2;
   if (X1plusX2==0.0) X1plusX2 = 1.0;
   double prop = X1/X1plusX2;
   double x1 = distribute*prop;
-  ts1.AngularCoords().set_X(x1);
-  ts2.AngularCoords().set_X(distribute-x1);
+  ts1.AngularCoords().add_X(x1); // [UPDATE 20080522] Changed set_X() to add_X(). Be careful about x coordinate initialization!
+  ts2.AngularCoords().add_X(distribute-x1); // [UPDATE 20080522] Changed set_X() to add_X(). Be careful about x coordinate initialization!
   return prop;
 }
 
@@ -720,16 +803,20 @@ double Distribute_Elongation(terminal_segment & ts1, terminal_segment & ts2, dou
 #endif
   // 4. Add daughter terminal_segment objects to the set of terminal segments
   DIAGNOSTIC_BEFORE_ALLOCATION(new_fibre_segment);
-  terminal_segment * t1 = new terminal_segment(*arbor,*(terminalsegment->Branch1())); //,acoords1);
-  terminal_segment * t2 = new terminal_segment(*arbor,*(terminalsegment->Branch2())); //,acoords2);
+  terminal_segment * t1 = new terminal_segment(*arbor,*(terminalsegment->Branch1()),centrifugalorder+1); //,acoords1);
+  terminal_segment * t2 = new terminal_segment(*arbor,*(terminalsegment->Branch2()),centrifugalorder+1); //,acoords2);
   Root()->link_after(t1);
   Root()->link_after(t2);
+  most_recent_branch1_ts = t1;
+  most_recent_branch2_ts = t2;
   DIAGNOSTIC_AFTER_ALLOCATION(new_fibre_segment,2,sizeof(terminal_segment));
   // ALL HANDLERS FOR MODEL PROPAGATION SHOULD BE CALLED HERE (Look for similar notes such as this elsewhere, e.g. in Delayed_Branching_Model::continuation_node_to_branch().)
   // 5. Handle the bifurcation in the Elongation Model
   elmodel->handle_branching(*t1,*t2);
-  // 6. Handle the bifurcation in the Elongation Rate Initialization Model
+  // 6. Handle the bifurcation in the Elongation Rate Initialization, TSB and TST Models
   erimodel->handle_branching(*t1,*t2);
+  tsbmodel->handle_branching(*t1,*t2);
+  tstmodel->handle_branching(*t1,*t2);
   // 7. Handle the bifurcation in the Branch Angle Model
   bamodel->handle_branching(*t1,*t2);
   // 8. Determine the distribution of initial lengths, returned in rho (x) of t1->angularcoords and t2->angularcoords
@@ -777,6 +864,8 @@ double Distribute_Elongation(terminal_segment & ts1, terminal_segment & ts2, dou
   S2absoluteangular.set_X(t2->Length());
   t1->set_angularcoords(S1absoluteangular); // Here, environmental pressures are also applied.
   t2->set_angularcoords(S2absoluteangular); // Here, environmental pressures are also applied.
+  t1->update_segment_vector();
+  t2->update_segment_vector();
   // 12. Remove this terminal_segment object
   if (prevts) {
     isolate();
@@ -788,44 +877,6 @@ double Distribute_Elongation(terminal_segment & ts1, terminal_segment & ts2, dou
   return true;
 }
 
-#endif // LEGACY_BRANCHING_PROTOCOL
-
-#ifdef LEGACY_BRANCHING_PROTOCOL
-#ifdef VECTOR3D
-bool terminal_segment::turn(spatial & acoords, extra_fibre_data & efd) {
-#endif
-#ifdef VECTOR2D
-bool terminal_segment::turn(spatial & acoords) {
-#endif
-  // create a turn in the structure
-  // The direction of a new terminal segments may need to be modified according
-  // to environment pressures. Here, this is dealt with in the constructor call.
-  update_segment_vector();
-#ifdef VECTOR3D
-  if (!terminalsegment->turn(efd)) return false;
-#endif
-#ifdef VECTOR2D
-  if (!terminalsegment->turn()) return false;
-#endif
-  // update the set of terminal segments
-  // Note that they are placed at the head of the list of terminal
-  // segments so that they are not processed as previously existing
-  // terminal segments when created during a looping growth function.
-  DIAGNOSTIC_BEFORE_ALLOCATION(new_fibre_segment);
-  terminal_segment * ts = new terminal_segment(*arbor,*(terminalsegment->Branch1()),acoords);
-  Root()->link_after(ts);
-  if (dirmodel) dirmodel->handle_turning(*ts);
-  elmodel->handle_turning(*ts);
-  bamodel->handle_turning(*ts);
-  remove();
-  // [***NOTE] A new history element for the direction model is not accounted
-  // for in the diagnostics below.
-  DIAGNOSTIC_AFTER_ALLOCATION(new_fibre_segment,0,sizeof(terminal_segment));
-  return true;
-}
-
-#else // NOT(LEGACY_BRANCHING_PROTOCOL)
-
 bool terminal_segment::turn(neuron * n) {
   // 1. Determine actual bifurcation node location in fixed step approximation
   double remainder = 0.0;
@@ -833,8 +884,6 @@ bool terminal_segment::turn(neuron * n) {
   DirectionModel()->direction(this,n,remainder);
   return true;
 }
-
-#endif // LEGACY_BRANCHING_PROTOCOL
 
 #ifdef VECTOR3D
 bool terminal_segment::turn_without_update_of_segment_vector(spatial & acoords, extra_fibre_data & efd) {
@@ -856,12 +905,14 @@ bool terminal_segment::turn_without_update_of_segment_vector(spatial & acoords) 
   // segments so that they are not processed as previously existing
   // terminal segments when created during a looping growth function.
   DIAGNOSTIC_BEFORE_ALLOCATION(new_fibre_segment);
-  terminal_segment * ts = new terminal_segment(*arbor,*(terminalsegment->Branch1()),acoords);
+  terminal_segment * ts = new terminal_segment(*arbor,*(terminalsegment->Branch1()),acoords,centrifugalorder);
   Root()->link_after(ts);
   // ALL HANDLERS FOR MODEL PROPAGATION SHOULD BE CALLED HERE (Look for similar notes such as this elsewhere, e.g. in Delayed_Branching_Model::continuation_node_to_branch().)
   if (dirmodel) dirmodel->handle_turning(*ts);
   elmodel->handle_turning(*ts);
   erimodel->handle_turning(*ts);
+  tsbmodel->handle_turning(*ts);
+  tstmodel->handle_turning(*ts);
   bamodel->handle_turning(*ts);
   remove();
   // [***NOTE] A new history element for the direction model is not accounted
@@ -910,11 +961,73 @@ double terminal_segment::randomize_last_segment_elongation(double mininterval) {
 }
 #endif // ENABLE_FIXED_STEP_SIMULATION
 
-#ifdef ENABLE_APICAL_TUFTING_TRIGGER_DISTANCE
-void terminal_segment::Check_Tuft_Distance_Threshold(double d) {
-  // Compares the distance from a growth cone to the soma to set the
-  // istuft flag.
-  update_segment_vector(); // Note that this is only done until istuft is set.
-  istuft = (terminalsegment->cartesian_soma_center_distance2()>=d);
+void structure_initialization::init(natural_schema_parent_set n, double _L0_min, double _L0_max) {
+  L0_min = _L0_min;
+  L0_max = _L0_max;
+  colnum = definedcolors;
+  definedcolors++;
+  // Some specific defaults that depend on the type of fiber structure
+  if (colortable) switch (n) {
+  case all_axons_sps: case all_multipolar_axons_sps: case all_bipolar_axons_sps: case all_pyramidal_axons_sps: colortable->set_color(colnum,colortable->coldef(CT_axon_excitatory)); break;;
+  case all_interneuron_axons_sps: colortable->set_color(colnum,colortable->coldef(CT_axon_inhibitory)); break;;
+  default: colortable->set_color(colnum,colortable->coldef(CT_dendrites));
+  }
 }
-#endif
+
+String structure_initialization::report_parameters() {
+  String res("L0_min=");
+  res += String(L0_min,"%.3f")+" L0_max="+String(L0_max,"%.3f");
+  res += " color(#" + String(colnum) + ")=0x";
+  if (colortable) res += RGBstr(colortable->get_color(colnum));
+  return res;
+}
+
+void structure_initialization::initialize(fibre_structure * fs_root) {
+  if (!fs_root) {
+    warning("Warning: Fiber structure root segment pointer (fs_root) is NULL in structure_initialization::initialize().\n");
+    return;
+  }
+  if ((L0_min<0.0) || (L0_max<0.0) || (L0_max<L0_min)) error("Error: Invalid (or negative) initial segment length range [L0_min,L0_max] for a fiber structure root segment of the neuron with numerical ID "+String((long) fs_root->N()->numerical_ID())+'\n');
+  fs_root->TerminalSegments()->head()->set_length(X_misc.get_rand_range_real1(L0_min,L0_max));
+  if (colnum<1) warning("Warning: The color with which to display neurite fiber of the neuron with numerical ID "+String((long) fs_root->N()->numerical_ID())+" was not set.\n");
+  fs_root->colnum = colnum;
+}
+
+structure_initialization * structure_initialization_selection(String & label, Command_Line_Parameters & clp, structure_initialization & superior_set, structure_initialization & strucinit) {
+  // Note: The result pointer is not necessarily a pointer to strucinit,
+  // since it is used here primarily to indicate whether a valid schema
+  // initialization was accomplished.
+  // Note: This is protocol compliant in terms of set specification, but
+  // unlike specifications for models, structure initialization data is
+  // allocated directly into existing array elements, instead setting
+  // pointers to clones.
+  int n;
+  // Determine if specific structure initialization information is provided for the set with the given label
+  if ((n=clp.Specifies_Parameter(label+"L0"))>=0) {
+    int L0veclen;
+    double * L0vec = str2vec(clp.ParValue(n),&L0veclen);
+    if (L0veclen<1) warning("Warning: Missing or non-numerical value for "+label+"L0.\n");
+    else {
+      strucinit.L0_min = L0vec[0];
+      if (L0veclen>1) strucinit.L0_max = L0vec[1];
+      else strucinit.L0_max = L0vec[0];
+    }
+    delete L0vec;
+  }
+  if (strucinit.L0_min<0.0) {// Try to obtain missing parameter values from the designated superior set
+    strucinit.L0_min = superior_set.L0_min;
+    strucinit.L0_max = superior_set.L0_max;
+  }
+  if ((n=clp.Specifies_Parameter(label+"color"))>=0) {
+    if (strucinit.colnum<1) {
+      strucinit.colnum = definedcolors;
+      definedcolors++;
+    }
+    if (colortable) colortable->set_color(strucinit.colnum,strtoul(clp.ParValue(n),NULL,0));
+  }
+  if (strucinit.colnum<1) { // Try to obtain missing parameter values from the designated superior set
+    strucinit.colnum = superior_set.colnum;
+  }
+  if ((strucinit.L0_min<0.0) || (strucinit.L0_max<0.0) || (strucinit.colnum<1)) return NULL;
+  return &strucinit;  
+}

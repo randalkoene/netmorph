@@ -35,12 +35,46 @@
 
 // global variables
 
+fanin_histogram net_fanin_histogram;
+
 Sampled_Growth_Output * sampled_output = NULL;
 Activity_Results_Output * actres = NULL;
 
 bool camera = false;
 
 // classes
+
+String fanin_histogram::octave_output() {
+  String res("fanin_histogram_means = [");
+  for (int i=0; i<50; i++) res += String(len[i],"%.3f\n");
+  res += "];\n\nn_fanin = [";
+  for (int i=0; i<50; i++) res += String((long) n[i]) + '\n';
+  res += "];\n";
+  return res;
+}
+
+Fig_Group * fanin_histogram::fig_output() {
+  Fig_Group * faninfig = new Fig_Group();
+  double angle = 0.0;
+  long x[3];
+  long y[3];
+  x[0] = 0;
+  y[0] = 0;
+  double cosa = 2.0;
+  double sina = 0.0;
+  for (int i=0; i<50; i++) {
+    x[1] = (long) (len[i]*cosa);
+    y[1] = (long) (len[i]*sina);
+    angle += FANIN_ANGLE_SLICE;
+    cosa = -2.0*cos(angle);
+    sina = 2.0*sin(angle);
+    x[2] = (long) (len[i]*cosa);
+    y[2] = (long) (len[i]*sina);
+    faninfig->Add_Fig_Object(new Fig_Polygon(0,1,0,7,50,20,2.0,0,0,y,x,3));
+  }
+  for (int i=0; i<10; i++) faninfig->Add_Fig_Object(new Fig_Circle(2,1,0,0,49,-1,0.0,0.0,0,0,400*i,0,0,400,200));
+  return faninfig;
+}
 
 Sampled_Output::Sampled_Output(network * netptr, double mt, double si, bool std): net(netptr), max_time(mt), sample_interval(si), numsamples(((int) (mt/si))+1), t_nextmark(si), maximum_resolution(false) {
   if (!netptr) error("nibr Error: No network specified in Sampled_Output::Sampled_Output()\n");
@@ -70,12 +104,15 @@ int parse_CLP_samplesetting(Command_Line_Parameters & clp, String label, int def
   return defaultvalue;
 }
 
+bool collect_statistics_for_fig_sequence = false;
+
 void Sampled_Growth_Output::parse_CLP(Command_Line_Parameters & clp) {
   Sampled_Output::parse_CLP(clp);
   int n;
   if ((n=clp.Specifies_Parameter("statsattr_autoplot"))>=0) autoplot = (downcase(clp.ParValue(n))==String("true"));
 #ifdef SAMPLES_INCLUDE_NETWORK_STATISTICS_BASE
   if ((n=clp.Specifies_Parameter("statsattr_collect_statistics"))>=0) collect_statistics = (downcase(clp.ParValue(n))==String("true"));
+  if (collect_statistics_for_fig_sequence) collect_statistics = true;
   if (collect_statistics) {
     for (int i = 0; i<STAT_LABELS_NUM; i++) netstats[i].parse_CLP(clp);
   } else {
@@ -115,6 +152,7 @@ bool Sampled_Growth_Output::Sample(double t) {
 #ifdef SAMPLES_INCLUDE_NETWORK_STATISTICS_BASE
   net->Collect_Data(*this);
   if (store_raw_data) Store_Tail_Raw_Data(statsname+"-raw-data");
+  //cout << 'S' << t << '\n';
   Cache_Tail_Statistics();
   Remove_Tail_Raw_Data((t>=max_time));
   if (t<max_time) Allocate_New_Data();
@@ -132,10 +170,12 @@ bool Sampled_Growth_Output::Sample(double t) {
   //if ((segmentcount==2) || ((segmentcount==1) && (t>=max_time))) Count_Segments();
   //if ((synapsesearchprofile==2) || ((synapsesearchprofile==1) && (t>=max_time))) Count_Synapse_Search();
   //if ((synapsegenesisandloss==2) || ((synapsegenesisandloss==1) && (t>=max_time))) Synapse_Genesis_and_Loss();
+  if (outattr_Txt_sequence) net->Txt_Output(Txtname+'-'+String(t,"%012.3f.txt"));
   return true;
 }
 
 void Sampled_Growth_Output::Output(bool show_stats) {
+  progress("Sampled growth output.\n");
 #ifdef SAMPLES_INCLUDE_NETWORK_STATISTICS_BASE
   if (show_stats) network_statistics_base::Octave_Output(statsname,autoplot);
 #endif
@@ -145,6 +185,7 @@ void Sampled_Growth_Output::Output(bool show_stats) {
 }
 
 void Sampled_Growth_Fig_Output::parse_CLP(Command_Line_Parameters & clp) {
+  collect_statistics_for_fig_sequence=true;
   Sampled_Growth_Output::parse_CLP(clp);
   int n;
   if ((n=clp.Specifies_Parameter("combinesequence"))>=0) combine = (downcase(clp.ParValue(n))==String("true"));
@@ -166,6 +207,7 @@ void Sampled_Growth_Fig_Output::parse_CLP(Command_Line_Parameters & clp) {
 
 String Sampled_Growth_Fig_Output::report_parameters() {
   String res(Sampled_Growth_Output::report_parameters());
+  res += "(Collecting statistics is auto-enabled by the option to create a sequence of sample figures.)\n";
   res += "Sample Output: combinesequence=";
   if (combine) res += "true (format: "+combinetype+")\n";
   else res += "false\n";
@@ -202,6 +244,7 @@ bool Sampled_Growth_Fig_Output::Sample(double t) {
     usewidth = figattr_focus_box_x2-figattr_focus_box_x1;
   }
   sampling = true;
+  //cout << 'F' << t << '\n';
   Fig_Group * figgroup = net->Fig_Output(figname+'-'+String(t,"%012.3f.fig"),usewidth,true);
   sampling = false;
   if (figgroup->TopLeftX()<topleftx) topleftx = figgroup->TopLeftX();
@@ -239,7 +282,8 @@ void Sampled_Growth_Fig_Output::Output(bool show_stats) {
   Sampled_Growth_Output::Output(show_stats);
   String fnamebase;
   //  if (!((figattr_show_spatial_segment_subsets) && (net->spatial_segment_subset()))) {
-  if (netfigidx>0) cout << "Aligning sequence of sample figures.\n"; cout.flush();
+  if (netfigidx>0) progress("Aligning sequence of sample figures.\n");
+  //cout << topleftx << ',' << toplefty << ',' << bottomrightx << ',' << bottomrighty << '\n';
   Fig_Rectangle figrectangle(0,1,colortable->colnum(CT_background),colortable->colnum(CT_background),999,-1,0.0,0,0,topleftx-2,toplefty-2,bottomrightx+2,bottomrighty+2);
   String figrectanglestr(figrectangle.str());
   if (figattr_show_scale) {
@@ -254,10 +298,11 @@ void Sampled_Growth_Fig_Output::Output(bool show_stats) {
 #endif
   //  }
   if (combine) {
-    cout << "Converting sample figures for combined representation:\n"; cout.flush();
+    progress("Converting sample figures for combined representation:\n");
     String magnificationstr(" ");
     if ((combine) && (combinemagnification!=1.0)) magnificationstr = " -m "+String(combinemagnification,"%.2f ");
 #ifndef CONVERT_READS_FIG_FILES
+#ifndef COMPILE_WITHOUT_FIG2DEV
 #ifdef SAMPLES_INCLUDE_NETWORK_STATISTICS_BASE
     if (netfigidx>0) PLL_LOOP_FORWARD(network_statistics_sample,netstats[0].head(),1) {
       fnamebase = figname+'-'+String(e->age(),"%012.3f");
@@ -266,8 +311,11 @@ void Sampled_Growth_Fig_Output::Output(bool show_stats) {
       fnamebase = figname+'-'+String(t(i),"%012.3f");
 #endif
       system(String(FIG2DEV)+String(" -L png -g#"+RGBstr(colortable->coldef(CT_background))+magnificationstr+fnamebase+".fig > "+fnamebase+".png").chars());
-      cout << '.'; cout.flush();
+      progress('.');
     }
+#else
+    progress("NETMORPH WAS COMPILED WITHOUT FIG2DEV - NO SEQUENCE CONVERSION FROM .fig TO .png.\n");
+#endif
 #endif
     // duplicate the last figure in order to linger a bit longer on the end result before looping back to the beginning
     // [***NOTE] It now appears that "-pause" can be used for the delay between
@@ -282,7 +330,7 @@ void Sampled_Growth_Fig_Output::Output(bool show_stats) {
 #else
     system(String("cp -f "+fnamebase+".png "+fnamebase+"last.png"));
 #endif
-    cout << "\nCombining samples into " << figname << '.' << combinetype << '\n';
+    progress("\nCombining samples into "+figname+'.'+combinetype+'\n');
 #ifdef CONVERT_READS_FIG_FILES
     system(String("convert -delay "+String(sequencedelay)+' '+figname+"-*fig "+figname+'.'+combinetype).chars());
 #else
@@ -309,11 +357,11 @@ void Sampled_Growth_Fig_Output::Output(bool show_stats) {
 }
 
 void Activity_Results_Output::spike(neuron * n, double t) {
-  cout << t << ':' << (unsigned long) n << '\n';
+  progress(String(t,"%.3f")+':'+String((long) n)+'\n');
 }
 
 void Activity_Results_Output::psp(neuron * pre, neuron * post, double t) {
-  cout << t << ':' << (unsigned long) pre << "->" << (unsigned long) post << '\n';
+  progress(String(t,"%.3f")+':'+String((long) pre)+"->"+String((long) post)+'\n');
 }
 
 void ARO_to_File::spike(neuron * n, double t) {
@@ -389,13 +437,16 @@ void parse_focus_box_CLP(String zoomlabel, Command_Line_Parameters & clp, spatia
   if ((n=clp.Specifies_Parameter(zoomlabel+"_zoom_center"))>=0) {
     neuron * nptr = static_cast<PLLRoot<neuron> *>(eq->Net())->el(atoi(clp.ParValue(n)));
     if (nptr) center = nptr->Pos();
-    else cout << "Parameter ERROR, " << zoomlabel << "_zoom_center: Neuron index " << clp.ParValue(n) << " does not exist in network.\n";
+    else warning("Parameter ERROR, "+zoomlabel+"_zoom_center: Neuron index "+clp.ParValue(n)+" does not exist in network.\n");
   }
   if ((n=clp.Specifies_Parameter(zoomlabel+"_zoom_centerX"))>=0) center.set_X(atof(clp.ParValue(n)));
   if ((n=clp.Specifies_Parameter(zoomlabel+"_zoom_centerY"))>=0) center.set_Y(atof(clp.ParValue(n)));
 #ifdef VECTOR3D
   if ((n=clp.Specifies_Parameter(zoomlabel+"_zoom_centerZ"))>=0) center.set_Z(atof(clp.ParValue(n)));
 #endif
+  double x,y,z;
+  center.get_all(x,y,z);
+  report("Zoom center of "+zoomlabel+" = "+String(x,"%.2f,")+String(y,"%.2f,")+String(z,"%.2f\n"));
 }
 
 void parse_focus_volume_CLP(String zoomlabel, Command_Line_Parameters & clp, double & width, double & height, double & depth) {

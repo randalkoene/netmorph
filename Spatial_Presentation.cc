@@ -60,12 +60,13 @@ void Spatial_Presentation::parse_CLP(Command_Line_Parameters & clp) {
   useprojection = get_spatial(clp,"camera",s);
   if (useprojection) {
     cameralocation = s;
-    cout << "Using PROJECTION viewing. Any Rotation view parameters are ignored.\n";
+    report("Using PROJECTION viewing. Any Rotation view parameters are ignored.\n");
     if (get_spatial(clp,"camera_ROT",s)) camerarotation = s;
     if (get_spatial(clp,"viewer",s)) viewerposition = s;
     set_projection();
   } else {
-    cout << "Using ROTATION viewing. Any Projection view parameters are ignored.\n";
+    report("Using ROTATION viewing. Any Projection view parameters are ignored.\n");
+    if (get_spatial(clp,"ROT_origin",s)) origin = s;
     if (get_spatial(clp,"ROT",s)) angles = s;
     if (get_spatial(clp,"ROT_interval",s)) rotateinterval = s;
     set_rotation(Angles());
@@ -80,12 +81,15 @@ String Spatial_Presentation::report_parameters() {
     res += "  viewer position = (" + String(viewerposition.X(),"%.2f,")+String(viewerposition.Y(),"%.2f,")+String(viewerposition.Z(),"%.2f)\n");
     return res;
   } else {
-    String res("Presentation initial axes rotations: ROT_<x,y,z>=(");
-    double ax, ay, az, rix, riy, riz;
+    double ox, oy, oz, ax, ay, az, rix, riy, riz;
+    String res("Presentation origin of rotation: ROT_origin_<x,y,z>=(");
+    Origin().get_all(ox,oy,oz);
+    res += String(ox,"%.2f,") + String(oy,"%.2f,") + String(oz,"%.2f)\n");
+    res += "Presentation initial axes rotations: ROT_<x,y,z>=(";
     Angles().get_all(ax,ay,az);
-    rotateinterval.get_all(rix,riy,riz);
     res += String(ax,"%.2f,") + String(ay,"%.2f,") + String(az,"%.2f)\n");
     res += "Presentation axes rotation intervals: ROT_interval_<x,y,z>=(";
+    rotateinterval.get_all(rix,riy,riz);
     res += String(rix,"%.2f,") + String(riy,"%.2f,") + String(riz,"%.2f)\n");
     return res;
   }

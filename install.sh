@@ -27,106 +27,143 @@
 #
 # Install from a versioned package of files and compile the program.
 
-which fig2dev
+echo "© Copyright 2008 Randal A. Koene <randalk@netmorph.org>"
+echo ""
+echo "With design assistance from J. van Pelt & A. van Ooyen, and support"
+echo "from the Netherlands Organization for Scientific Research (NWO)"
+echo "Program Computational Life Sciences grant CLS2003 (635.100.005) and"
+echo "from the EC Marie Curie Research and Training Network (RTN)"
+echo "NEURoVERS-it 019247."
+echo ""
+echo "This installation script is part of NETMORPH."
+echo ""
+echo "NETMORPH is free software: you can redistribute it and/or modify"
+echo "it under the terms of the GNU General Public License as published by"
+echo "the Free Software Foundation, either version 3 of the License, or"
+echo "(at your option) any later version."
+echo ""
+echo "NETMORPH is distributed in the hope that it will be useful,"
+echo "but WITHOUT ANY WARRANTY; without even the implied warranty of"
+echo "MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the"
+echo "GNU General Public License for more details."
+echo ""
+echo "You should have received a copy of the GNU General Public License"
+echo "along with NETMORPH.  If not, see <http://www.gnu.org/licenses/>."
+echo ""
+
+includefig2dev=1
+
+which sed
 if [ $? -ne 0 ]; then
-  echo "Installation cannot proceed:"
-  echo "  To compile NETMORPH, the fig2dev program that is distributed with"
-  echo "  the XFig package (see http://www.xfig.org) must be installed and"
-  echo "  locatable by the command 'which fig2dev'."
-  exit 1
+    echo "The sed utility is not available in the execution PATH."
+    echo "The sed utility is distributed with all standard versions"
+    echo "of the Linux/Unix operating systems."
+    echo ""
+    echo "Installation cancelled."
+    exit
 fi
 
-machinespec=`echo $MACHTYPE | grep -c "linux"`
+which fig2dev
+if [ $? -ne 0 ]; then
+    echo "The fig2dev utility is not available in the execution PATH."
+    echo "The fig2dev utility is distributed with the XFig package,"
+    echo "available at http://www.xfig.org."
+    echo ""
+    echo "Would you like to compile NETMORPH without fig2dev capabilities?"
+    printf "(Y/n): "
+    read fig2devspec
+    if [ "$fig2devspec" = "n" ]; then
+	echo ""
+	echo "Installation cancelled."
+	exit
+    fi
+    includefig2dev=0
+fi
+
+usercfile=0
+echo "Would you like to include the use of a Unix-style resource file,"
+printf ".nibrrc, .nibr2Drc (y/N): "
+read rcfilespec
+if [ "$rcfilespec" = "y" ]; then
+    echo "Use of a resource file will be compiled into NETMORPH."
+    usercfile=1
+fi
+
+if [ "$1" = "-nodetect" ]; then
+    machinespec=0
+else 
+    machinespec=`echo $MACHTYPE | grep -c "linux"`
+fi
+
 if [ $machinespec -ne 1 ]; then
-  echo "Your operating system does not appear to be Linux."
+  if [ "$1" = "-nodetect" ]; then
+      echo "Installation invoked with the -nodetect option."
+  else
+      echo "Your operating system does not appear to be Linux."
+  fi
   echo "Please select one of the following:"
   echo "[1] Install for Linux."
-  echo "[2] Install for Macintosh OSX."
-  echo "[3] Install for Cygwin."
-  echo "(Or cancel installation by entering a value other than 1-3.)"
+  echo "[2] Install for Linux64."
+  echo "[3] Install for Macintosh OSX."
+  echo "[4] Install for Cygwin."
+  echo "(Or cancel installation by entering a value other than 1-4.)"
   printf "Installation choice: "
   read machinespec
-  if [ $machinespec -ne 1 -a $machinespec -ne 2 -a $machinespec -ne 3 ]; then
+  if [ $machinespec -ne 1 -a $machinespec -ne 2 -a $machinespec -ne 3 -a $machinespec -ne 4 ]; then
     echo "Installation cancelled."
     exit 1
   fi
 fi
 
 if [ $machinespec -eq 1 ]; then
+# Linux
   cp -f Makefile.linux Makefile
 else
   if [ $machinespec -eq 2 ]; then
-    cp -f Makefile.mac Makefile
+  # Linux64
+    sed 's/MACHSTR=x86/#MACHSTR=x86/g' Makefile.linux > Makefile 
   else
     if [ $machinespec -eq 3 ]; then
-      cp -f Makefile.cygwin Makefile
-      cd dil2al
-      mv -f Makefile Makefile.linux
-      sed 's/[-]Werror//g' Makefile.linux > Makefile
-      cd ..
+    # Mac
+      sed 's/MACHSTR=x86/#MACHSTR=x86/g; s/^\(INCLUDES=.*\)$/\1 -I.\/mac/g' Makefile.linux > Makefile 
     else
-      echo "Installation cancelled."
-      exit
+      if [ $machinespec -eq 4 ]; then
+      # Cygwin
+	sed 's/^\(INCLUDES=.*\)$/\1 -I.\/cygwin/g' Makefile.linux > Makefile
+        cd dil2al
+        mv -f Makefile Makefile.linux
+        sed 's/[-]Werror//g' Makefile.linux > Makefile
+        cd ..
+      else
+        echo "Installation cancelled."
+        exit
+      fi
     fi
   fi
+fi
+
+if [ $includefig2dev -eq 0 ]; then
+    sed 's/^\(OUTPUTCHOICES=.*\)$/\1 -DCOMPILE_WITHOUT_FIG2DEV/g' Makefile > Makefile.nofig2dev
+    mv -f Makefile.nofig2dev Makefile
+fi
+
+if [ $usercfile -ne 0 ]; then
+    sed 's/^\(MODELCHOICES=.*\)$/\1 -DUSE_RCFILE/g' Makefile > Makefile.rcfile
+    mv -f Makefile.rcfile Makefile
 fi
 
 PACKAGENAME=netmorph
 PACKAGEDATE=`cat VERSION`
 PACKAGE="$PACKAGENAME-$PACKAGEDATE"
 
-mkdir -p ~/octave/common-m
-mkdir -p ~/src/include
-mkdir -p ~/src/geometry
-mkdir -p ~/src/dil2al
-mkdir -p ~/src/lib
-
-mv -f common-m/* ~/octave/common-m/
-mv -f include/* ~/src/include/
-mv -f geometry/* ~/src/geometry/
-mv -f dil2al/* ~/src/dil2al/
-
 CURDIR=`pwd`
 
-cd ~/src/dil2al
-
-# in case of older versions
-make clean
-# new dependencies
-ln -s regex-gnu.c regex.c
-ln -s regex-gnu.h regex.h
-make regex-gnu.o
-make regex.o
-make BigRegex.o
-make BigString.o
-
-cd ~/src/geometry
-
-# in case of older versions
-make clean
-# new dependencies
-make
-
-cd ~/src/include
-
-ln -s ../geometry/Point2D.hh
-ln -s ../geometry/Point3D.hh
-ln -s ../geometry/Vector2D.hh
-ln -s ../geometry/Vector3D.hh
-
-cd ~/src/lib
-
-ln -s ../geometry/libgeometry.a
+echo "==> Preparing netmorph code..."
 
 cd "$CURDIR"
-
-ln -s ~/src/dil2al/BigRegex.hh
-ln -s ~/src/dil2al/BigString.hh
-ln -s ~/src/dil2al/regex-gnu.h
-ln -s ~/src/dil2al/BigRegex.o
-ln -s ~/src/dil2al/BigString.o
-ln -s ~/src/dil2al/regex-gnu.o
 ln -s evaluate-partitioning.present.m epp.m
+
+make clean
 make
 
 if [ -f nibr ]; then

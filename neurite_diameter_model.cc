@@ -38,6 +38,11 @@ const char neurite_diameter_model_label[NUM_ndm][12] = {
   "rall"
 };
 
+// variables and objects
+
+normal_pdf defaultrallepowerpdf(X_branch,1.47,0.3);
+normal_pdf defaultralldtermpdf(X_branch,0.7,0.3);
+
 // classes
 
 void asymptotic_soma_proportion_ndm::diameters() {
@@ -65,6 +70,7 @@ double rall_power_law_ndm::fibre_diameter(fibre_segment * fs) {
     if (fs->branch2) { // this is the parent of a bifurcation
       double d_1 = fibre_diameter(fs->branch1);
       double d_2 = fibre_diameter(fs->branch2);
+      double e_power = PDF_e_power->random_positive();
       double d_epower = exp(e_power*log(d_1)) + exp(e_power*log(d_2));
       double d = exp(log(d_epower)/e_power);
       fs->set_diameter(d);
@@ -79,8 +85,9 @@ double rall_power_law_ndm::fibre_diameter(fibre_segment * fs) {
       fs->set_diameter(d);
       return d;
   } else { // this is a terminal segment
-    fs->set_diameter(d_term);
-    return d_term;
+    double d = PDF_d_term->random_positive();
+    fs->set_diameter(d);
+    return d;
   }
 }
 
@@ -96,20 +103,19 @@ void rall_power_law_ndm::diameters() {
 }
 
 void rall_power_law_ndm::parse_CLP(Command_Line_Parameters & clp) {
-  int n;
-  if ((n=clp.Specifies_Parameter("ndm.e_power"))>=0) {
-    double new_e_power = atof(clp.ParValue(n));
-    if (new_e_power>0.0) e_power = new_e_power;
-    else warning("Warning: The e_power for Rall Power Law diameters must be greater than zero, not modified.\n");
-  }
-  if ((n=clp.Specifies_Parameter("ndm.d_term"))>=0) d_term = atof(clp.ParValue(n));
+  //  int n;
+  PDF_e_power = pdfselection("ndm.e_power",clp,X_branch);
+  if (!PDF_e_power) PDF_e_power = defaultrallepowerpdf.clone();
+  PDF_d_term = pdfselection("ndm.d_term",clp,X_branch);
+  if (!PDF_d_term) PDF_d_term = defaultralldtermpdf.clone();
 }
 
 String rall_power_law_ndm::report_parameters() {
-  String res("Rall Power Law neurite diameter model: e_power=");
-  res += String(e_power,"%.3f");
-  res += " d_term=";
-  res += String(d_term,"%.3f");
+  String res("Rall Power Law neurite diameter model: e_power ");
+  if (PDF_e_power) res += PDF_e_power->report_parameters();
+  res += " d_term ";
+  if (PDF_d_term) res += PDF_d_term->report_parameters();
+  res += "\n===============\n|| DEVELOPER NOTE: Neurite diameter models are not yet set-schema module compliant. Selection affects the entire network!\n===============\n";
   return res;
 }
 

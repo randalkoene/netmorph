@@ -66,7 +66,10 @@ public:
   // [*** NOTE] See ~/src/nnmodels/splineevent/ for function examples.
   // The default event end time is set to the default max_growth_time plus
   // ten seconds.
-#define DEFAULT_EVENT_END_TIME (20.0*24.0*60.0*60.0)+10.0
+  //#define DEFAULT_EVENT_END_TIME (20.0*24.0*60.0*60.0)+10.0
+  // [***UPDATE 20080728] We set the default event end time to zero,
+  // so that no activity events are processed after simulated development.
+#define DEFAULT_EVENT_END_TIME 0.0
   Event_Queue(network * n): net(n), t(0.0), T_end(DEFAULT_EVENT_END_TIME) {}
   network * Net() { return net; }
   double T() { return t; }

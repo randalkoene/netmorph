@@ -40,11 +40,14 @@
 #include "event.hh"
 #include "state_storable.hh"
 #include "Txt_Object.hh"
+#include "VRML_Object.hh"
+#include "Catacomb_Object.hh"
 #define __NETWORK_HH
 
 // variables
 
 extern bool sampling; // sampling flag to distinguish callers (should be set and reset by caller)
+extern bool numneurons_is_default; // flag to indicate that numneurons was set by a fallback to default 
 
 // classes
 
@@ -57,6 +60,41 @@ class network_statistics_base;
 class Neurite_Diameter_Model;
 #endif
 
+class region: public PLLHandle<region> {
+  // A region object is an arbitrary collection of neurons. The network can
+  // assign any number of regions, in accordance with groupings established,
+  // for example during neuron placement.
+protected:
+  String name;
+  PLLRoot<neuronptrlist> nlist;
+public:
+  region(String _name): name(_name) {}
+  region(String _name, neuron & n): name(_name) { nlist.link_before(new neuronptrlist(&n)); }
+  String Name() { return name; }
+  PLLRoot<neuronptrlist> & Nlist() { return nlist; }
+  region & append(neuron & n) { nlist.link_before(new neuronptrlist(&n)); return *this; }
+  region & operator+=(neuron & n) { return append(n); }
+  region & append(String _name, neuron & n);
+  region & conditional_create(String _name, neuron & n);
+  int find(neuron & n);
+  spatial center();
+  Catacomb_Group * net_Catacomb();
+};
+
+class regionslist: public PLLRoot<region> {
+public:
+  regionslist() {}
+  regionslist(String _name, neuron & n) {
+    link_before(new region(_name,n));
+  }
+  region & append(String _name, neuron & n) {
+    if (head()) return head()->conditional_create(_name,n);
+    link_before(new region(_name,n));
+    return *head();
+  }
+  int find(neuron & n);
+};
+
 class network: public PLLRoot<neuron>, public Event_Queue {
 protected:
   String netinfo;
@@ -68,6 +106,7 @@ protected:
   Network_Statistics_Root * nsr;
   Spatial_Segment_Subset * sss; // used within develop_connection_structure()
   Neurite_Diameter_Model * ndm;
+  regionslist regions;
   void add_typed_neuron(neuron_type nt, neuron * psmin, neuron * psmax);
   void remove_abstract_connections_without_synapses();
 public:
@@ -77,6 +116,7 @@ public:
   network(int numneurons, neuron * psmin, neuron * psmax, double principalprobability, bool e = true); // (see nibr.cc)
   network(int numneurons, neuron * psmin, neuron * psmax, Network_Statistics_Root & netstats, bool _edges = true); // (see nibr.cc)
   virtual ~network() { delete sss; }
+  regionslist & Regions() { return regions; }
   spatial & Center() { return center; }
   double Time() { return t; }
   bool Seek_Candidate_Synapses() { return candidate_synapses; }
@@ -85,9 +125,9 @@ public:
   Shape_Circle_Result shape_circle(Command_Line_Parameters & clp);
 #ifdef VECTOR3D
   Shape_Box_Result shape_box(Command_Line_Parameters & clp);
-  Shape_Regions_Result shape_regions(Command_Line_Parameters & clp);
+  Shape_Regions_Result shape_regions(Command_Line_Parameters & clp, neuron * psmin = NULL, neuron * psmax = NULL);
 #endif
-  Shape_Result shape_network(Command_Line_Parameters & clp);
+  Shape_Result shape_network(Command_Line_Parameters & clp, neuron * psmin = NULL, neuron * psmax = NULL);
   neuron * nearest(spatial & p);
   neuronset * inrange(neuron * n, double radius, neuron_type ntype = UNTYPED_NEURON); // (see nibr.cc)
   void uniform_random_connectivity(double range, int minconn, int maxconn, neuron_type sourcetype = UNTYPED_NEURON, neuron_type targettype = UNTYPED_NEURON, bool clearexisting = true); // (see nibr.cc)
@@ -104,6 +144,8 @@ public:
   double mean_number_of_input_terminal_segments(network_statistics_data * nsd = NULL);
   double mean_presynaptic_structure_length(network_statistics_data & termnsd, network_statistics_data & nsd, network_statistics_data * internsd = NULL);
   double mean_postsynaptic_structure_length(network_statistics_data & termnsd, network_statistics_data & nsd, network_statistics_data * internsd = NULL);
+  void move(spatial & pos); // move all neurons in the network to center their soma on pos
+  void fanin_rot(); // in spherical coordinates, rotate all points to theta=0
   void abstract_connections();
   Fig_Group * abstract_connections_Fig();
   Fig_Group * Fig_Abstract_Connections(String figname, double width = 0.0, bool overwrite = false);
@@ -119,8 +161,15 @@ public:
   bool Txt_Output(String txtname);
   bool Data_Output_Synapse_Distance(String dataname);
   bool Data_Output_Connection_Distance(String dataname);
+  VRML_Group * net_VRML();
+  bool VRML_Output(String ac3dname);
+  Catacomb_Group * net_Catacomb();
+  bool Catacomb_Output(String ccmname);
+#ifdef VECTOR3D
   void net_Slice(Slice & slice);
   bool Slice_Output(String slicename, Slice & slice);
+  Fig_Group * Slice_Outlines_Output(String figname, Slice & slice, double width = 0.0, bool overwrite = false);
+#endif
   void set_figattr(int fattr); // (see nibr.cc)
   void visible_pre_and_target_post(neuron & n); // (see nibr.cc)
   virtual void parse_CLP(Command_Line_Parameters & clp);
@@ -201,21 +250,44 @@ public:
   virtual spatial random_location();
 };
 
+class sphere_shaped_volume: public shaped_volume {
+protected:
+  spatial center;
+  double radius;
+public:
+  sphere_shaped_volume(String * l = NULL): shaped_volume(l), radius(1.0) {}
+  virtual String str() { return String("sphere"); };
+  virtual void parse_CLP(Command_Line_Parameters & clp);
+  virtual String report_parameters();
+  virtual double displaywidth() { return 2.0*radius; }
+  virtual spatial random_location();
+};
+
 class region_parameters: public PLLHandle<region_parameters> {
 protected:
   String label;
   shaped_volume * sv;
   neuronptr * memberneurons;
-  int nummemberneurons;
+  int nummemberneurons; // only those from the general pool
+  int generalandspecificneurons; // including those specifically defined for the region
   double minneuronseparation;
+  int specificneurons[UNTYPED_NEURON];
 public:
   region_parameters(const char * l, Command_Line_Parameters & clp);
   ~region_parameters() { delete sv; delete[] memberneurons; }
   String Label() { return label; }
   shaped_volume & shape() { return *sv; }
-  neuron * add_neurons(neuron * all, neuron * n);
+  virtual String report_parameters();
+  neuron * add_neurons(PLLRoot<neuron> * all, neuron * n, neuron * psmin = NULL, neuron * psmax = NULL);
   neuronptr * neurons() { return memberneurons; }
-  int N() { return nummemberneurons; }
+  int N() { return generalandspecificneurons; }
+  int general_pool_N() { return nummemberneurons; }
+  int specific_N() { return generalandspecificneurons-nummemberneurons; }
+  void set_general_pool(unsigned int num) {
+    generalandspecificneurons -= nummemberneurons;
+    nummemberneurons = num;
+    generalandspecificneurons += nummemberneurons;
+  }
   double average_distance_to_nearest_neighbor();
 };
 
@@ -227,6 +299,21 @@ public:
   virtual ~region_parameters_root() {}
   virtual void parse_CLP(Command_Line_Parameters & clp);
   virtual String report_parameters();
+  int total_N() {
+    int num = 0;
+    PLL_LOOP_FORWARD(region_parameters,head(),1) num += e->N();
+    return num;
+  }
+  int total_general_pool_N() {
+    int num = 0;
+    PLL_LOOP_FORWARD(region_parameters,head(),1) num += e->general_pool_N();
+    return num;
+  }
+  int total_specific_N() {
+    int num = 0;
+    PLL_LOOP_FORWARD(region_parameters,head(),1) num += e->specific_N();
+    return num;
+  }
 };
 
 #endif

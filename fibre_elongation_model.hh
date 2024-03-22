@@ -128,8 +128,8 @@ protected:
     double dL; // elongation resources for this update
     arbor_elongation_model_base_parameters(double _dL): dL(_dL) {}
   } base_parameters;
-  virtual ~arbor_elongation_model_base() { if (contributing) contributing->delete_shared(); if (pdf) delete pdf; }
 public:
+  virtual ~arbor_elongation_model_base() { if (contributing) contributing->delete_shared(); if (pdf) delete pdf; }// NOTE: On 2024-03-19, moved this from protected to public so that fibre_structure.hh can destruct this.
   arbor_elongation_model_base(arbor_elongation_model_base * aemcontrib, double & aemweight, arbor_elongation_model_base & schema);
   arbor_elongation_model_base(String & thislabel, String & label, Command_Line_Parameters & clp);
   virtual void delete_shared() { delete this; }
@@ -268,7 +268,7 @@ public:
   terminal_segment_elongation_model_base(String & thislabel, String & label, Command_Line_Parameters & clp);
   virtual void delete_shared() { delete this; }
   void reset(double t = 0.0);
-  virtual terminal_segment_elongation_model_base * clone() = 0;
+  virtual terminal_segment_elongation_model_base * clone(terminal_segment * ts) = 0;
   virtual void handle_branching(terminal_segment & ts1, terminal_segment & ts2);
   virtual void handle_turning(terminal_segment & ts);
   virtual double perturbed_expected_elongation();
@@ -288,7 +288,7 @@ class simple_terminal_segment_elongation_model: public terminal_segment_elongati
 public:
   simple_terminal_segment_elongation_model(terminal_segment_elongation_model_base * tsemcontrib, double & tsemweight, simple_terminal_segment_elongation_model & schema);
   simple_terminal_segment_elongation_model(String & thislabel, String & label, Command_Line_Parameters & clp);
-  virtual terminal_segment_elongation_model_base * clone();
+  virtual terminal_segment_elongation_model_base * clone(terminal_segment * ts);
   virtual double predict_elongate();
   virtual String report_parameters_specific();
 };
@@ -306,7 +306,7 @@ class inertia_terminal_segment_elongation_model: public terminal_segment_elongat
 public:
   inertia_terminal_segment_elongation_model(terminal_segment_elongation_model_base * tsemcontrib, double & tsemweight, inertia_terminal_segment_elongation_model & schema);
   inertia_terminal_segment_elongation_model(String & thislabel, String & label, Command_Line_Parameters & clp);
-  virtual terminal_segment_elongation_model_base * clone();
+  virtual terminal_segment_elongation_model_base * clone(terminal_segment * ts);
   virtual double predict_elongate();
   virtual String report_parameters_specific();
 };
@@ -328,7 +328,7 @@ protected:
 public:
   second_order_terminal_segment_elongation_model(terminal_segment_elongation_model_base * tsemcontrib, double & tsemweight, second_order_terminal_segment_elongation_model & schema);
   second_order_terminal_segment_elongation_model(String & thislabel, String & label, Command_Line_Parameters & clp);
-  virtual terminal_segment_elongation_model_base * clone();
+  virtual terminal_segment_elongation_model_base * clone(terminal_segment * ts);
   virtual double predict_elongate();
   virtual String report_parameters_specific();
 };
@@ -341,7 +341,7 @@ class constrained_second_order_terminal_segment_elongation_model: public second_
 public:
   constrained_second_order_terminal_segment_elongation_model(terminal_segment_elongation_model_base * tsemcontrib, double & tsemweight, constrained_second_order_terminal_segment_elongation_model & schema);
   constrained_second_order_terminal_segment_elongation_model(String & thislabel, String & label, Command_Line_Parameters & clp);
-  virtual terminal_segment_elongation_model_base * clone();
+  virtual terminal_segment_elongation_model_base * clone(terminal_segment * ts);
   virtual double predict_elongate();
 };
 
@@ -367,7 +367,7 @@ protected:
 public:
   initialized_CSO_terminal_segment_elongation_model(terminal_segment_elongation_model_base * tsemcontrib, double & tsemweight, initialized_CSO_terminal_segment_elongation_model & schema);
   initialized_CSO_terminal_segment_elongation_model(String & thislabel, String & label, Command_Line_Parameters & clp);
-  virtual terminal_segment_elongation_model_base * clone();
+  virtual terminal_segment_elongation_model_base * clone(terminal_segment * ts);
   virtual String report_parameters_specific();
 };
 
@@ -383,7 +383,7 @@ protected:
 public:
   decaying_second_order_terminal_segment_elongation_model(terminal_segment_elongation_model_base * tsemcontrib, double & tsemweight, decaying_second_order_terminal_segment_elongation_model & schema);
   decaying_second_order_terminal_segment_elongation_model(String & thislabel, String & label, Command_Line_Parameters & clp);
-  virtual terminal_segment_elongation_model_base * clone();
+  virtual terminal_segment_elongation_model_base * clone(terminal_segment * ts);
   virtual double predict_elongate();
   virtual String report_parameters_specific();
 };
@@ -414,7 +414,7 @@ protected:
 public:
   delayed_branch_terminal_segment_elongation_model(terminal_segment_elongation_model_base * tsemcontrib, double & tsemweight, delayed_branch_terminal_segment_elongation_model & schema);
   delayed_branch_terminal_segment_elongation_model(String & thislabel, String & label, Command_Line_Parameters & clp);
-  virtual terminal_segment_elongation_model_base * clone();
+  virtual terminal_segment_elongation_model_base * clone(terminal_segment * ts);
   virtual double predict_elongate();
   virtual String report_parameters_specific();
 };
@@ -432,11 +432,74 @@ class BESTL_terminal_segment_elongation_model: public terminal_segment_elongatio
   // after bifurcation. This class overloads the handle_branching() function.
   // In the simplest form, no perturbation is applied at all at updates. This is
   // very similar to the BESTL model used in [PELT:VARIABILITY].
+  // With this TSEM it is also possible to add some elongation at the onset of each
+  // new branch, based on the assumption that branching takes some time and that
+  // branches already have some length once branching is completed (see TL#200805220909.1).
+protected:
+  probability_distribution_function * branchpdf; // this also needs cloning and deletion
 public:
   BESTL_terminal_segment_elongation_model(terminal_segment_elongation_model_base * tsemcontrib, double & tsemweight, BESTL_terminal_segment_elongation_model & schema);
   BESTL_terminal_segment_elongation_model(String & thislabel, String & label, Command_Line_Parameters & clp);
-  virtual terminal_segment_elongation_model_base * clone();
+  ~BESTL_terminal_segment_elongation_model() { if (branchpdf) delete branchpdf; }
+  virtual terminal_segment_elongation_model_base * clone(terminal_segment * ts);
   virtual double predict_elongate();
+  virtual void handle_branching(terminal_segment & ts1, terminal_segment & ts2);
+  virtual String report_parameters_specific();
+};
+
+class BESTL_nonnormalizing_terminal_segment_elongation_model: public BESTL_terminal_segment_elongation_model {
+  // This elongation model is similar to the BESTL TSEM, but it assumes that F=0 at the
+  // arbor level and does not apply normalization. In other words, the elongation speed
+  // of each growth cone is absolute and not relative to the elongation speed of other
+  // growth cones!
+  // Beware: THIS DOES ASSUME THAT F=0! This also assumes that the nonnorm
+  // BESTL ERI model is used.
+  // (See TL#200805301000.1.)
+public:
+  BESTL_nonnormalizing_terminal_segment_elongation_model(terminal_segment_elongation_model_base * tsemcontrib, double & tsemweight, BESTL_nonnormalizing_terminal_segment_elongation_model & schema);
+  BESTL_nonnormalizing_terminal_segment_elongation_model(String & thislabel, String & label, Command_Line_Parameters & clp);
+  ~BESTL_nonnormalizing_terminal_segment_elongation_model() { if (branchpdf) delete branchpdf; }
+  virtual terminal_segment_elongation_model_base * clone(terminal_segment * ts);
+  virtual void elongate(terminal_segment * ts);
+  //virtual double predict_elongate();
+  //virtual void handle_branching(terminal_segment & ts1, terminal_segment & ts2);
+  virtual String report_parameters_specific();
+};
+
+class BESTLNN_pyramidal_AD_terminal_segment_elongation_model: public BESTL_nonnormalizing_terminal_segment_elongation_model {
+  // This elongation model is similar to the non-normalizing BESTL TSEM, but
+  // it is intended specifically for use with all_pyramidal_dendrites_sps,
+  // since this TSEM uses parameters that describe a prototype apical
+  // dendrite of a pyramidal neuron.
+  // Beware: THIS DOES ASSUME THAT F=0! This also assumes that the nonnorm
+  // BESTL ERI model is used.
+protected:
+  struct BESTLNN_pyramidal_AD_terminal_segment_elongation_model_parameters {
+    double trunk_length_SQ;
+    int num_obliques;
+    double dist2nextoblique;
+    String prefix;
+    BESTLNN_pyramidal_AD_terminal_segment_elongation_model_parameters(double tr_len_SQ, int n_o, double d2_o, String p): trunk_length_SQ(tr_len_SQ), num_obliques(n_o), dist2nextoblique(d2_o), prefix(p) {}
+  } parameters;
+  probability_distribution_function * trunklengthpdf; // this also needs cloning and deletion
+  probability_distribution_function * obliquespdf; // this also needs cloning and deletion
+  probability_distribution_function * obliqueanglepdf; // this also needs cloning and deletion
+  void initialize_parameters();
+public:
+  BESTLNN_pyramidal_AD_terminal_segment_elongation_model(terminal_segment_elongation_model_base * tsemcontrib, double & tsemweight, BESTLNN_pyramidal_AD_terminal_segment_elongation_model & schema);
+  BESTLNN_pyramidal_AD_terminal_segment_elongation_model(String & thislabel, String & label, Command_Line_Parameters & clp);
+  ~BESTLNN_pyramidal_AD_terminal_segment_elongation_model() {
+    if (trunklengthpdf) delete trunklengthpdf;
+    if (obliquespdf) delete obliquespdf;
+    if (obliqueanglepdf) delete obliqueanglepdf;
+  }
+  virtual terminal_segment_elongation_model_base * clone(terminal_segment * ts);
+  virtual void set_next_oblique_distance();
+  virtual void set_tuft_models(terminal_segment * ts);
+  virtual void set_oblique_models(terminal_segment * ts);
+  virtual void elongate(terminal_segment * ts);
+  //virtual double predict_elongate();
+  //virtual void handle_branching(terminal_segment & ts1, terminal_segment & ts2);
   virtual String report_parameters_specific();
 };
 
@@ -444,13 +507,20 @@ class elongation_rate_initialization_model_base {
   // Specific models that determine the initial elongation rate of
   // terminal segments after a bifurcation. The cached perturbed elongation
   // quota terminal_segment::base_parameters.l_i_cache is set.
-  // Note that this is not necessary during growth prior to bifurcation,
-  // since the quota has no effect then. All elongation resources determined
-  // at the arbor level are used for elongation at the single growth cone.
+  // Note that with most TSEMs this is not necessary during growth prior to
+  // bifurcation, since the quota has no effect then. All elongation
+  // resources determined at the arbor level are used for elongation at the
+  // single growth cone.
+  // Some TSEM, such as the nonnorm_BESTL TSEM do make use of the
+  // root_initialize() function that is provided by certain ERI models. In
+  // the case of the BESTL TSEM this is necessary in order to draw an
+  // initial elongation rate from a distribution, since no further variation
+  // of that rate takes place until a first branching event.
+  // (See TL#200807020156.10.)
   //
   // Models specific for terminal segments may be shared, in which case it
   // is sensible to designate them per pre/postsynaptic arbor.
-  // Some derived classes of this calss
+  // Some derived classes of this class
   // may allow sharing of the same object for many
   // arbors, in which case specific information is obtained when elongation
   // functions are called. Otherwise, each assigned elongation model object
@@ -461,6 +531,9 @@ class elongation_rate_initialization_model_base {
   // Elongation models to use can be chosen at general and increasingly
   // specific levels: network, neuron, pre/postsynaptic structure.
   // This base object enables chaining of multiple elongation models.
+  //
+  // Note that this model relates to considerations described in
+  // TL#200709152200.1 and linked task log entries.
 protected:
   elongation_rate_initialization_model_base * contributing;
   double contributingweight;
@@ -484,6 +557,7 @@ public:
   virtual void predict_initial_quota(double & predictedquota1,double & predictedquota2, terminal_segment * ts1, terminal_segment * ts2,double weight = 1.0) = 0;
   virtual double predict(double weight, double & predictedquota1, double & predictedquota2, terminal_segment * ts1, terminal_segment * ts2);
   virtual void initialize(terminal_segment * ts1, terminal_segment * ts2);
+  virtual void root_initialize(double & l_i_cache) {}
   virtual String report_parameters_specific() = 0;
   String report_parameters();
 };
@@ -503,6 +577,20 @@ public:
   length_distribution_eri_model(String & thislabel, String & label, Command_Line_Parameters & clp);
   virtual elongation_rate_initialization_model_base * clone();
   virtual void predict_initial_quota(double & predictedquota1,double & predictedquota2, terminal_segment * ts1, terminal_segment * ts2,double weight = 1.0);
+  virtual String report_parameters_specific();
+};
+
+class nonnorm_BESTL_length_distribution_eri_model: public length_distribution_eri_model {
+  // This model uses the initial lengths (parts of remainders) of the two terminal segments,
+  // when available, as a hint to which branch should receive the greater initial elongation rate.
+  // This ERI model is compatible with the nonnorm_BESTL TSEM and treats the ERI distribution as a
+  // distribution of absolute elongation rates.
+public:
+  nonnorm_BESTL_length_distribution_eri_model(elongation_rate_initialization_model_base * ericontrib, double & eriweight, nonnorm_BESTL_length_distribution_eri_model & schema);
+  nonnorm_BESTL_length_distribution_eri_model(String & thislabel, String & label, Command_Line_Parameters & clp);
+  virtual elongation_rate_initialization_model_base * clone();
+  virtual void predict_initial_quota(double & predictedquota1,double & predictedquota2, terminal_segment * ts1, terminal_segment * ts2,double weight = 1.0);
+  virtual void root_initialize(double & l_i_cache);
   virtual String report_parameters_specific();
 };
 
@@ -574,12 +662,19 @@ extern terminal_segment_elongation_model general_terminal_segment_elongation_mod
 extern String general_terminal_segment_elongation_model_root;
 // [Now using the regular protocol natural set arrays.] extern arbor_elongation_model_base * general_arbor_elongation_model_schema;
 // [Now using the regular protocol natural set arrays.] extern terminal_segment_elongation_model_base * general_terminal_segment_elongation_model_schema;
-extern arbor_elongation_model_base_ptr general_arbor_elongation_model_base_subset_schemas[];
-extern terminal_segment_elongation_model_base_ptr general_terminal_segment_elongation_model_base_subset_schemas[];
 // See http://rak.minduploading.org:8080/caspan/Members/randalk/model-specification-implementation/.
 extern elongation_rate_initialization_model default_elongation_rate_initialization_model; // identifier, changed when a different universal model is set
 extern String universal_elongation_rate_initialization_model_root; // Used only to report if chaining at the universal set level.
-extern elongation_rate_initialization_model_base_ptr elongation_rate_initialization_model_subset_schemas[];
+
+// Region and natural subset specific schemas (initialized in neuron.cc:general_neuron_parameters_interface::parse_CLP(Command_Line_Parameters & clp, network & net))
+typedef arbor_elongation_model_base_ptr * region_arbor_elongation_model_base_ptr;
+extern region_arbor_elongation_model_base_ptr * arbor_elongation_model_region_subset_schemas;
+// Region and natural subset specific schemas (initialized in neuron.cc:general_neuron_parameters_interface::parse_CLP(Command_Line_Parameters & clp, network & net))
+typedef terminal_segment_elongation_model_base_ptr * region_terminal_segment_elongation_model_base_ptr;
+extern region_terminal_segment_elongation_model_base_ptr * terminal_segment_elongation_model_region_subset_schemas;
+// Region and natural subset specific schemas (initialized in neuron.cc:general_neuron_parameters_interface::parse_CLP(Command_Line_Parameters & clp, network & net))
+typedef elongation_rate_initialization_model_base_ptr * region_elongation_rate_initialization_model_base_ptr;
+extern region_elongation_rate_initialization_model_base_ptr * elongation_rate_initialization_model_region_subset_schemas;
 
 // Indices for a few natural subsets, see TL#200603120618.2
 /* Now using the regular protocol natural set arrays.*/

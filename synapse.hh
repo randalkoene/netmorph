@@ -39,6 +39,9 @@
 #include "event.hh"
 
 // Class pointer forward declarations (to avoid recursive inclusion)
+#ifndef __SPATIAL_HH
+class spatial;
+#endif
 #ifndef __CONNECTION_HH
 class connection;
 #endif
@@ -86,6 +89,8 @@ public:
   //virtual double Strength() { return 0.0; }
   virtual double Peak_Response() { return 0.0; }
   virtual double Reversal_Potential() { return 0.0; }
+  void move_add(spatial & addvec);
+  void fanin_rot();
   Fig_Object * net_Fig();
   Txt_Object * net_Txt();
 };

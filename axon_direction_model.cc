@@ -38,30 +38,23 @@
 #include "fibre_structure.hh"
 #include "dendritic_growth_model.hh"
 #include "environment_physics.hh"
+#include "Spatial_Presentation.hh"
 
 /* [***INCOMPLETE] Here I can include functions that parse the command line for
    general parameters to be used in specific direction models if no neuron or
    terminal segment specific parameters are given.
  */
 
-#ifdef INCLUDE_SCHEMA_PARENT_SET_PROTOCOL_DIRECTION_MODELS
 // global variables
 // See http://rak.minduploading.org:8080/caspan/Members/randalk/model-specification-implementation/.
 direction_model default_direction_model = radial_dm; // identifier, changed when a different universal model is set
 String universal_direction_model_root; // Used only to report if chaining at the universal set level.
-direction_model_base_ptr direction_model_subset_schemas[NUM_NATURAL_SPS] = {
-  NULL,
-  NULL,
-  NULL,
-  NULL,
-  NULL,
-  NULL,
-  NULL,
-  NULL
-};
-#endif
 
 general_direction_model_parameters_interface general_direction_model_parameters;
+
+// Region and natural subset specific schemas (initialized in neuron.cc:general_neuron_parameters_interface::parse_CLP(Command_Line_Parameters & clp, network & net))
+region_direction_model_base_ptr * direction_model_region_subset_schemas = NULL;
+
 
 void general_direction_model_parameters_interface::parse_CLP(Command_Line_Parameters & clp) {
   int n;
@@ -198,15 +191,8 @@ direction_model_base::direction_model_base(direction_model_base * dmcontrib, dou
   }
 }
 
-#ifdef INCLUDE_SCHEMA_PARENT_SET_PROTOCOL_DIRECTION_MODELS
 direction_model_base::direction_model_base(String & thislabel, String & label, Command_Line_Parameters & clp):
   admpdf(X_turn),
-#else
-direction_model_base::direction_model_base(String & label, Command_Line_Parameters & clp):
-#ifdef ADM_PRIORITIZE_SPEED_OVER_SPACE
-  admpdf(X_turn,turnanglemax-turnanglemin),
-#endif
-#endif
   contributing(NULL), contributingweight(1.0), base_parameters(turnanglemin,turnanglemax) {
   // [***INCOMPLETE] More specific choices for parameters, e.g. the veer
   // limits of the probability distribution, can be detected here. Those may
@@ -219,24 +205,23 @@ direction_model_base::direction_model_base(String & label, Command_Line_Paramete
   // [***NOTE] This is not a CLP_Modifiable, because I do not wish to have to
   // store the label in order to be able to parse_CLP at any time.
   int n;
-#ifdef INCLUDE_SCHEMA_PARENT_SET_PROTOCOL_DIRECTION_MODELS
   double vmin = base_parameters.veeranglemin;
   double vmax = base_parameters.veeranglemax;
   if ((n=clp.Specifies_Parameter(thislabel+"veeranglemin"))>=0) {
     vmin = atof(clp.ParValue(n));
     if (vmin<0.0) {
-      cout << "Warning: " << thislabel << "veeranglemin=" << clp.ParValue(n) << " not permitted, value must be >=0.0, not modified\n";
+      warning("Warning: "+thislabel+"veeranglemin="+clp.ParValue(n)+" not permitted, value must be >=0.0, not modified\n");
       vmin = base_parameters.veeranglemin;
     }
   }
   if ((n=clp.Specifies_Parameter(thislabel+"veeranglemax"))>=0) {
     vmax = atof(clp.ParValue(n));
     if (vmax<=0.0) {
-      cout << "Warning: " << thislabel << "veeranglemax=" << clp.ParValue(n) << " not permitted, value must be >0.0, not modified\n";
+      warning("Warning: "+thislabel+"veeranglemax="+clp.ParValue(n)+" not permitted, value must be >0.0, not modified\n");
       vmax = base_parameters.veeranglemax;
     }
   }
-  if (vmax<=vmin) cout << "Warning: " << thislabel << "veeranglemax must be > " << thislabel << "veeranglemin, not modified\n";
+  if (vmax<=vmin) warning("Warning: "+thislabel+"veeranglemax must be > "+thislabel+"veeranglemin, not modified\n");
   else {
     base_parameters.veeranglemin = vmin;
     base_parameters.veeranglemax = vmax;
@@ -244,33 +229,11 @@ direction_model_base::direction_model_base(String & label, Command_Line_Paramete
 #ifdef ADM_PRIORITIZE_SPEED_OVER_SPACE
   admpdf.setup(base_parameters.veeranglemax-base_parameters.veeranglemin);
 #endif
-#endif
   if (label.empty()) return;
-#ifdef INCLUDE_SCHEMA_PARENT_SET_PROTOCOL_DIRECTION_MODELS
   if ((n=clp.Specifies_Parameter(label+"dm_weight"))>=0) contributingweight = atof(clp.ParValue(n));
   if (!direction_model_selection(label,clp,contributing,contributing)) error("Error in direction_model_base(): No contributing direction model found for "+label+".\n");
-#else
-  // Look for a chain of contributing direction models
-  String nextlabel;
-  if ((n=clp.Specifies_Parameter(label+".dm_label"))>=0) nextlabel = label+'.'+clp.URI_unescape_ParValue(n);
-  if ((n=clp.Specifies_Parameter(label+".dm_weight"))>=0) contributingweight = atof(clp.ParValue(n));
-  if ((n=clp.Specifies_Parameter(label+".direction_model"))>=0) {
-    String modelstr(downcase(clp.ParValue(n)));
-#ifdef ADM_PRIORITIZE_SPEED_OVER_SPACE
-    if (modelstr==String("segment_history_tension")) contributing = new tension_direction_model(*(new pll_axon_direction_history()),nextlabel,clp);
-#else
-  // [***INCOMPLETE] Clearly, this does not work as implemented here,
-  // because ts2 is not available. Consider if I should keep the space
-  // conserving version at all.
-   if (modelstr==String("segment_history_tension")) contributing = new tension_direction_model(*(new parse_axon_direction_history(ts2.TerminalSegment())),nextlabel,clp);
-#endif
-    else if (modelstr==String("cell_attraction")) contributing = new cell_attraction_direction_model(nextlabel,clp);
-    else warning("Warning: Unknown contributing direction model ("+modelstr+") at labelled direction model "+label+".\n");
-  }
-#endif
 }
 
-#ifdef INCLUDE_SCHEMA_PARENT_SET_PROTOCOL_DIRECTION_MODELS
 String direction_model_base::report_parameters() {
   // This calls report_parameters_specific() in any derived class and
   // propagates parameter reporting tocontributing models.
@@ -283,7 +246,6 @@ String direction_model_base::report_parameters() {
   }
   return res;
 }
-#endif
 
 void direction_model_base::turn(terminal_segment * ts, spatial & predicted, double initlen) {
   // Using the resulting preferred direction found in direction(), apply
@@ -338,15 +300,20 @@ void direction_model_base::turn(terminal_segment * ts, spatial & predicted, doub
 #endif
 }
 
-tension_direction_model::tension_direction_model(axon_direction_history & _adh, direction_model_base * dmbcontrib, double & dmbweight,  tension_direction_model & schema): direction_model_base(dmbcontrib,dmbweight,schema), adh(&_adh) {
+tension_direction_model::tension_direction_model(axon_direction_history & _adh, direction_model_base * dmbcontrib, double & dmbweight,  tension_direction_model & schema): direction_model_base(dmbcontrib,dmbweight,schema), adh(&_adh), tension_parameters(schema.tension_parameters) {
 }
 
-#ifdef INCLUDE_SCHEMA_PARENT_SET_PROTOCOL_DIRECTION_MODELS
+tension_direction_model::tension_direction_model(axon_direction_history & _adh, String & thislabel, String & label, Command_Line_Parameters & clp): direction_model_base(thislabel,label,clp), adh(&_adh), tension_parameters(2.0) {
+  int n;
+  if ((n=clp.Specifies_Parameter(thislabel+"history_power"))>=0) tension_parameters.history_power =  atof(clp.ParValue(n));
+  // Chaining of models is taken care of in the base constructor.
+}
+
 String tension_direction_model::report_parameters_specific() {
-  String res(" segment history tension");
+  String res(" segment history tension (history_power = ");
+  res += String(tension_parameters.history_power,"%.3f)");
   return res;
 }
-#endif
 
 direction_model_base * tension_direction_model::clone() {
 #ifdef ADM_PRIORITIZE_SPEED_OVER_SPACE
@@ -395,7 +362,7 @@ void tension_direction_model::predict_direction(spatial & predicted) {
   for (; (L=adh->segment_length())>=0.0; adh->next_further()) if (L>0.0) {
     double mass = L * M_PI * adh->segment_radius_squared();
     double distance = distancebyfibre + (L/2.0);
-    double relativegravitation = mass / (distance*distance);
+    double relativegravitation = mass / pow(distance,tension_parameters.history_power);
     predicted += relativegravitation*adh->segment_unit_direction();
     distancebyfibre += L;
   }
@@ -447,15 +414,158 @@ void tension_direction_model::direction(terminal_segment * ts, neuron * e, doubl
   turn(ts,predicted,initlen);
 }
 
+radial_direction_model::radial_direction_model(direction_model_base * dmbcontrib, double & dmbweight,  radial_direction_model & schema): direction_model_base(dmbcontrib,dmbweight,schema), radial_parameters(schema.radial_parameters) {
+}
+
+radial_direction_model::radial_direction_model(String & thislabel, String & label, Command_Line_Parameters & clp): direction_model_base(thislabel,label,clp), radial_parameters(false) {
+  int n;
+  if ((n=clp.Specifies_Parameter(thislabel+"Samsonovich_hypothesis"))>=0) radial_parameters.Samsonovich_hypothesis = (downcase(clp.ParValue(n))==String("true"));
+  // Chaining of models is taken care of in the base constructor.
+}
+
+String radial_direction_model::report_parameters_specific() {
+  String res(" radial");
+  if (radial_parameters.Samsonovich_hypothesis) res += " (with Samsonovich hypothesis)";
+  else res += " (no Samsonovich hypothesis)";
+  return res;
+}
+
+direction_model_base * radial_direction_model::clone() {
+  return new radial_direction_model(contributing,contributingweight,*this);
+}
+
+void radial_direction_model::handle_branching(terminal_segment & ts1, terminal_segment & ts2) {
+  ts2.set_direction_model(clone());
+  ts1.set_direction_model(this);
+}
+
+void radial_direction_model::handle_turning(terminal_segment & ts) {
+  // ts is the new terminal_segment.
+  ts.set_direction_model(this);
+}
+
+void radial_direction_model::predict_direction(spatial & predicted, neuron * n, terminal_segment * ts) {
+  // This model function predicts a direction that is the same as the parent
+  // direction, or a radial direction if the Samsonovich hypothesis is applied.
+  // (This model is the replacement for the legacy direction code used in older
+  // versions of NETMORPH, see TL#200808041538.1.)
+  if (radial_parameters.Samsonovich_hypothesis) {
+    fibre_segment * fs = ts->TerminalSegment();
+    predicted = fs->P1;
+    predicted -= fs->N()->Pos();
+  } else {
+    predicted = ts->AngularCoords();
+    predicted.convert_from_spherical(); // to make summation of normalized contributions and then conversion back to spherical possible in direction()
+  }
+}
+
+spatial radial_direction_model::predict(double weight, terminal_segment * ts, neuron * e) {
+  // Called in a chain of direction models to apply, where the first model
+  // in the chain is automatically assigned the weight 1.0 and the weighting
+  // of other direction models is proportional to that (i.e. it can be > 1.0).
+  spatial predicted;
+  predict_direction(predicted,e,ts);
+  predicted.normalize();
+  predicted *= weight;
+  if (contributing) predicted += contributing->predict(contributingweight,ts,e);
+  return predicted;
+}
+
+void radial_direction_model::direction(terminal_segment * ts, neuron * e, double initlen) {
+  // ts points to the terminal segment before the turn
+  // e points to the neuron to which the arbor belongs
+  ts->update_segment_vector(); // hence, use ts->turn_free()
+  spatial predicted;
+  predict_direction(predicted,e,ts);
+  if (contributing) {
+    predicted.normalize(); // only necessary here
+    predicted += contributing->predict(contributingweight,ts,e);
+  }
+  predicted.convert_to_spherical();
+  if (predicted.X()==0.0) { // [***INCOMPLETE] See TL.
+    predicted = ts->AngularCoords();
+  }
+  // make the turn with probabilistic veering around the predicted direction
+  turn(ts,predicted,initlen);
+}
+
+vector_direction_model::vector_direction_model(direction_model_base * dmbcontrib, double & dmbweight,  vector_direction_model & schema): direction_model_base(dmbcontrib,dmbweight,schema), vector_parameters(schema.vector_parameters) {
+}
+
+vector_direction_model::vector_direction_model(String & thislabel, String & label, Command_Line_Parameters & clp): direction_model_base(thislabel,label,clp), vector_parameters() {
+#ifdef VECTOR3D
+  get_spatial(clp,thislabel+"direction",vector_parameters.direction);
+#endif
+#ifdef VECTOR2D
+  warning("Warning: In 2D, the expected direction for the vector direction model is always (0,0).\n");
+#endif
+  // Chaining of models is taken care of in the base constructor.
+}
+
+String vector_direction_model::report_parameters_specific() {
+  String res(" vector");
+  double x,y,z;
+  vector_parameters.direction.get_all(x,y,z);
+  res += " (direction = [" + String(x,"%.3f,")+String(y,"%.3f,")+String(z,"%.3f])");
+  return res;
+}
+
+direction_model_base * vector_direction_model::clone() {
+  return new vector_direction_model(contributing,contributingweight,*this);
+}
+
+void vector_direction_model::handle_branching(terminal_segment & ts1, terminal_segment & ts2) {
+  ts2.set_direction_model(clone());
+  ts1.set_direction_model(this);
+}
+
+void vector_direction_model::handle_turning(terminal_segment & ts) {
+  // ts is the new terminal_segment.
+  ts.set_direction_model(this);
+}
+
+void vector_direction_model::predict_direction(spatial & predicted, neuron * n, terminal_segment * ts) {
+  // This model function predicts a direction along a specified vector.
+  predicted = vector_parameters.direction;
+}
+
+spatial vector_direction_model::predict(double weight, terminal_segment * ts, neuron * e) {
+  // Called in a chain of direction models to apply, where the first model
+  // in the chain is automatically assigned the weight 1.0 and the weighting
+  // of other direction models is proportional to that (i.e. it can be > 1.0).
+  spatial predicted;
+  predict_direction(predicted,e,ts);
+  predicted.normalize();
+  predicted *= weight;
+  if (contributing) predicted += contributing->predict(contributingweight,ts,e);
+  return predicted;
+}
+
+void vector_direction_model::direction(terminal_segment * ts, neuron * e, double initlen) {
+  // ts points to the terminal segment before the turn
+  // e points to the neuron to which the arbor belongs
+  ts->update_segment_vector(); // hence, use ts->turn_free()
+  spatial predicted;
+  predict_direction(predicted,e,ts);
+  if (contributing) {
+    predicted.normalize(); // only necessary here
+    predicted += contributing->predict(contributingweight,ts,e);
+  }
+  predicted.convert_to_spherical();
+  if (predicted.X()==0.0) { // [***INCOMPLETE] See TL.
+    predicted = ts->AngularCoords();
+  }
+  // make the turn with probabilistic veering around the predicted direction
+  turn(ts,predicted,initlen);
+}
+
 cell_attraction_direction_model::cell_attraction_direction_model(direction_model_base * dmbcontrib, double & dmbweight, cell_attraction_direction_model & schema): direction_model_base(dmbcontrib,dmbweight,schema) {
 }
 
-#ifdef INCLUDE_SCHEMA_PARENT_SET_PROTOCOL_DIRECTION_MODELS
 String cell_attraction_direction_model::report_parameters_specific() {
   String res(" cell attraction");
   return res;
 }
-#endif
 
 direction_model_base * cell_attraction_direction_model::clone() {
   return new cell_attraction_direction_model(contributing,contributingweight,*this);
@@ -512,18 +622,18 @@ void cell_attraction_direction_model::direction(terminal_segment * ts, neuron * 
   }
   predicted.convert_to_spherical();
   if (predicted.X()==0.0) {
-    cout << "NO DIRECTION\n"; // [***INCOMPLETE] See TL.
+    warning("Warning: NO DIRECTION PREDICTED in cell_attraction_direction_model::direction()\n"); // [***INCOMPLETE] See TL.
     predicted = ts->AngularCoords();
   }
   // 3. make the turn with probabilistic veering around the predicted direction
   turn(ts,predicted,initlen);
 }
 
-#ifdef INCLUDE_SCHEMA_PARENT_SET_PROTOCOL_DIRECTION_MODELS
 String direction_model_idstr[NUM_dm] = {
+  "radial",
   "segment_history_tension",
   "cell_attraction",
-  "radial"
+  "vector"
 };
 
 direction_model_base * direction_model_selection(String & label, Command_Line_Parameters & clp, direction_model_base * superior_set, direction_model_base_ptr & dmbptr) {
@@ -570,8 +680,10 @@ direction_model_base * direction_model_selection(String & label, Command_Line_Pa
     dmbptr = new cell_attraction_direction_model(label,nextlabel,clp);
     break;;
   case radial_dm:
-    dmbptr = NULL; // [***INCOMPLETE] I need to create a protocol-compliant version of the radial model
-    return NULL;
+    dmbptr = new radial_direction_model(label,nextlabel,clp);
+    break;;
+  case vector_dm:
+    dmbptr = new vector_direction_model(label,nextlabel,clp);
     break;;
   default: // If not specified, inherit from immediate superior set
     if (!superior_set) return NULL;
@@ -579,10 +691,9 @@ direction_model_base * direction_model_selection(String & label, Command_Line_Pa
     break;;
   }
   // In case a secondary schema reference is provided through dmbptr for the universal set level, create a clone for the universal set
-  if ((label.empty()) && (direction_model_subset_schemas[universal_sps]!=dmbptr)) {
-    if (direction_model_subset_schemas[universal_sps]) direction_model_subset_schemas[universal_sps]->delete_shared();
-    direction_model_subset_schemas[universal_sps] = dmbptr->clone();
+  if ((label.empty()) && (direction_model_region_subset_schemas[0][universal_sps]!=dmbptr)) {
+    if (direction_model_region_subset_schemas[0][universal_sps]) direction_model_region_subset_schemas[0][universal_sps]->delete_shared();
+    direction_model_region_subset_schemas[0][universal_sps] = dmbptr->clone();
   }
   return dmbptr;
 }
-#endif

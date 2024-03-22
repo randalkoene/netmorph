@@ -112,6 +112,8 @@ enum stat_labels {
   axons_len_between_bifurcations,
   dendrites_term_len_since_bifurcation,
   axons_term_len_since_bifurcation,
+  dendrites_term_len_since_soma,
+  axons_term_len_since_soma,
   dendrites_turns_between_bifurcations,
   axons_turns_between_bifurcations,
   dendrites_branch_angles,
@@ -125,7 +127,7 @@ enum stat_labels {
   dendrites_cartratio_somatoterm,
   axons_cartratio_somatoterm,
   dendrites_seven_micron_branch_angles, // measured with the 7 micron method
-  axon_seven_micron_branch_angles,
+  axons_seven_micron_branch_angles,
   STAT_LABELS_NUM};
 
 extern const char stat_label_str[STAT_LABELS_NUM][30];
@@ -409,7 +411,7 @@ public:
   bool Collecting_Statistics() { return collect_statistics; }
   void Allocate_New_Data();
   void Set_Tail_Age(double sample_t) {
-    for (int i=0; i<STAT_LABELS_NUM; i++) netstats[i].tail()->set_age(sample_t);
+    for (int i=0; i<STAT_LABELS_NUM; i++) if (netstats[i].tail()) netstats[i].tail()->set_age(sample_t);
   }
   // Sample time (age) increases from head() to tail() so that an increasing
   // ordered retrieval is possible by using the PLL_LOOP_FORWARD macro.

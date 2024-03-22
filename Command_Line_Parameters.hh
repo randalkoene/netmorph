@@ -33,17 +33,19 @@
 
 #include <limits>
 #include <cfloat>
+#include <climits>
 //STL#include <vector>
 #include "StringList.hh"
 
 #define TRACK_RECOGNIZED_COMMANDS
-//#define DEBUG_COMMAND_LINE_PARAMETERS
 
 class Command_Line_Parameters {
 protected:
   bool calledbyforminput;
   int clpargc;
   char ** clpargv;
+  void Add_to_Substitutions(String subs);
+  void Apply_Substitutions(String & pname);
 #ifdef TRACK_RECOGNIZED_COMMANDS
   void Add_Parameter(String pname, String pvalue, String co);
 #else
@@ -61,6 +63,8 @@ protected:
   StringList origin;
   int recognizedsize;
 #endif
+  StringList substitutionpat, substitutionstr;
+  int numsubstitutions;
 #ifdef TRACK_RECOGNIZED_COMMANDS
 protected:
   void Expand_Recognized(unsigned int oldlen, unsigned int newlen);
@@ -73,14 +77,7 @@ public:
   String URI_unescape_ParValue(int n);
 #ifdef TRACK_RECOGNIZED_COMMANDS
   //STLlong Specifies_Parameter(String pname) { long n = parname.iselement(pname); if ((n>=0) && ((unsigned long) n < recognized->size())) (*recognized)[n]++; return n; }
-  long Specifies_Parameter(String pname) {
-    long n = parname.iselement(pname);
-    if ((n>=0) && (n<recognizedsize) && (recognized!=NULL)) recognized[n]++;
-#ifdef DEBUG_COMMAND_LINE_PARAMETERS
-    cout << n << ':' << numparameters << ':' << pname << ':' << Par(n) << '\n'; cout.flush();
-#endif
-    return n;
-  }
+  long Specifies_Parameter(String pname) { long n = parname.iselement(pname); if ((n>=0) && (n<recognizedsize) && (recognized!=NULL)) recognized[n]++; return n; }
   int Recognized(unsigned int n) { if ((recognized) && (n<(unsigned int) numparameters)) return recognized[n]; return -1; }
   String Origin(int n) { if (n<numparameters) return origin[n]; else return String("unknown"); }
   int NumUnrecognized();
@@ -114,6 +111,8 @@ public:
   virtual String report_parameters() = 0; // human readable explanatory report of parameter settings
   //***  virtual String parameter_instructions() = 0; // list of instructions for parse_CLP() that recreate the parameter settings
 };
+
+void report_compiler_directives();
 
 #endif
 

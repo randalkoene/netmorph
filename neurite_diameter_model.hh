@@ -92,14 +92,18 @@ class rall_power_law_ndm: public Neurite_Diameter_Model {
   // Based on observations by Larkman (1991) of terminal segments with a narrow
   // range of diameters, we assume that all terminal segments have an equal
   // diameter d_term, which is set by default to 1.25 micrometers.
+  // Also see [PELT:VARIABILITY].
 protected:
-  double e_power;
-  double d_term;
+  probability_distribution_function * PDF_e_power;
+  probability_distribution_function * PDF_d_term;
   double fibre_diameter(fibre_segment * fs);
 public:
-  rall_power_law_ndm(network & _net): Neurite_Diameter_Model(_net), e_power(1.5), d_term(1.25) {}
-  rall_power_law_ndm(network & _net, Command_Line_Parameters & clp): Neurite_Diameter_Model(_net), e_power(1.5), d_term(1.25) { parse_CLP(clp); }
-  //virtual ~rall_power_law_ndm() {}
+  rall_power_law_ndm(network & _net): Neurite_Diameter_Model(_net), PDF_e_power(NULL), PDF_d_term(NULL) {
+    // cloning should take place here from schema
+    error("The default constructor of rall_power_law_ndm is not yet a usable set-modular component!\n");
+  }
+  rall_power_law_ndm(network & _net, Command_Line_Parameters & clp): Neurite_Diameter_Model(_net), PDF_e_power(NULL), PDF_d_term(NULL) { parse_CLP(clp); }
+  virtual ~rall_power_law_ndm() { if (PDF_e_power) delete PDF_e_power; if (PDF_d_term) delete PDF_d_term; }
   virtual void diameters();
   virtual void parse_CLP(Command_Line_Parameters & clp);
   virtual String report_parameters();

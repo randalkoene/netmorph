@@ -29,17 +29,22 @@
 #include "prepost_structure.hh"
 #include "axon_direction_model.hh"
 #include "neuron.hh"
+#include "network.hh"
 #include "Command_Line_Parameters.hh"
+
+// [UPDATE 20080702:] The case in which we define INCLUDE_SCHEMA_PARENT_SET_PROTOCOL_DIRECTION_MODELS is now REQUIRED for compilation.
+// [UPDATE AC 20110322:]  Added _typeid to fibre_structure to enable distinction between Apical and Basal dendrites.
 
 natural_schema_parent_set axons_most_specific_natural_set[UNTYPED_NEURON+1] = {
   all_axons_sps,
   all_interneuron_axons_sps,
-  all_axons_sps,
+  all_multipolar_axons_sps,
+  all_bipolar_axons_sps,
   all_pyramidal_axons_sps,
   all_axons_sps
 };
 
-presynaptic_structure::presynaptic_structure(neuron & _n, Segment & initseg, spatial & acoords, int _typeid): fibre_structure(_n,initseg,acoords) {
+presynaptic_structure::presynaptic_structure(neuron & _n, Segment & initseg, spatial & acoords, int _typeid): fibre_structure(_n,initseg,acoords, _typeid) {
   // If a general or specific parameter settings so indicate, the terminal
   // segment created in this constructor can be associated with a direction
   // model.
@@ -50,40 +55,26 @@ presynaptic_structure::presynaptic_structure(neuron & _n, Segment & initseg, spa
   // PROTOCOL: As described in task log entries of DIL#20070612153815.1, protocol-compliant sets have
   // model schema assigned to them. Therefore, components need only look for the schema of the most
   // specific (narrow) set to which they belong.
-#ifndef INCLUDE_SCHEMA_PARENT_SET_PROTOCOL_DIRECTION_MODELS
-  axon_direction_history * adh = NULL;
-  if (general_axon_direction_model!=legacy_dm) {
-    switch (general_axon_direction_model) {
-    case segment_history_tension_dm: 
-#ifdef ADM_PRIORITIZE_SPEED_OVER_SPACE
-      adh = new pll_axon_direction_history();
-#else
-      adh = new parse_axon_direction_history(*this);
-#endif
-      terminalsegments.head()->set_direction_model(new tension_direction_model(*adh,general_axon_direction_model_root,*main_clp));
-      break;;
-    case cell_attraction_dm:
-      terminalsegments.head()->set_direction_model(new cell_attraction_direction_model(general_axon_direction_model_root,*main_clp));
-      break;;
-    default: break;; // to avoid a compilation warning message about legacy_dm
-    }
-  }
-#endif // NOT(INCLUDE_SCHEMA_PARENT_SET_PROTOCOL_DIRECTION_MODELS)
   // [***INCOMPLETE] This is a crude way to parse applicable subsets
   // (see TL#200603120618.4)
   // Beware: I assume elmodel==NULL during initialization!
   // A hierarchy of natural subsets (see DIL#20060323042401.1)
+  network * net = general_neuron_parameters.Cached_Net();
+  if (!net) error("Error: Applicable model schema for the network must be determined before specifying models and parameters for each neuron.\n");
+  int regid = net->Regions().find(*N()) + 1; // Adding 1 automatically shifts regid to 0 (the "universal network") when the neuron is not found in a defined region.
   terminal_segment * ts = terminalsegments.head();
   neuron_type ntype = N()->TypeID();
   natural_schema_parent_set nset = axons_most_specific_natural_set[ntype];
-  bmmodel = branching_model_subset_schemas[nset]->clone();
-  ts->set_branch_angle_model(branch_angle_model_subset_schemas[nset]->clone());
-  elmodel = general_arbor_elongation_model_base_subset_schemas[nset]->clone();
-  ts->set_elongation_model(general_terminal_segment_elongation_model_base_subset_schemas[nset]->clone());
-  ts->set_ERI_model(elongation_rate_initialization_model_subset_schemas[nset]->clone());
-#ifdef INCLUDE_SCHEMA_PARENT_SET_PROTOCOL_DIRECTION_MODELS
-  ts->set_direction_model(direction_model_subset_schemas[nset]->clone());
-#endif
+  //cout << "PRESYN FIBER: NEURON " << N()->numerical_ID() << " belongs to region number " << regid << " with nset " << nset << '\n';
+  bmmodel = branching_model_region_subset_schemas[regid][nset]->clone(this);
+  ts->set_branch_angle_model(branch_angle_model_region_subset_schemas[regid][nset]->clone());
+  elmodel = arbor_elongation_model_region_subset_schemas[regid][nset]->clone();
+  ts->set_ERI_model(elongation_rate_initialization_model_region_subset_schemas[regid][nset]->clone()); // This must come before TSEM (see TL#200807020156.10).
+  ts->set_elongation_model(terminal_segment_elongation_model_region_subset_schemas[regid][nset]->clone(ts));
+  ts->set_TSBM_model(TSBM_region_subset_schemas[regid][nset]->clone(ts));
+  ts->set_TSTM_model(TSTM_region_subset_schemas[regid][nset]->clone());
+  ts->set_direction_model(direction_model_region_subset_schemas[regid][nset]->clone());
+  structure_initialization_region_subset_schemas[regid][nset].initialize(this);
 }
 
 terminal_segment_ptr * presynaptic_structure::array_of_terminal_segments() {
@@ -103,7 +94,7 @@ terminal_segment_ptr * presynaptic_structure::array_of_terminal_segments() {
 void presynaptic_structure::Collect_Data(network_statistics_base & nsb) {
   if (nsb.netstats[axons_termsegs_n].Collect()) nsb.netstats[axons_termsegs_n].Collect_Data((double) terminalsegments.length());
   fibre_collected_data fcd(nsb,true);
-  PLL_LOOP_FORWARD(terminal_segment,terminalsegments.head(),1) e->Collect_Data(fcd); // this must be done first
+  PLL_LOOP_FORWARD(terminal_segment,terminalsegments.head(),1) e->Collect_Data(fcd); // this must be done first (includes update_segment_vector())
   fibre_segment::Collect_Data(fcd);
   nsb.netstats[axons_arbor_len].Collect_Data(fcd.arborlength);
 }
@@ -112,12 +103,13 @@ void presynaptic_structure::Collect_Data(network_statistics_base & nsb) {
 natural_schema_parent_set dendrites_most_specific_natural_set[UNTYPED_NEURON+1] = {
   all_dendrites_sps,
   all_interneuron_dendrites_sps,
-  all_dendrites_sps,
+  all_multipolar_dendrites_sps,
+  all_bipolar_dendrites_sps,
   all_pyramidal_dendrites_sps,
   all_dendrites_sps
 };
 
-postsynaptic_structure::postsynaptic_structure(neuron & _n, Segment & initseg, spatial & acoords, int _typeid): fibre_structure(_n,initseg,acoords) {
+postsynaptic_structure::postsynaptic_structure(neuron & _n, Segment & initseg, spatial & acoords, int _typeid): fibre_structure(_n,initseg,acoords, _typeid) {
   // If a general or specific parameter settings so indicate, the terminal
   // segment created in this constructor can be associated with a direction
   // model.
@@ -126,41 +118,25 @@ postsynaptic_structure::postsynaptic_structure(neuron & _n, Segment & initseg, s
   // PROTOCOL: As described in task log entries of DIL#20070612153815.1, protocol-compliant sets have
   // model schema assigned to them. Therefore, components need only look for the schema of the most
   // specific (narrow) set to which they belong.
-#ifndef INCLUDE_SCHEMA_PARENT_SET_PROTOCOL_DIRECTION_MODELS
-  axon_direction_history * adh = NULL;
-  if (general_dendrite_direction_model!=radial_dm) {
-    switch (general_dendrite_direction_model) {
-    case segment_history_tension_dm:
-#ifdef ADM_PRIORITIZE_SPEED_OVER_SPACE
-      adh = new pll_axon_direction_history();
-#else
-      adh = new parse_axon_direction_history(*this);
-#endif
-      terminalsegments.head()->set_direction_model(new tension_direction_model(*adh,general_dendrite_direction_model_root,*main_clp));
-      break;;
-   case cell_attraction_dm:
-      terminalsegments.head()->set_direction_model(new cell_attraction_direction_model(general_dendrite_direction_model_root,*main_clp));
-      break;
-    default: break;; // to avoid a compilation warning message about legacy_dm
-    }
-  }
-#endif
   // [***INCOMPLETE] This is a crude way to parse applicable subsets
   // (see TL#200603120618.4)
   // A hierarchy of natural subsets (see DIL#20060323042401.1)
+  network * net = general_neuron_parameters.Cached_Net();
+  if (!net) error("Error: Applicable model schema for the network must be determined before specifying models and parameters for each neuron.\n");
+  int regid = net->Regions().find(*N()) + 1; // Adding 1 automatically shifts regid to 0 (the "universal network") when the neuron is not found in a defined region.
   terminal_segment * ts = terminalsegments.head();
   neuron_type ntype = N()->TypeID();
   natural_schema_parent_set nset = dendrites_most_specific_natural_set[ntype];
   if ((ntype==PYRAMIDAL) && (_typeid==ALL_APICAL_PYRAMIDAL_DENDRITES_AEM)) nset = all_apical_pyramidal_dendrites_sps;
-  bmmodel = branching_model_subset_schemas[nset]->clone();
-  ts->set_branch_angle_model(branch_angle_model_subset_schemas[nset]->clone());
-  elmodel = general_arbor_elongation_model_base_subset_schemas[nset]->clone();
-  ts->set_elongation_model(general_terminal_segment_elongation_model_base_subset_schemas[nset]->clone());
-  ts->set_ERI_model(elongation_rate_initialization_model_subset_schemas[nset]->clone());
-#ifdef INCLUDE_SCHEMA_PARENT_SET_PROTOCOL_DIRECTION_MODELS
-  ts->set_direction_model(direction_model_subset_schemas[nset]->clone());
-#endif
-
+  bmmodel = branching_model_region_subset_schemas[regid][nset]->clone(this);
+  ts->set_branch_angle_model(branch_angle_model_region_subset_schemas[regid][nset]->clone());
+  elmodel = arbor_elongation_model_region_subset_schemas[regid][nset]->clone();
+  ts->set_ERI_model(elongation_rate_initialization_model_region_subset_schemas[regid][nset]->clone()); // This must come before TSEM (see TL#200807020156.10).
+  ts->set_elongation_model(terminal_segment_elongation_model_region_subset_schemas[regid][nset]->clone(ts));
+  ts->set_TSBM_model(TSBM_region_subset_schemas[regid][nset]->clone(ts));
+  ts->set_TSTM_model(TSTM_region_subset_schemas[regid][nset]->clone());
+  ts->set_direction_model(direction_model_region_subset_schemas[regid][nset]->clone());
+  structure_initialization_region_subset_schemas[regid][nset].initialize(this);
 }
 
 terminal_segment_ptr * postsynaptic_structure::array_of_terminal_segments() {

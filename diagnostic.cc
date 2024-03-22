@@ -63,7 +63,7 @@ void memory_allocation_diagnostic::allocating(long intended, long actual) {
 memory_statistics::~memory_statistics() {
   ofstream dfl("memory_statistics.ascii");
   if (!dfl) {
-    cerr << "nibr: Unable to create memory_statistics.ascii in memory_statistics::~memory_statistics()\n";
+    warning("Warning: Unable to create memory_statistics.ascii in memory_statistics::~memory_statistics()\n");
   } else {
     dfl << "# Created by nibr diagnostic: memory statistics, Randal A. Koene\n";
     dfl << "# name: events\n# type: matrix\n# rows: 1\n# columns: 1\n";

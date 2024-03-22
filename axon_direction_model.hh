@@ -254,24 +254,41 @@ protected:
   virtual ~direction_model_base() { if (contributing) contributing->delete_shared(); }
 public:
   direction_model_base(direction_model_base * dmcontrib, double & dmweight, direction_model_base & schema);
-#ifdef INCLUDE_SCHEMA_PARENT_SET_PROTOCOL_DIRECTION_MODELS
   direction_model_base(String & thislabel, String & label, Command_Line_Parameters & clp);
-#else
-  direction_model_base(String & label, Command_Line_Parameters & clp);
-#endif
   virtual direction_model_base * clone() = 0;
   virtual void delete_shared() { delete this; }
   virtual void handle_branching(terminal_segment & ts1, terminal_segment & ts2) = 0;
   virtual void handle_turning(terminal_segment & ts) = 0;
   virtual spatial predict(double weight, terminal_segment * ts, neuron * e) = 0;
   virtual void direction(terminal_segment * ts, neuron * e, double initlen = 0.0) = 0;
-#ifdef INCLUDE_SCHEMA_PARENT_SET_PROTOCOL_DIRECTION_MODELS
   virtual String report_parameters_specific() = 0;
   String report_parameters();
-#endif
 };
 
 typedef direction_model_base * direction_model_base_ptr;
+
+class radial_direction_model: public direction_model_base {
+  // This is the simplest model of growth cone direction, which
+  // makes only the optional assumption (based on a hypothesis
+  // by Samsonovich) that dendrite growth cones tend to return
+  // to a growth direction that is radial to the soma.
+protected:
+  struct radial_dm_parameters {
+    bool Samsonovich_hypothesis;
+    radial_dm_parameters(bool samshyp): Samsonovich_hypothesis(samshyp) {}
+  } radial_parameters;
+  void predict_direction(spatial & predicted, neuron * n, terminal_segment * ts);
+public:
+  radial_direction_model(direction_model_base * dmbcontrib, double & dmbweight, radial_direction_model & schema);
+  radial_direction_model(String & thislabel, String & label, Command_Line_Parameters & clp);
+  ~radial_direction_model() {}
+  virtual direction_model_base * clone();
+  virtual void handle_branching(terminal_segment & ts1, terminal_segment & ts2);
+  virtual void handle_turning(terminal_segment & ts);
+  virtual spatial predict(double weight, terminal_segment * ts, neuron * e);
+  virtual void direction(terminal_segment * ts, neuron * e, double initlen = 0.0);
+  virtual String report_parameters_specific();
+};
 
 class tension_direction_model: public direction_model_base {
   // This default model is based on the following hypotheses:
@@ -289,24 +306,22 @@ class tension_direction_model: public direction_model_base {
   // (See further comments in axon_direction_model::direction().)
 protected:
   axon_direction_history * adh;
+  struct tension_dm_parameters {
+    double history_power;
+    tension_dm_parameters(double hp): history_power(hp) {}
+  } tension_parameters;
   void predict_direction(spatial & predicted);
 public:
   //tension_direction_model(axon_direction_history & _adh): adh(&_adh) {}
   tension_direction_model(axon_direction_history & _adh, direction_model_base * dmbcontrib, double & dmbweight,  tension_direction_model & schema);
-#ifdef INCLUDE_SCHEMA_PARENT_SET_PROTOCOL_DIRECTION_MODELS
-  tension_direction_model(axon_direction_history & _adh, String & thislabel, String & label, Command_Line_Parameters & clp): direction_model_base(thislabel,label,clp), adh(&_adh) {}
-#else
-  tension_direction_model(axon_direction_history & _adh, String & label, Command_Line_Parameters & clp): direction_model_base(label,clp), adh(&_adh) {}
-#endif
+  tension_direction_model(axon_direction_history & _adh, String & thislabel, String & label, Command_Line_Parameters & clp);
   ~tension_direction_model() { delete adh; }
   virtual direction_model_base * clone();
   virtual void handle_branching(terminal_segment & ts1, terminal_segment & ts2);
   virtual void handle_turning(terminal_segment & ts);
   virtual spatial predict(double weight, terminal_segment * ts, neuron * e);
   virtual void direction(terminal_segment * ts, neuron * e, double initlen = 0.0);
-#ifdef INCLUDE_SCHEMA_PARENT_SET_PROTOCOL_DIRECTION_MODELS
   virtual String report_parameters_specific();
-#endif
 };
 
 class cell_attraction_direction_model: public direction_model_base {
@@ -318,28 +333,48 @@ protected:
 public:
   //cell_attraction_direction_model() {}
   cell_attraction_direction_model(direction_model_base * dmbcontrib, double & dmbweight, cell_attraction_direction_model & schema);
-#ifdef INCLUDE_SCHEMA_PARENT_SET_PROTOCOL_DIRECTION_MODELS
   cell_attraction_direction_model(String & thislabel, String & label, Command_Line_Parameters & clp): direction_model_base(thislabel,label,clp) {}
-#else
-  cell_attraction_direction_model(String & label, Command_Line_Parameters & clp): direction_model_base(label,clp) {}
-#endif
   virtual direction_model_base * clone();
   virtual void handle_branching(terminal_segment & ts1, terminal_segment & ts2);
   virtual void handle_turning(terminal_segment & ts);
   virtual spatial predict(double weight, terminal_segment * ts, neuron * e);
   virtual void direction(terminal_segment * ts, neuron * e, double initlen = 0.0);
-#ifdef INCLUDE_SCHEMA_PARENT_SET_PROTOCOL_DIRECTION_MODELS
   virtual String report_parameters_specific();
-#endif
 };
 
-#ifdef INCLUDE_SCHEMA_PARENT_SET_PROTOCOL_DIRECTION_MODELS
+class vector_direction_model: public direction_model_base {
+  // This growth cone direction model expects the direction
+  // of growth to be along a specified vector.
+  // This model can be useful, for example in a chain of
+  // direction models that guide apical dendrite trunk growth
+  // for demonstration purposes.
+protected:
+  struct vector_dm_parameters {
+    spatial direction;
+    vector_dm_parameters() {}
+    vector_dm_parameters(spatial d): direction(d) {}
+  } vector_parameters;
+  void predict_direction(spatial & predicted, neuron * n, terminal_segment * ts);
+public:
+  vector_direction_model(direction_model_base * dmbcontrib, double & dmbweight, vector_direction_model & schema);
+  vector_direction_model(String & thislabel, String & label, Command_Line_Parameters & clp);
+  ~vector_direction_model() {}
+  virtual direction_model_base * clone();
+  virtual void handle_branching(terminal_segment & ts1, terminal_segment & ts2);
+  virtual void handle_turning(terminal_segment & ts);
+  virtual spatial predict(double weight, terminal_segment * ts, neuron * e);
+  virtual void direction(terminal_segment * ts, neuron * e, double initlen = 0.0);
+  virtual String report_parameters_specific();
+};
+
 // global variables
 // See http://rak.minduploading.org:8080/caspan/Members/randalk/model-specification-implementation/.
 extern direction_model default_direction_model; // identifier, changed when a different universal model is set
 extern String universal_direction_model_root; // Used only to report if chaining at the universal set level.
-extern direction_model_base_ptr direction_model_subset_schemas[];
-#endif
+
+// Region and natural subset specific schemas (initialized in neuron.cc:general_neuron_parameters_interface::parse_CLP(Command_Line_Parameters & clp, network & net))
+typedef direction_model_base_ptr * region_direction_model_base_ptr;
+extern region_direction_model_base_ptr * direction_model_region_subset_schemas;
 
 // functions
 direction_model_base * direction_model_selection(String & label, Command_Line_Parameters & clp, direction_model_base * superior_set, direction_model_base_ptr & dmbptr);

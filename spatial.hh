@@ -108,7 +108,7 @@ public:
 #ifdef VECTOR2D
   spatial(double X, double Y, double Z = 0.0): Vector(X,Y) {}
   void set_all(double X, double Y, double Z = 0.0) { x=X; y=Y; }
-  void get_all(double & X, double & Y, double & Z) { X=x; Y=y; }
+  void get_all(double & X, double & Y, double & Z) { X=x; Y=y; Z=0.0; }
   void plane_mapped(double & px, double & py) { px = x; py = y; }
 #endif
   //operator Vector () { return ::Vector(); }

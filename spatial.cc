@@ -291,6 +291,7 @@ void Rotation::rotate(const spatial & s, spatial & rotated) {
 }
 
 void Rotation::rotate_extract_view(const spatial & s, double & x, double & y) {
+  //cout << origin.X() << ',' << origin.Y() << '\n';
   spatial translated(s); translated -= origin;
   x = dot(xr,translated);
   y = dot(yr,translated);

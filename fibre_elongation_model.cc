@@ -27,7 +27,10 @@
 
 #include "fibre_elongation_model.hh"
 #include "fibre_structure.hh"
+#include "dendritic_growth_model.hh"
+#include "axon_direction_model.hh"
 #include "neuron.hh"
+#include "Txt_Object.hh"
 #include "diagnostic.hh"
 
 #define DAYSECONDS 86400.0
@@ -49,22 +52,19 @@ String general_terminal_segment_elongation_model_root;
 
 // Schema object pointer arrays
 // [***NOTE] See TL#200603120618.2.
-arbor_elongation_model_base_ptr general_arbor_elongation_model_base_subset_schemas[NUM_NATURAL_SPS] = {NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL};
-terminal_segment_elongation_model_base_ptr general_terminal_segment_elongation_model_base_subset_schemas[NUM_NATURAL_SPS] = {NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL};
 
 // See http://rak.minduploading.org:8080/caspan/Members/randalk/model-specification-implementation/.
 elongation_rate_initialization_model default_elongation_rate_initialization_model = length_distribution_eri; // identifier, changed when a different universal model is set
 String universal_elongation_rate_initialization_model_root; // Used only to report if chaining at the universal set level.
-elongation_rate_initialization_model_base_ptr elongation_rate_initialization_model_subset_schemas[NUM_NATURAL_SPS] = {
-  NULL,
-  NULL,
-  NULL,
-  NULL,
-  NULL,
-  NULL,
-  NULL,
-  NULL
-};
+
+// Region and natural subset specific schemas (initialized in neuron.cc:general_neuron_parameters_interface::parse_CLP(Command_Line_Parameters & clp, network & net))
+region_arbor_elongation_model_base_ptr * arbor_elongation_model_region_subset_schemas = NULL;
+
+// Region and natural subset specific schemas (initialized in neuron.cc:general_neuron_parameters_interface::parse_CLP(Command_Line_Parameters & clp, network & net))
+region_terminal_segment_elongation_model_base_ptr * terminal_segment_elongation_model_region_subset_schemas = NULL;
+
+// Region and natural subset specific schemas (initialized in neuron.cc:general_neuron_parameters_interface::parse_CLP(Command_Line_Parameters & clp, network & net))
+region_elongation_rate_initialization_model_base_ptr * elongation_rate_initialization_model_region_subset_schemas = NULL;
 
 arbor_elongation_model_base::arbor_elongation_model_base(arbor_elongation_model_base * aemcontrib, double & aemweight, arbor_elongation_model_base & schema): contributing(NULL), contributingweight(1.0), prev_t(eq->T()), base_parameters(schema.base_parameters) {
   if (aemcontrib) { // Clone chained models
@@ -304,9 +304,10 @@ String Polynomial_O3_arbor_elongation_model::report_parameters_specific() {
 }
 
 terminal_segment_elongation_model_base::terminal_segment_elongation_model_base(terminal_segment_elongation_model_base * tsemcontrib, double & tsemweight, terminal_segment_elongation_model_base & schema): contributing(NULL), contributingweight(1.0), prev_t(eq->T()), l_i_cache_t(eq->T()), base_parameters(schema.base_parameters) {
+  // [***NOTE:] In the current implementation, any TSEM that requires ts during initialization (e.g. nonnorm_BESTL) must be at the head of a chain.
   if (tsemcontrib) { // Clone chained models
     contributingweight = tsemweight;
-    contributing = tsemcontrib->clone();
+    contributing = tsemcontrib->clone(NULL);
   }
   pdf = schema.pdf->clone();
   // [***INCOMPLETE] The REDUCED_MEMORY_PTSEM option is in need of a place for initialization, where (a) the arbor can be reached in order to set tsem_pdf, where (b) the applicable prefix is known (e.g. "all_axons."), and (c) needs to take care of deleting the allocated PDF object as well. Also, I need to add more compiler directives around references to pdf when compiling with REDUCED_MEMORY_PTSEM.
@@ -321,7 +322,10 @@ terminal_segment_elongation_model_base::terminal_segment_elongation_model_base(S
   // store the label in order to be able to parse_CLP at any time.
   pdf = pdfselection(thislabel+"tsem.",clp,X_elongate);
   if (!pdf) pdf = new normal_pdf(X_elongate,0.0,0.3,1.0); // a normal PDF is the default for TSEMs
-  else if (pdf->amplitude()>1.0) warning("Warning: Terminal Segment Elongation Model has perturbation with amplitude greater than 1.0, retraction may occur!\n");
+  else {
+    if (pdf->amplitude()>1.0) warning("Warning: Terminal Segment Elongation Model has perturbation with amplitude greater than 1.0, retraction may occur!\n");
+    else if ((pdf->amplitude()==0.0) && (pdf->mean_X()>0.0)) warning("Warning: TSEM perturbation is added to 1.0 before multiplication with the computed elongation speed. When using a delta PDF this means that values greater than zero can cause ramping up to 'infinite' elongation speed and resulting invalid computations.\n");
+  }
   if (label.empty()) return;
   int n;
   if ((n=clp.Specifies_Parameter(label+"tsem_weight"))>=0) contributingweight = atof(clp.ParValue(n));
@@ -337,7 +341,7 @@ void terminal_segment_elongation_model_base::reset(double t) {
 }
 
 void terminal_segment_elongation_model_base::handle_branching(terminal_segment & ts1, terminal_segment & ts2) {
-  ts2.set_elongation_model(clone());
+  ts2.set_elongation_model(clone(&ts2));
   ts1.set_elongation_model(this);
 }
 
@@ -474,7 +478,7 @@ simple_terminal_segment_elongation_model::simple_terminal_segment_elongation_mod
   // Chaining of models is taken care of in the base constructor.
 }
 
-terminal_segment_elongation_model_base * simple_terminal_segment_elongation_model::clone() {
+terminal_segment_elongation_model_base * simple_terminal_segment_elongation_model::clone(terminal_segment * ts) {
   return new simple_terminal_segment_elongation_model(contributing,contributingweight,*this);
 }
 
@@ -504,7 +508,7 @@ inertia_terminal_segment_elongation_model::inertia_terminal_segment_elongation_m
   // Chaining of models is taken care of in the base constructor.
 }
 
-terminal_segment_elongation_model_base * inertia_terminal_segment_elongation_model::clone() {
+terminal_segment_elongation_model_base * inertia_terminal_segment_elongation_model::clone(terminal_segment * ts) {
   return new inertia_terminal_segment_elongation_model(contributing,contributingweight,*this);
 }
 
@@ -537,7 +541,7 @@ second_order_terminal_segment_elongation_model::second_order_terminal_segment_el
   // Chaining of models is taken care of in the base constructor.
 }
 
-terminal_segment_elongation_model_base * second_order_terminal_segment_elongation_model::clone() {
+terminal_segment_elongation_model_base * second_order_terminal_segment_elongation_model::clone(terminal_segment * ts) {
   return new second_order_terminal_segment_elongation_model(contributing,contributingweight,*this);
 }
 
@@ -584,7 +588,7 @@ constrained_second_order_terminal_segment_elongation_model::constrained_second_o
   // Chaining of models is taken care of in the base constructor.
 }
 
-terminal_segment_elongation_model_base * constrained_second_order_terminal_segment_elongation_model::clone() {
+terminal_segment_elongation_model_base * constrained_second_order_terminal_segment_elongation_model::clone(terminal_segment * ts) {
   return new constrained_second_order_terminal_segment_elongation_model(contributing,contributingweight,*this);
 }
 
@@ -620,7 +624,7 @@ initialized_CSO_terminal_segment_elongation_model::initialized_CSO_terminal_segm
   // acceleration is set by the base class (probable default = 0.5).
 }
 
-terminal_segment_elongation_model_base * initialized_CSO_terminal_segment_elongation_model::clone() {
+terminal_segment_elongation_model_base * initialized_CSO_terminal_segment_elongation_model::clone(terminal_segment * ts) {
   return new initialized_CSO_terminal_segment_elongation_model(contributing,contributingweight,*this);
 }
 
@@ -640,7 +644,7 @@ decaying_second_order_terminal_segment_elongation_model::decaying_second_order_t
   // Chaining of models is taken care of in the base constructor.
 }
 
-terminal_segment_elongation_model_base * decaying_second_order_terminal_segment_elongation_model::clone() {
+terminal_segment_elongation_model_base * decaying_second_order_terminal_segment_elongation_model::clone(terminal_segment * ts) {
   return new decaying_second_order_terminal_segment_elongation_model(contributing,contributingweight,*this);
 }
 
@@ -693,7 +697,7 @@ delayed_branch_terminal_segment_elongation_model::delayed_branch_terminal_segmen
   elongation_commencement = eq->T() + 0.0;
 }
 
-terminal_segment_elongation_model_base * delayed_branch_terminal_segment_elongation_model::clone() {
+terminal_segment_elongation_model_base * delayed_branch_terminal_segment_elongation_model::clone(terminal_segment * ts) {
   return new delayed_branch_terminal_segment_elongation_model(contributing,contributingweight,*this);
 }
 
@@ -727,17 +731,20 @@ String delayed_branch_terminal_segment_elongation_model::report_parameters_speci
   return res;
 }
 
-BESTL_terminal_segment_elongation_model::BESTL_terminal_segment_elongation_model(terminal_segment_elongation_model_base * tsemcontrib, double & tsemweight, BESTL_terminal_segment_elongation_model & schema): terminal_segment_elongation_model_base(tsemcontrib,tsemweight,schema) {
+BESTL_terminal_segment_elongation_model::BESTL_terminal_segment_elongation_model(terminal_segment_elongation_model_base * tsemcontrib, double & tsemweight, BESTL_terminal_segment_elongation_model & schema): terminal_segment_elongation_model_base(tsemcontrib,tsemweight,schema), branchpdf(NULL) {
   // Chaining of models is taken care of in the base constructor.
+  branchpdf = schema.branchpdf->clone();
 }
 
 BESTL_terminal_segment_elongation_model::BESTL_terminal_segment_elongation_model(String & thislabel, String & label, Command_Line_Parameters & clp): terminal_segment_elongation_model_base(thislabel,label,clp) {
   // Chaining of models is taken care of in the base constructor.
   base_parameters.l_i_cache = 1.0; // this is the assumed mean of the BESTL quota distribution
   // Note: The mean can shift if other models contribute to the elongation quota determination.
+  branchpdf = pdfselection(thislabel+"tsem.branch.",clp,X_elongate);
+  if (!branchpdf) branchpdf = new normal_pdf(X_elongate,2.0,1.0); // a normal PDF is the default for TSEM branch length initialization
 }
 
-terminal_segment_elongation_model_base * BESTL_terminal_segment_elongation_model::clone() {
+terminal_segment_elongation_model_base * BESTL_terminal_segment_elongation_model::clone(terminal_segment * ts) {
   return new BESTL_terminal_segment_elongation_model(contributing,contributingweight,*this);
 }
 
@@ -755,8 +762,303 @@ double BESTL_terminal_segment_elongation_model::predict_elongate() {
   return base_parameters.l_i_cache; // see TL#200709150740.1
 }
 
+void BESTL_terminal_segment_elongation_model::handle_branching(terminal_segment & ts1, terminal_segment & ts2) {
+  ts2.set_elongation_model(clone(&ts2));
+  ts1.set_elongation_model(this);
+  if (branchpdf) {
+    ts1.AngularCoords().add_X(branchpdf->random_positive());
+    ts2.AngularCoords().add_X(branchpdf->random_positive());
+  }
+}
+
 String BESTL_terminal_segment_elongation_model::report_parameters_specific() {
-  String res(" BESTL");
+  String res(" BESTL: branchPDF: ");
+  if (branchpdf) res += branchpdf->report_parameters();
+  return res;
+}
+
+BESTL_nonnormalizing_terminal_segment_elongation_model::BESTL_nonnormalizing_terminal_segment_elongation_model(terminal_segment_elongation_model_base * tsemcontrib, double & tsemweight, BESTL_nonnormalizing_terminal_segment_elongation_model & schema): BESTL_terminal_segment_elongation_model(tsemcontrib,tsemweight,schema) {
+  // Chaining of models is taken care of in the base constructor.
+}
+
+BESTL_nonnormalizing_terminal_segment_elongation_model::BESTL_nonnormalizing_terminal_segment_elongation_model(String & thislabel, String & label, Command_Line_Parameters & clp): BESTL_terminal_segment_elongation_model(thislabel,label,clp) {
+  // [*** Note:] See TL#200807020156.5 - WITHDRAWN! See TL#200807020156.10.
+  //probability_distribution_function * rootratepdf = pdfselection(thislabel+"tsem.rootrate.",clp,X_elongate);
+  //if (rootratepdf) base_parameters.l_i_cache = rootratepdf->random_positive();
+  //else base_parameters.l_i_cache = 0.00013889;
+  // Chaining of models is taken care of in the base constructor.
+}
+
+terminal_segment_elongation_model_base * BESTL_nonnormalizing_terminal_segment_elongation_model::clone(terminal_segment * ts) {
+  terminal_segment_elongation_model_base * tsemb = new BESTL_nonnormalizing_terminal_segment_elongation_model(contributing,contributingweight,*this);
+  if (ts) {
+    if ((!ts->Prev()) && (!ts->Next())) { // We still use the regular ERI->initialize() call from the terminal_segment::branch() function when branching
+      if (!(ts->ElongationRateInitializationModel())) error("ElongationRateInitializationModel() is NULL in BESTL_nonnormalizing_terminal_segment_elongation_model::clone().\n");
+      else ts->ElongationRateInitializationModel()->root_initialize(tsemb->base_parameters.l_i_cache); // Insures that initial segments also draw from the ERI distribution (see TL#200807020156.10)
+    }
+  }
+  return tsemb;
+}
+
+void BESTL_nonnormalizing_terminal_segment_elongation_model::elongate(terminal_segment * ts) {
+  // PROTOCOL: This is called during growth.
+  // This function calls:
+  //   perturbed_expected_elongation()
+  //   ElongationModel()->elongation()
+  //   ts->add_length()
+  //   ts->update_segment_vector()
+  if (eq->T()<=prev_t) return;
+  // 1., 2. & 3 compute perturbed expected elongation
+  // The three regular steps of the model call have been turned into
+  // a separate function here, so that the calculations can be invoked
+  // for all terminal segments as needed, while the sum of those results
+  // is needed for the elongation by proportional allocation of resources.
+  // [***NOTE] If the elongation calculations for specific terminal segments
+  // need to access other information about the terminal segment, or about
+  // other objects in the ts->Arbor(), then we can pass the ts parameter to
+  // other member functions, such as perturbed_expected_elongation().
+#ifdef REDUCED_MEMORY_PTSEM
+  tsem_pdf_cache = ts->Arbor()->TSEM_Pdf();
+#endif
+  double l_i = perturbed_expected_elongation();
+  // Note: There is no normalization to other growth cones here!
+#ifdef LEGACY_ELONGATION
+  l_i *= random_double(0.2,1.8);
+#endif
+  // 5. elongate by proportion of available resources
+  // double L_i = l_i * ts->Arbor()->ElongationModel()->elongation(ts->Arbor()); // [***NOTE] See TL#200807020156.5.
+  double L_i = l_i * (eq->T()-prev_t); // All is done locally for these absolute elongation rates! (See TL#200807020156.5.)
+#ifdef TESTING_ELONGATION_TOTAL
+  usedarborelongationfraction += l_i;
+#endif
+#ifdef DEBUGGING_ELONGATION
+  if (L_i<0.0) debugging.tsemb_elongate_decreasing++;
+  else if (L_i==0.0) debugging.tsemb_elongate_stopped++;
+#endif
+  ts->add_length(L_i);
+  // Test actual elongation pieces created per dt:
+  //cout << String(L_i,"_%.8f") << '&' << String(l_i,"%.8f");
+  if (figattr_update_terminal_segments_visibly) ts->update_segment_vector();
+  prev_t = eq->T();
+  return;
+}
+
+String BESTL_nonnormalizing_terminal_segment_elongation_model::report_parameters_specific() {
+  String res(" non-normalizing ");
+  res += BESTL_terminal_segment_elongation_model::report_parameters_specific();
+  return res;
+}
+
+BESTLNN_pyramidal_AD_terminal_segment_elongation_model::BESTLNN_pyramidal_AD_terminal_segment_elongation_model(terminal_segment_elongation_model_base * tsemcontrib, double & tsemweight, BESTLNN_pyramidal_AD_terminal_segment_elongation_model & schema): BESTL_nonnormalizing_terminal_segment_elongation_model(tsemcontrib,tsemweight,schema), parameters(schema.parameters), trunklengthpdf(NULL), obliquespdf(NULL), obliqueanglepdf(NULL) {
+  // Chaining of models is taken care of in the base constructor.
+  trunklengthpdf = schema.trunklengthpdf->clone();
+  // Note that we do not generate a new parameters.trunk_length_SQ value here, so that the expected trunk length is not changed when passing branch nodes that connect to obliques.
+  obliquespdf = schema.obliquespdf->clone();
+  // Note that we do not generate a new number of obliques here, so that the expected number of oblique branches does not change as we pass branch nodes that connect to them.
+  if (schema.obliqueanglepdf) obliqueanglepdf = schema.obliqueanglepdf->clone();
+}
+
+void BESTLNN_pyramidal_AD_terminal_segment_elongation_model::initialize_parameters() {
+  // This is used to initialize trunk length and number of obliques parameters when new
+  // PDFs may be selected by a constructor or when the TSEM of a root fiber terminal
+  // segment is allocated (see TL#200808050218.2).
+  parameters.trunk_length_SQ = trunklengthpdf->random_positive();
+  parameters.trunk_length_SQ *= parameters.trunk_length_SQ;
+  parameters.num_obliques = (int) obliquespdf->random_positive();
+  parameters.dist2nextoblique = 0;
+  set_next_oblique_distance();
+}
+
+BESTLNN_pyramidal_AD_terminal_segment_elongation_model::BESTLNN_pyramidal_AD_terminal_segment_elongation_model(String & thislabel, String & label, Command_Line_Parameters & clp): BESTL_nonnormalizing_terminal_segment_elongation_model(thislabel,label,clp), parameters(700.0*700.0,0,DBL_MAX,"pyrAP"), trunklengthpdf(NULL), obliquespdf(NULL), obliqueanglepdf(NULL) {
+  // [*** Note:] See TL#200807020156.5 - WITHDRAWN! See TL#200807020156.10.
+  trunklengthpdf = pdfselection(thislabel+"tsem.trunklength.",clp,X_elongate);
+  if (!trunklengthpdf) trunklengthpdf = new normal_pdf(X_elongate,700.0,100.0);
+  obliquespdf = pdfselection(thislabel+"tsem.obliques.",clp,X_elongate);
+  if (!obliquespdf) obliquespdf = new normal_pdf(X_elongate,7.0,3.0);
+  obliqueanglepdf = pdfselection(thislabel+"tsem.obliqueangle.",clp,X_elongate); // if NULL then there is no perturbation
+  int n;
+  if ((n=clp.Specifies_Parameter(thislabel+"tsem.prefix"))>=0) parameters.prefix = clp.ParValue(n);
+  initialize_parameters();// Here we generate new values, since the PDFs may be new (see TL#200808050218.2).
+  // Chaining of models is taken care of in the base constructor.
+}
+
+terminal_segment_elongation_model_base * BESTLNN_pyramidal_AD_terminal_segment_elongation_model::clone(terminal_segment * ts) {
+  BESTLNN_pyramidal_AD_terminal_segment_elongation_model * tsemb = new BESTLNN_pyramidal_AD_terminal_segment_elongation_model(contributing,contributingweight,*this);
+  if (ts) {
+    if ((!ts->Prev()) && (!ts->Next())) { // We still use the regular ERI->initialize() call from the terminal_segment::branch() function when branching
+      tsemb->initialize_parameters(); // Note: Fixed according to TL#200808050218.2.
+      if (!(ts->ElongationRateInitializationModel())) error("ElongationRateInitializationModel() is NULL in BESTL_nonnormalizing_terminal_segment_elongation_model::clone().\n");
+      else ts->ElongationRateInitializationModel()->root_initialize(tsemb->base_parameters.l_i_cache); // Insures that initial segments also draw from the ERI distribution (see TL#200807020156.10)
+    }
+  }
+  return tsemb;
+}
+
+void BESTLNN_pyramidal_AD_terminal_segment_elongation_model::set_next_oblique_distance() {
+  if (parameters.num_obliques>0) {
+    parameters.dist2nextoblique = sqrt(parameters.dist2nextoblique) + (sqrt(parameters.trunk_length_SQ)/((double) parameters.num_obliques));
+    parameters.dist2nextoblique *= parameters.dist2nextoblique;
+    //cout << "NUM OBLIQUES: " << parameters.num_obliques << " NEXT OBLIQUE: " << parameters.dist2nextoblique << '\n';
+  } else parameters.dist2nextoblique = DBL_MAX;
+}
+
+void BESTLNN_pyramidal_AD_terminal_segment_elongation_model::set_tuft_models(terminal_segment * ts) {
+  // BEWARE: This function causes a self-destruct of the present terminal segment. Do not try to
+  // modify any variables of the terminal segment object or its dependents after calling this
+  // function!
+  //cout << "TUFTING!"; cout.flush();
+  if (Txt_tuftrootbranchnodelist) (*Txt_tuftrootbranchnodelist) += String((long) ts->TerminalSegment()) + '\n';
+  ts->branch(NULL);
+  String prefixstr(parameters.prefix);
+  if (!prefixstr.empty()) prefixstr += ".tuft.";
+  else prefixstr = "tuft.";
+  // TSEMs
+  terminal_segment_elongation_model_base * tsembptr1 = NULL;
+  terminal_segment_elongation_model_selection(prefixstr,*main_clp,terminal_segment_elongation_model_region_subset_schemas[0][all_pyramidal_dendrites_sps],tsembptr1);
+  most_recent_branch1_ts->set_elongation_model(tsembptr1);
+  terminal_segment_elongation_model_base * tsembptr2 = tsembptr1->clone(most_recent_branch2_ts);
+  most_recent_branch2_ts->set_elongation_model(tsembptr2);
+  // ERI models
+  elongation_rate_initialization_model_base * eribptr = NULL;
+  elongation_rate_initialization_model_selection(prefixstr,*main_clp,elongation_rate_initialization_model_region_subset_schemas[0][all_pyramidal_dendrites_sps],eribptr);
+  most_recent_branch1_ts->set_ERI_model(eribptr);
+  eribptr->root_initialize(tsembptr1->base_parameters.l_i_cache); // reinitialize according to the new ERI model
+  eribptr = eribptr->clone();
+  most_recent_branch2_ts->set_ERI_model(eribptr);
+  eribptr->root_initialize(tsembptr2->base_parameters.l_i_cache); // reinitialize according to the new ERI model
+  // TSB models
+  TSBM_base * tsbmbptr = NULL;
+  TSBM_selection(prefixstr,*main_clp,TSBM_region_subset_schemas[0][all_pyramidal_dendrites_sps],tsbmbptr,most_recent_branch1_ts);
+  most_recent_branch1_ts->set_TSBM_model(tsbmbptr);
+  most_recent_branch2_ts->set_TSBM_model(tsbmbptr->clone(most_recent_branch2_ts));
+  // Branch angle models
+  branch_angle_model_base * bambptr = NULL;
+  branch_angle_model_selection(prefixstr,*main_clp,branch_angle_model_region_subset_schemas[0][all_pyramidal_dendrites_sps],bambptr);
+  most_recent_branch1_ts->set_branch_angle_model(bambptr);
+  most_recent_branch2_ts->set_branch_angle_model(bambptr->clone());
+  // [***NOTE] Possibly recompute branch angles here in a manner similar to that used in terminal_segment::branch().
+  // Direction models
+  direction_model_base * dmbptr = NULL;
+  direction_model_selection(prefixstr,*main_clp,direction_model_region_subset_schemas[0][all_pyramidal_dendrites_sps],dmbptr);
+  most_recent_branch1_ts->set_direction_model(dmbptr);
+  most_recent_branch2_ts->set_direction_model(dmbptr->clone());
+}
+
+void BESTLNN_pyramidal_AD_terminal_segment_elongation_model::set_oblique_models(terminal_segment * ts) {
+  // BEWARE: This function causes a self-destruct of the present terminal segment. Do not try to
+  // modify any variables of the terminal segment object or its dependents after calling this
+  // function!
+  //cout << "OBLIQUE!"; cout.flush();
+  if (Txt_obliquerootbranchnodelist) (*Txt_obliquerootbranchnodelist) += String((long) ts->TerminalSegment()) + '\n';
+  // 1. For obliques, preserve the growth angle of the main branch and prepare an oblique angle
+  spatial mainbranchacoords(ts->AngularCoords());
+  mainbranchacoords.set_X(0.0);
+  double veerangle = M_PI/2.0;
+  if (obliqueanglepdf) veerangle += obliqueanglepdf->random_selection();
+#ifdef VECTOR3D
+  spatial obliqueacoords;
+  veer(ts,veerangle,obliqueacoords,-1.0); // for the oblique branch
+#endif
+#ifdef VECTOR2D
+  spatial obliqueacoords(ts->AngularCoords());
+  if (X_turn.get_rand_real1()<0.5) obliqueacoords.add_Y(-veerangle);
+  else obliqueacoords.add_Y(veerangle);
+#endif
+  obliqueacoords.set_X(0.0);
+  ts->branch(NULL);
+  // 2. Modify the growth angles of oblique branches to preserve the angle of the main branch and give obliques orthogonal angles
+  most_recent_branch1_ts->set_angularcoords(mainbranchacoords); // Here, environmental pressures are also applied.
+  most_recent_branch1_ts->update_segment_vector();
+  most_recent_branch2_ts->set_angularcoords(obliqueacoords); // Here, environmental pressures are also applied.
+  most_recent_branch2_ts->update_segment_vector();
+  // 3. Set models for the oblique branch
+  String prefixstr(parameters.prefix);
+  if (!prefixstr.empty()) prefixstr += ".oblique.";
+  else prefixstr = "oblique.";
+  // TSEMs
+  terminal_segment_elongation_model_base * tsembptr = NULL;
+  terminal_segment_elongation_model_selection(prefixstr,*main_clp,terminal_segment_elongation_model_region_subset_schemas[0][all_pyramidal_dendrites_sps],tsembptr);
+  // most_recent_branch1_ts retains the current apical trunk settings
+  most_recent_branch2_ts->set_elongation_model(tsembptr);
+  // ERI models
+  elongation_rate_initialization_model_base * eribptr = NULL;
+  elongation_rate_initialization_model_selection(prefixstr,*main_clp,elongation_rate_initialization_model_region_subset_schemas[0][all_pyramidal_dendrites_sps],eribptr);
+  // most_recent_branch1_ts retains the current apical trunk settings
+  most_recent_branch2_ts->set_ERI_model(eribptr);
+  eribptr->root_initialize(tsembptr->base_parameters.l_i_cache); // reinitialize according to the new ERI model
+  // TSB models
+  TSBM_base * tsbmbptr = NULL;
+  TSBM_selection(prefixstr,*main_clp,TSBM_region_subset_schemas[0][all_pyramidal_dendrites_sps],tsbmbptr,most_recent_branch2_ts);
+  most_recent_branch2_ts->set_TSBM_model(tsbmbptr);
+  // Branch angle models
+  branch_angle_model_base * bambptr = NULL;
+  branch_angle_model_selection(prefixstr,*main_clp,branch_angle_model_region_subset_schemas[0][all_pyramidal_dendrites_sps],bambptr);
+  most_recent_branch2_ts->set_branch_angle_model(bambptr);
+  // [***NOTE] Possibly recompute branch angles here in a manner similar to that used in terminal_segment::branch().
+  // Direction models
+  direction_model_base * dmbptr = NULL;
+  direction_model_selection(prefixstr,*main_clp,direction_model_region_subset_schemas[0][all_pyramidal_dendrites_sps],dmbptr);
+  most_recent_branch2_ts->set_direction_model(dmbptr);
+}
+
+void BESTLNN_pyramidal_AD_terminal_segment_elongation_model::elongate(terminal_segment * ts) {
+  // PROTOCOL: This is called during growth.
+  // This function calls:
+  //   perturbed_expected_elongation()
+  //   ElongationModel()->elongation()
+  //   ts->add_length()
+  //   ts->update_segment_vector()
+  if (eq->T()<=prev_t) return;
+  // 1., 2. & 3 compute perturbed expected elongation
+  // The three regular steps of the model call have been turned into
+  // a separate function here, so that the calculations can be invoked
+  // for all terminal segments as needed, while the sum of those results
+  // is needed for the elongation by proportional allocation of resources.
+  // [***NOTE] If the elongation calculations for specific terminal segments
+  // need to access other information about the terminal segment, or about
+  // other objects in the ts->Arbor(), then we can pass the ts parameter to
+  // other member functions, such as perturbed_expected_elongation().
+#ifdef REDUCED_MEMORY_PTSEM
+  tsem_pdf_cache = ts->Arbor()->TSEM_Pdf();
+#endif
+  double l_i = perturbed_expected_elongation();
+  // Note: There is no normalization to other growth cones here!
+#ifdef LEGACY_ELONGATION
+  l_i *= random_double(0.2,1.8);
+#endif
+  // 5. elongate by proportion of available resources
+  // double L_i = l_i * ts->Arbor()->ElongationModel()->elongation(ts->Arbor()); // [***NOTE] See TL#200807020156.5.
+  double L_i = l_i * (eq->T()-prev_t); // All is done locally for these absolute elongation rates! (See TL#200807020156.5.)
+#ifdef TESTING_ELONGATION_TOTAL
+  usedarborelongationfraction += l_i;
+#endif
+#ifdef DEBUGGING_ELONGATION
+  if (L_i<0.0) debugging.tsemb_elongate_decreasing++;
+  else if (L_i==0.0) debugging.tsemb_elongate_stopped++;
+#endif
+  ts->add_length(L_i);
+  // Test actual elongation pieces created per dt:
+  //cout << String(L_i,"_%.8f");
+  // Is it time to tuft?
+  ts->update_segment_vector();
+  double dist2tosoma = ts->TerminalSegment()->cartesian_soma_center_distance2();
+  prev_t = eq->T(); // do this first to avoid self-destruct problems (see set_tuft_models() and set_oblique_models())
+  if (dist2tosoma>=parameters.trunk_length_SQ) set_tuft_models(ts);
+  else { // Is it time for an oblique branch?
+    if (dist2tosoma>=parameters.dist2nextoblique) {
+      set_next_oblique_distance(); // do this first to avoid self-destruct problems (see set_oblique_models())
+      set_oblique_models(ts);
+    }
+  }
+  return;
+}
+
+String BESTLNN_pyramidal_AD_terminal_segment_elongation_model::report_parameters_specific() {
+  String res(" pyramidal apical dendrite prototyping ");
+  res += BESTL_nonnormalizing_terminal_segment_elongation_model::report_parameters_specific();
+  res += " trunk length PDF: " + trunklengthpdf->report_parameters();
+  res += " obliques PDF: " + obliquespdf->report_parameters();
+  res += " prefix: " + parameters.prefix;
   return res;
 }
 
@@ -865,9 +1167,11 @@ length_distribution_eri_model::length_distribution_eri_model(elongation_rate_ini
 
 length_distribution_eri_model::length_distribution_eri_model(String & thislabel, String & label, Command_Line_Parameters & clp): elongation_rate_initialization_model_base(thislabel,label,clp) {
   // Chaining of models is taken care of in the base constructor.
+  //cout << "SETTING UP LENGTH DISTR. model\n";
   pdf = pdfselection(thislabel+"eri.",clp,X_elongate);
-  if (!pdf) pdf = new normal_pdf(X_elongate,1.0,0.3,2.0); // a normal PDF is the default for TSEMs
-  else if (pdf->amplitude()>1.0) warning("Warning: Elongation Rate Initialization Model has perturbation with amplitude greater than 1.0!\n");
+  //if (!pdf) cout << "NO SPECIFIC PDF FOUND\n";
+  if (!pdf) pdf = new normal_pdf(X_elongate,0.0,1.0,3.0); // a normal PDF is the default for TSEMs
+  //  else if (pdf->amplitude()>1.0) warning("Warning: Elongation Rate Initialization Model has perturbation with amplitude greater than 1.0!\n");
 }
 
 elongation_rate_initialization_model_base * length_distribution_eri_model::clone() {
@@ -875,11 +1179,30 @@ elongation_rate_initialization_model_base * length_distribution_eri_model::clone
 }
 
 void length_distribution_eri_model::predict_initial_quota(double & predictedquota1,double & predictedquota2, terminal_segment * ts1, terminal_segment * ts2,double weight) {
+  // Note that this model relates to considerations described in
+  // TL#200709152200.1 and linked task log entries.
+  // (See source code dated prior to 20080425 for the older implementation
+  // that was changed in response to problems dealt with in TL#200804182330.1.)
+  // We compute a (normal) random number. The standard mean value is the mean
+  // of existing quotas. Negative values are compressed through the sigmoid
+  // function 2*(1/1+e(-t)), so that a value of -inf equates to a zero quota
+  // and a value of 0 equates to 1.0*meanquota of previously existing growth
+  // cones. Positive values are converted as (0.5*t)+1, so that 0 is again
+  // equal to 1.0*meanquota and 2 becomes 2*meanquota. Clearly now, it is
+  // possible change both the possible relative slowdown or speedup by changing
+  // the standard deviation of the normal function. The std 1.0 will be set as
+  // the compiled default. Changing the mean value away from 0.0 can do more
+  // drastic things by biasing new initial elongation rates to be slower or
+  // faster than the elongation rates of existing growth cones.
+  //cout << "ENTERED LENGTH-DISTR. quota prediction" << pdf->report_parameters() << '\n';
   double len1 = ts1->Length();
   double len2 = ts2->Length();
-  // A distribution about 1.0 is used by default.
-  double Xa = pdf->random_positive();
-  double Xb = pdf->random_positive();
+  double Xa = pdf->random_selection();
+  double Xb = pdf->random_selection();
+  if (Xa<0.0) Xa = 2.0/(1.0+exp(-Xa));
+  else Xa = (0.5*Xa)+1.0;
+  if (Xb<0.0) Xb = 2.0/(1.0+exp(-Xb));
+  else Xb = (0.5*Xb)+1.0;
   // Initial quotas take into account the ratio len1:len2, or at least their order
   if (len1>len2) {
     if (Xa<Xb) SWAPDOUBLES(Xa,Xb);
@@ -896,20 +1219,64 @@ void length_distribution_eri_model::predict_initial_quota(double & predictedquot
   // in the list.
   double maxquota = 1.0;
   double meanquota = Get_Mean_and_Max_Quotas(ts1->Next(),maxquota);
-  // If necessary, initial quotas are scaled, so that 1.0 maps to the mean and
-  // 2.0 is twice the maximum. Notice that specifying different mean, std and
-  // truncation parameters for the PDF can shift the way in which new branch
-  // elongation quotas compare to the quotas of the existing tree.
-  // The difference between 2.0 and 1.0 is 1.0, which must be mapped to max-mean
-  double maxamp = 2*(maxquota-meanquota);
-  Xa = ((Xa - 1.0) * maxamp) + meanquota;
-  Xb = ((Xb - 1.0) * maxamp) + meanquota;
+  // What to do about unbounded probability distributions (amplitude == DBL_MAX - mean_X)?
+  // Watch out for amplitude == 0
+  // Suggest the use of a truncation value
+  // Scaling
+  //double maxamp = 2*(maxquota-meanquota);
+  Xa *= meanquota;
+  Xb *= meanquota;
   predictedquota1 += (weight*Xa);
   predictedquota2 += (weight*Xb);
+#ifdef TESTQUOTAS
+  quotas += String(eq->T(),"t=%.2f, ") + String(meanquota,"MQ=%.5f, ") + String(predictedquota1,"b1Q=%.5f, ") + String(predictedquota2,"b2Q=%.2f\n");
+#endif
 }
 
 String length_distribution_eri_model::report_parameters_specific() {
   String res(" length distribution");
+  res += pdf->report_parameters();
+  return res;
+}
+
+nonnorm_BESTL_length_distribution_eri_model::nonnorm_BESTL_length_distribution_eri_model(elongation_rate_initialization_model_base * ericontrib, double & eriweight, nonnorm_BESTL_length_distribution_eri_model & schema): length_distribution_eri_model(ericontrib,eriweight,schema) {
+  // Chaining of models is taken care of in the base constructor.
+}
+
+nonnorm_BESTL_length_distribution_eri_model::nonnorm_BESTL_length_distribution_eri_model(String & thislabel, String & label, Command_Line_Parameters & clp): length_distribution_eri_model(thislabel,label,clp) {
+  // Chaining of models is taken care of in the base constructor.
+}
+
+elongation_rate_initialization_model_base * nonnorm_BESTL_length_distribution_eri_model::clone() {
+  return new nonnorm_BESTL_length_distribution_eri_model(contributing,contributingweight,*this);
+}
+
+void nonnorm_BESTL_length_distribution_eri_model::predict_initial_quota(double & predictedquota1,double & predictedquota2, terminal_segment * ts1, terminal_segment * ts2,double weight) {
+  // This model applies the same correlation between initial branch lengths and
+  // initial branch elongation rates as the length_distribution_eri_model, but
+  // considers elongation rates absolute in accordance with notes in TL#200807020156.5.
+  double len1 = ts1->Length();
+  double len2 = ts2->Length();
+  double Xa = pdf->random_positive();
+  double Xb = pdf->random_positive();
+  // Initial quotas take into account the ratio len1:len2, or at least their order
+  if (len1>len2) {
+    if (Xa<Xb) SWAPDOUBLES(Xa,Xb);
+  } else {
+    if (Xa>Xb) SWAPDOUBLES(Xa,Xb);
+  }
+  predictedquota1 += (weight*Xa);
+  predictedquota2 += (weight*Xb);
+}
+
+void nonnorm_BESTL_length_distribution_eri_model::root_initialize(double & l_i_cache) {
+  // [***INCOMPLETE] We may add "contributing" parts here, just as in the initialize() function, resulting in a weighted sum.
+  l_i_cache = pdf->random_positive();
+}
+
+String nonnorm_BESTL_length_distribution_eri_model::report_parameters_specific() {
+  String res(" non-normalizing BESTL length distribution");
+  res += pdf->report_parameters();
   return res;
 }
 
@@ -930,9 +1297,27 @@ elongation_rate_initialization_model_base * pure_stochastic_eri_model::clone() {
 }
 
 void pure_stochastic_eri_model::predict_initial_quota(double & predictedquota1,double & predictedquota2, terminal_segment * ts1, terminal_segment * ts2,double weight) {
-  // A distribution about 1.0 is used by default.
-  double Xa = pdf->random_positive();
-  double Xb = pdf->random_positive();
+  // Note that this model relates to considerations described in
+  // TL#200709152200.1 and linked task log entries.
+  // (See source code dated prior to 20080425 for the older implementation
+  // that was changed in response to problems dealt with in TL#200804182330.1.)
+  // We compute a (normal) random number. The standard mean value is the mean
+  // of existing quotas. Negative values are compressed through the sigmoid
+  // function 2*(1/1+e(-t)), so that a value of -inf equates to a zero quota
+  // and a value of 0 equates to 1.0*meanquota of previously existing growth
+  // cones. Positive values are converted as (0.5*t)+1, so that 0 is again
+  // equal to 1.0*meanquota and 2 becomes 2*meanquota. Clearly now, it is
+  // possible change both the possible relative slowdown or speedup by changing
+  // the standard deviation of the normal function. The std 1.0 will be set as
+  // the compiled default. Changing the mean value away from 0.0 can do more
+  // drastic things by biasing new initial elongation rates to be slower or
+  // faster than the elongation rates of existing growth cones.
+  double Xa = pdf->random_selection();
+  double Xb = pdf->random_selection();
+  if (Xa<0.0) Xa = 2.0/(1.0+exp(-Xa));
+  else Xa = (0.5*Xa)+1.0;
+  if (Xb<0.0) Xb = 2.0/(1.0+exp(-Xb));
+  else Xb = (0.5*Xb)+1.0;
   // If the terminal segment elongation models of ts1 and ts2 do not have any
   // contributing models (contributing==NULL), and they are of a BESTL type,
   // then there is no need to compute a mean to compete with, and all will
@@ -943,14 +1328,13 @@ void pure_stochastic_eri_model::predict_initial_quota(double & predictedquota1,d
   // in the list.
   double maxquota = 1.0;
   double meanquota = Get_Mean_and_Max_Quotas(ts1->Next(),maxquota);
-  // If necessary, initial quotas are scaled, so that 1.0 maps to the mean and
-  // 2.0 is twice the maximum. Notice that specifying different mean, std and
-  // truncation parameters for the PDF can shift the way in which new branch
-  // elongation quotas compare to the quotas of the existing tree.
-  // The difference between 2.0 and 1.0 is 1.0, which must be mapped to max-mean
-  double maxamp = 2*(maxquota-meanquota);
-  Xa = ((Xa - 1.0) * maxamp) + meanquota;
-  Xb = ((Xb - 1.0) * maxamp) + meanquota;
+  // What to do about unbounded probability distributions (amplitude == DBL_MAX - mean_X)?
+  // Watch out for amplitude == 0
+  // Suggest the use of a truncation value
+  // Scaling
+  //double maxamp = 2*(maxquota-meanquota);
+  Xa *= meanquota;
+  Xb *= meanquota;
   predictedquota1 += (weight*Xa);
   predictedquota2 += (weight*Xb);
 }
@@ -1081,9 +1465,9 @@ arbor_elongation_model_base * arbor_elongation_model_selection(String & label, C
     break;;
   }
   // In case a secondary schema reference is provided through aembptr for the universal set level, create a clone for the universal set
-  if ((label.empty()) && (general_arbor_elongation_model_base_subset_schemas[universal_sps]!=aembptr)) {
-    if (general_arbor_elongation_model_base_subset_schemas[universal_sps]) general_arbor_elongation_model_base_subset_schemas[universal_sps]->delete_shared();
-    general_arbor_elongation_model_base_subset_schemas[universal_sps] = aembptr->clone();
+  if ((label.empty()) && (arbor_elongation_model_region_subset_schemas[0][universal_sps]!=aembptr)) {
+    if (arbor_elongation_model_region_subset_schemas[0][universal_sps]) arbor_elongation_model_region_subset_schemas[0][universal_sps]->delete_shared();
+    arbor_elongation_model_region_subset_schemas[0][universal_sps] = aembptr->clone();
   }
   return aembptr;
 }
@@ -1095,7 +1479,9 @@ String terminal_segment_elongation_model_idstr[NUM_tsem] = {
   "constrained_second_order",
   "initialized_cso",
   "decaying_second_order",
-  "bestl" // downcased!
+  "bestl",
+  "nonnorm_bestl", // downcased!
+  "pyrad_bestlnn" // downcased!
 };
 
 terminal_segment_elongation_model_base * terminal_segment_elongation_model_selection(String & label, Command_Line_Parameters & clp, terminal_segment_elongation_model_base * superior_set, terminal_segment_elongation_model_base_ptr & tsembptr) {
@@ -1146,21 +1532,28 @@ terminal_segment_elongation_model_base * terminal_segment_elongation_model_selec
   case BESTL_tsem:
     tsembptr = new BESTL_terminal_segment_elongation_model(label,nextlabel,clp);
     break;;
+  case nonnorm_BESTL_tsem:
+    tsembptr = new BESTL_nonnormalizing_terminal_segment_elongation_model(label,nextlabel,clp);
+    break;;
+  case pyrAD_BESTLNN_tsem:
+    tsembptr = new BESTLNN_pyramidal_AD_terminal_segment_elongation_model(label,nextlabel,clp);
+    break;;
   default: // If not specified, inherit from immediate superior set
     if (!superior_set) return NULL;
-    tsembptr = superior_set->clone();
+    tsembptr = superior_set->clone(NULL);
     break;;
   }
   // In case a secondary schema reference is provided through aembptr for the universal set level, create a clone for the universal set
-  if ((label.empty()) && (general_terminal_segment_elongation_model_base_subset_schemas[universal_sps]!=tsembptr)) {
-    if (general_terminal_segment_elongation_model_base_subset_schemas[universal_sps]) general_terminal_segment_elongation_model_base_subset_schemas[universal_sps]->delete_shared();
-    general_terminal_segment_elongation_model_base_subset_schemas[universal_sps] = tsembptr->clone();
+  if ((label.empty()) && (terminal_segment_elongation_model_region_subset_schemas[0][universal_sps]!=tsembptr)) {
+    if (terminal_segment_elongation_model_region_subset_schemas[0][universal_sps]) terminal_segment_elongation_model_region_subset_schemas[0][universal_sps]->delete_shared();
+    terminal_segment_elongation_model_region_subset_schemas[0][universal_sps] = tsembptr->clone(NULL);
   }
   return tsembptr;
 }
 
 String elongation_rate_initialization_model_idstr[NUM_eri] = {
   "length_distribution",
+  "nonnorm_bestl_length_distribution",
   "pure_stochastic",
   "zero",
   "unitary",
@@ -1197,6 +1590,9 @@ elongation_rate_initialization_model_base * elongation_rate_initialization_model
   case length_distribution_eri:
     eribptr = new length_distribution_eri_model(label,nextlabel,clp);
     break;;
+  case nonnorm_BESTL_length_distribution_eri:
+    eribptr = new nonnorm_BESTL_length_distribution_eri_model(label,nextlabel,clp);
+    break;;
   case pure_stochastic_eri:
     eribptr = new pure_stochastic_eri_model(label,nextlabel,clp);
     break;;
@@ -1215,9 +1611,9 @@ elongation_rate_initialization_model_base * elongation_rate_initialization_model
     break;;
   }
   // In case a secondary schema reference is provided through aembptr for the universal set level, create a clone for the universal set
-  if ((label.empty()) && (elongation_rate_initialization_model_subset_schemas[universal_sps]!=eribptr)) {
-    if (elongation_rate_initialization_model_subset_schemas[universal_sps]) elongation_rate_initialization_model_subset_schemas[universal_sps]->delete_shared();
-    elongation_rate_initialization_model_subset_schemas[universal_sps] = eribptr->clone();
+  if ((label.empty()) && (elongation_rate_initialization_model_region_subset_schemas[0][universal_sps]!=eribptr)) {
+    if (elongation_rate_initialization_model_region_subset_schemas[0][universal_sps]) elongation_rate_initialization_model_region_subset_schemas[0][universal_sps]->delete_shared();
+    elongation_rate_initialization_model_region_subset_schemas[0][universal_sps] = eribptr->clone();
   }
   return eribptr;
 }

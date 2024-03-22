@@ -35,14 +35,34 @@ String * Txt_fiberrootlist = NULL;
 String * Txt_continuationnodelist = NULL;
 String * Txt_bifurcationnodelist = NULL;
 String * Txt_terminalgrowthconelist = NULL;
+String * Txt_tuftrootbranchnodelist = NULL;
+String * Txt_obliquerootbranchnodelist = NULL;
 long Txt_neuronindex = 0;
 long Txt_synapseindex = 0;
 long Txt_nodeindex = -1;
 
 Txt_Header::Txt_Header(): text("#NETMORPH Txt; Generated Structure\n#Format:\n#1. List of neurons\n#2. List of synapses\n") {
-  if (outattr_track_nodegenesis) text += "#3. List of fiber structure (axon/dendrite) roots\n#4. List of continuation nodes (turn points)\n#5. List of bifrucation nodes (branch points)\n#6. List of terminal growth cones (end points)\n";
-  text += "#\n#List of neurons contains:\n#  neuron index number, neuron label, soma center x coordinate, soma center y coordinate, soma center z coordinate\n#List of synapses contains:\n#  synapse index number, postsynaptic receptor type, x coordinate, y coordinate, z coordinate, presynaptic neuron label, postsynaptic neuron label, simulated time of synaptogenesis\n#(If multiple synapses have the same location then there are multiple different types of receptor populations at that synaptic location.)\n";
-  if (outattr_track_nodegenesis)text += "#List of root nodes contains:\n#  node index number, fiber structure type, x coordinate, y coordinate, z coordinate, soma neuron label, simulated time of node genesis\n#List of continuation nodes contains:\n#  node index number, fiber structure type, x coordinate, y coordinate, z coordinate, soma neuron label, parent label, simulated time of node genesis\n#List of bifurcation nodes contains:\n#  node index number, fiber structure type, x coordinate, y coordinate, z coordinate, soma neuron label, parent label, simulated time of node genesis\n#List of terminal growth cones contains:\n#  node index number, fiber structure type, x coordinate, y coordinate, z coordinate, soma neuron label, parent label, simulated time of node genesis\n#(Fiber structure types are: axon, dendrite, apical dendrite. The parent label refers to the first centripetal point, i.e. towards the soma.)\n";
+  if (outattr_track_nodegenesis) text += "#3. List of fiber structure (axon/dendrite) roots\n#4. List of continuation nodes (turn points)\n#5. List of bifurcation nodes (branch points)\n#6. List of terminal growth cones (end points)\n#7. List of apical dendrite tuft root nodes (branch points)\n#8. List of apical dendrite oblique root nodes (branch points)\n";
+  text += "#\n#List of neurons contains:\n";
+  text += COLUMN_LABELS_NEURONS;
+  text += "#List of synapses contains:\n";
+  text += COLUMN_LABELS_SYNAPSES;
+  text += "#(If multiple synapses have the same location then there are multiple different types of receptor populations at that synaptic location.)\n";
+  if (outattr_track_nodegenesis) {
+    text += "#List of root nodes contains:\n";
+    text += COLUMN_LABELS_ROOT_NODES;
+    text += "#List of continuation nodes contains:\n";
+    text += COLUMN_LABELS_FIBER_NODES;
+    text += "#List of bifurcation nodes contains:\n";
+    text += COLUMN_LABELS_FIBER_NODES;
+    text += "#List of terminal growth cones contains:\n";
+    text += COLUMN_LABELS_FIBER_NODES;
+    text += "#List of apical dendrite tuft root nodes contains:\n";
+    text += COLUMN_LABELS_TUFT_NODES;
+    text += "#List of apical dendrite oblique root nodes contains:\n";
+    text += COLUMN_LABELS_OBLIQUE_NODES;
+    text += "#(Fiber structure types are: axon, dendrite, apical dendrite. The parent label refers to the first centripetal point, i.e. towards the soma.)\n";
+  }
   text += '\n';
 }
 

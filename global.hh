@@ -34,7 +34,7 @@
 #include "BigString.hh"
 #include "Command_Line_Parameters.hh"
 #include "mtprng.hh"
-//#include <stdint.h>
+#include <stdint.h>
 
 // global defines
 
@@ -47,8 +47,6 @@ extern unsigned long int aemrandomdist[];
 #endif
 
 // Testing new code
-#define INCLUDE_SCHEMA_PARENT_SET_PROTOCOL_DIRECTION_MODELS
-
 #define STRICTLY_ADHERE_TO_TAU_C_BINF_RELATION
 
 #define FIGSCALED(figcoord) ((long) (figscale*(figcoord)))
@@ -81,18 +79,33 @@ enum growth_cone_competition_type { gcc_within_tree, gcc_within_all_AorD, gcc_wh
 enum fibre_structure_class_id { axon_fs, dendrite_fs, NUM_fs };
 
 enum branching_model { van_Pelt_bm, polynomial_O1_bm, polynomial_O3_bm, NUM_bm };
+enum TSBM { van_Pelt_tsbm, van_Pelt_specBM_tsbm, NUM_tsbm };
+enum TSTM { tm_none, tm_each_dt, tm_linear_rate, tm_branch_coupled, tm_NUM };
 enum branch_angle_model { balanced_forces_bam, fork_main_daughter_bam, NUM_bam };
 enum turning_model { independent_rate_tm, elongation_locked_tm, bifurcation_coupled_tm, NUM_tm };
-enum direction_model { radial_dm, segment_history_tension_dm, cell_attraction_dm, NUM_dm };
+enum direction_model { radial_dm, segment_history_tension_dm, cell_attraction_dm, vector_dm, NUM_dm };
 enum arbor_elongation_model { van_Pelt_aem, polynomial_O1_aem, polynomial_O3_aem, NUM_aem };
-enum terminal_segment_elongation_model { simple_tsem, inertia_tsem, second_order_tsem, constrained_second_order_tsem, initialized_CSO_tsem, decaying_second_order_tsem, BESTL_tsem, NUM_tsem };
-enum elongation_rate_initialization_model { length_distribution_eri, pure_stochastic_eri, zero_eri, unitary_eri, continue_defaults_eri, NUM_eri };
+enum terminal_segment_elongation_model { simple_tsem, inertia_tsem, second_order_tsem, constrained_second_order_tsem, initialized_CSO_tsem, decaying_second_order_tsem, BESTL_tsem, nonnorm_BESTL_tsem, pyrAD_BESTLNN_tsem, NUM_tsem };
+enum elongation_rate_initialization_model { length_distribution_eri, nonnorm_BESTL_length_distribution_eri, pure_stochastic_eri, zero_eri, unitary_eri, continue_defaults_eri, NUM_eri };
 
 // PROTOCOL: [See TL#200709121534.] As for all defined sets, in the case of natural sets also, parsing specifications must occur for more general
 //           sets before proceeding to more specific (narrow) sets. This insures that the more general model selections are available for
 //           inheritance when such a selection is not made explicitly for a more specific set. Note that this is similar to object inheritance
 //           in languages such as C++, and the order of constructor calls.
-enum natural_schema_parent_set { universal_sps, all_axons_sps, all_dendrites_sps, all_pyramidal_axons_sps, all_pyramidal_dendrites_sps, all_interneuron_axons_sps, all_interneuron_dendrites_sps, all_apical_pyramidal_dendrites_sps, NUM_NATURAL_SPS };
+enum natural_schema_parent_set {
+  universal_sps,
+  all_axons_sps,
+  all_dendrites_sps,
+  all_multipolar_axons_sps,
+  all_multipolar_dendrites_sps,
+  all_bipolar_axons_sps,
+  all_bipolar_dendrites_sps,
+  all_pyramidal_axons_sps,
+  all_pyramidal_dendrites_sps,
+  all_interneuron_axons_sps,
+  all_interneuron_dendrites_sps,
+  all_apical_pyramidal_dendrites_sps,
+  NUM_NATURAL_SPS };
 extern natural_schema_parent_set superior_natural_set[NUM_NATURAL_SPS];
 
 // global variables
@@ -104,12 +117,14 @@ extern bool outattr_show_stats;
 extern bool outattr_track_synaptogenesis;
 extern bool outattr_track_nodegenesis;
 extern bool outattr_make_full_Txt;
+extern bool outattr_make_full_X3D;
+extern bool outattr_make_full_Catacomb;
+extern fibre_structure_class_id statsattr_fan_in_analysis;
+extern bool outattr_Txt_sequence;
 extern bool outattr_Txt_separate_files;
 extern bool outattr_synapse_distance_frequency;
 extern bool outattr_connection_distance_frequency;
 extern double outattr_distance_frequency_distbinsize;
-extern double tex_textwidth;
-extern double figscale;
 extern bool figattr_show_electrodes;
 extern bool figattr_show_neurons;
 extern bool figattr_show_abstract_connections;
@@ -152,17 +167,16 @@ extern bool reduce_rand_calls;
 // object so that each neuron can link to its own specific instance.
 extern bool random_orientation;
 extern double random_orientation_amplitude;
+extern bool apical_specified_overrides_centroid;
 extern bool use_specified_basal_direction;
 extern double specified_basal_direction_theta;
 extern double specified_basal_direction_phi;
-extern int multipolar_mintrees; // *** this should be in Multipolar_Statistics
-extern int multipolar_maxtrees; // *** this should be in Multipolar_Statistics
 extern double multipolar_initangledevratio; // *** this should be in Multipolar_Statistics
-extern int multipolar_axon_mintrees; // *** this should be in Multipolar_Statistics
-extern int multipolar_axon_maxtrees; // *** this should be in Multipolar_Statistics
 extern double multipolar_axon_initangledevratio; // *** this should be in Multipolar_Statistics
 
 extern double pyramidaltreesmaxdeviation; // *** this should be in Pyramidal_statistics or in the pspreadmin/pspreadmax initialization
+extern double bipolartreesmaxdeviation;
+extern double multipolartreesmaxdeviation;
 
 extern double branchanglemin; // *** this should be in Multipolar_Statistics
 extern double branchanglemax; // *** this should be in Multipolar_Statistics
@@ -175,11 +189,9 @@ extern bool dendrite_two_branch_types; // *** this should be in Multipolar_Stati
 extern bool axon_two_branch_types; // *** this should be in Multipolar_Statistics
 extern double turnanglemin; // *** this should be in Multipolar_Statistics
 extern double turnanglemax; // *** this should be in Multipolar_Statistics
-extern double turnmaxdeviationfromnormal; // *** this should be in Multipolar_Statistics
-extern bool dendrite_Samsonovich_hypothesis; // *** this should be in Multipolar_Statistics
-extern bool axon_Samsonovich_hypothesis; // *** this should be in Multipolar_Statistics
 // === end parameter section ===
 
+extern bool fibreswithturns;
 extern bool initiallengthatactualfirstbranch;
 extern bool branchsomewhereinsegment;
 
@@ -192,15 +204,32 @@ extern bool evaluate_connectivity_immediately; // ** this could be in dendritic_
 
 extern unsigned long warning_fibre_segment_net_Fig_zero_length;
 extern unsigned long warning_Spatial_Segment_Subset_intersects_zero_length;
-extern bool warnings_on;
+#define WARN_OFF        0
+#define WARN_STDOUT     1
+#define WARN_STDOUTFILE 2
+#define WARN_FILE       3
+extern int warnings_on; // OFF, STDOUT, STDOUT & FILE, FILE
+extern int reports_on; // OFF, STDOUT, STDOUT & FILE, FILE
+extern int progress_on; // OFF, STDOUT, STDOUT & FILE, FILE
 
 extern String outputdirectory;
 extern String absoluteoutputURL;
+
+extern String warningfile;
+extern String reportfile;
+extern String progressfile;
+
+//#define TESTQUOTAS
+#ifdef TESTQUOTAS
+extern String quotas;
+#endif
 
 // function declarations
 
 void error(String msg);
 void warning(String msg);
+void report(String msg);
+void progress(String msg);
 
 void global_parse_CLP(Command_Line_Parameters & clp);
 String global_report_parameters();
@@ -317,8 +346,14 @@ double square_distance(double x1, double y1, double x2, double y2);
 class probability_distribution_function {
   // This is the base class for a variety of probability distribution
   // functions.
+  // There are certain functions that each PDF must support:
+  //   mean_X()
+  //   (std_X())
+  //   random_positive()
+  //   random_selection()
+  //   amplitude()
 private:
-  probability_distribution_function() { cerr << "Error: Default constructor probability_distribution_function() should never be called.\n"; exit(1); }
+  probability_distribution_function() { error("Error: Default constructor probability_distribution_function() should never be called.\n"); }
 protected:
   rng * X_uni;
 #ifdef INCLUDE_PDF_SAMPLING
@@ -337,6 +372,7 @@ public:
   probability_distribution_function(String thislabel, Command_Line_Parameters & clp, rng & _X_uni): X_uni(&_X_uni) {}
   virtual ~probability_distribution_function() {}
 #endif
+  virtual double mean_X() = 0;
   virtual double random_positive() = 0;
   virtual double random_selection() = 0;
   virtual double amplitude() = 0;
@@ -356,9 +392,10 @@ protected:
 public:
   delta_pdf(rng & _X_uni, double _v = 0.0): probability_distribution_function(_X_uni), v(_v) {}
   delta_pdf(String thislabel, Command_Line_Parameters & clp, rng & _X_uni);
+  virtual double mean_X() { return v; }
   virtual double random_positive() { if (v>=0.0) return v; else return -v; }
   virtual double random_selection() { return v; }
-  virtual double amplitude() { return 1.0; }
+  virtual double amplitude() { return 0.0; } // I corrected this from 1.0.
   virtual String report_parameters() { return String("delta PDF: "+String(v,"value=%.3f")); }
   virtual probability_distribution_function * clone() { return new delta_pdf(*X_uni,v); }
 };
@@ -366,6 +403,7 @@ public:
 class uniform_pdf: public probability_distribution_function {
 public:
   uniform_pdf(rng & _X_uni): probability_distribution_function(_X_uni) {}
+  virtual double mean_X() { return 0.0; }
   virtual double random_positive() { return X_uni->get_rand_real1(); }
   virtual double random_selection() { return X_uni->get_rand_range_real1(-1.0,1.0); }
   virtual double amplitude() { return 1.0; }
@@ -391,6 +429,7 @@ public:
     twoa = 2.0*a;
     twomax_y = 2.0*max_y;    
   }
+  virtual double mean_X() { return 0.0; }
   virtual double random_positive() {
     double y = max_y*X_uni->get_rand_real1();
     return (negb + sqrt(SQb + (twoa*y)))/a;
@@ -429,6 +468,7 @@ public:
   spline_normal_pdf(rng & _X_uni, double max_x, double sigvalue, double sigproportion): probability_distribution_function(_X_uni) { setup(max_x,sigvalue,sigproportion); }
   spline_normal_pdf(String thislabel, Command_Line_Parameters & clp, rng & _X_uni);
   virtual void setup(double max_x, double sigvalue, double sigproportion);
+  virtual double mean_X() { return 0.0; }
   virtual double random_positive();
   virtual double random_selection();
   virtual double amplitude() { return _max_x; }
@@ -446,6 +486,7 @@ protected:
 public:
   spline_normal_pdf_with_min(rng & _X_uni, double _min_x, double max_x, double sigvalue, double sigproportion): spline_normal_pdf(_X_uni,max_x-_min_x,sigvalue-_min_x,sigproportion), min_x(_min_x) {}
   spline_normal_pdf_with_min(String thislabel, Command_Line_Parameters & clp, rng & _X_uni);
+  virtual double mean_X() { return 0.0; }
   virtual double random_positive() { return min_x + spline_normal_pdf::random_positive(); }
   virtual double random_selection() { double y = spline_normal_pdf::random_selection(); if (y<0) return y-min_x; return y+min_x; }
   virtual String report_local_parameters();
@@ -534,12 +575,55 @@ protected:
 public:
   exponential_pdf(rng & _X_uni): probability_distribution_function(_X_uni) { zigset(); }
   exponential_pdf(String thislabel, Command_Line_Parameters & clp, rng & _X_uni);
+  virtual double mean_X() { return 0.0; }
   virtual double random_positive();
   virtual double random_selection();
   virtual double amplitude() { return 1.0; }
   virtual String report_local_parameters();
   virtual String report_parameters();
   virtual probability_distribution_function * clone() { return new exponential_pdf(*X_uni); }
+};
+
+class discinv_pdf: public probability_distribution_function {
+  // A random generator with a distribution that is obtained by using the inverse
+  // of a discrete cdf.
+  // Parameters:
+  //   P = a vector of values
+  //   N = the length of p
+  //   R_min = lowest output value in the random value output range
+  //   R_max = highest output value in the random value output range
+  // This is done as explained in ~/octave/arbrnd.m, i.e.:
+  // 1. provide discrete P
+  // 2. compute normalized discrete p
+  // 3. compute and store discrete cumulative q=cumsum(P)
+  // 4. compute the output conversion vector r
+  // 5. get a random variable u between 0 and 1
+  // 6. walk through q to find the first value >= u
+  // 7. at that index, look into r, return that value
+protected:
+  double * p;
+  double * q;
+  double * r;
+  int n;
+  double r_min, r_max;
+  double r_mean, r_std;
+#ifdef INCLUDE_PDF_SAMPLING
+  double random_selection_calculation();
+#endif
+public:
+  discinv_pdf(rng & _X_uni): probability_distribution_function(_X_uni), p(0), q(0), r(0), n(0), r_min(0.0), r_max(1.0), r_mean(0.0), r_std(0.0) {}
+  discinv_pdf(rng & _X_uni, double * P, int N, double R_min = 0.0, double R_max = 1.0): probability_distribution_function(_X_uni) { set_discrete_pdf(P, N, R_min, R_max); }
+  discinv_pdf(String thislabel, Command_Line_Parameters & clp, rng & _X_uni);
+  ~discinv_pdf() { if (p) delete[] p; if (q) delete[] q; if (r) delete[] r; } 
+  double mean_X() { return r_mean; }
+  double std_X() { return r_std; }
+  void set_discrete_pdf(double * P, int N, double R_min = 0.0, double R_max = 1.0);
+  virtual double random_positive();
+  virtual double random_selection();
+  virtual double amplitude() { return 1.0; }
+  virtual String report_local_parameters();
+  virtual String report_parameters();
+  virtual probability_distribution_function * clone() { return new discinv_pdf(*X_uni,p,n,r_min,r_max); }
 };
 
 probability_distribution_function * pdfselection(String basecommand, Command_Line_Parameters & clp, rng & _X_uni);

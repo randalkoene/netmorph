@@ -31,6 +31,7 @@
 
 Color_Table defaultcolortable;
 Color_Table * colortable = &defaultcolortable;
+long definedcolors = 32; // the base colors pre-defined in XFig, colors numbered 32 and above are user-defined colors
 
 const char ctname[CT_ARRAY_SIZE][25] = {
   "CT_background",
@@ -55,7 +56,7 @@ const char ctname[CT_ARRAY_SIZE][25] = {
 // classes
 
 void Color_Table::init() {
-  for (int i = 0; i<CT_ARRAY_SIZE; i++) ct[i].colnum = 32+i;
+  for (int i = 0; i<CT_ARRAY_SIZE; i++) { ct[i].colnum = definedcolors; definedcolors++; }
   ct[CT_background].coldef = 0xffffff;
   ct[CT_neuron_untyped].coldef = 0x000000;
   ct[CT_neuron_principal].coldef = 0x0000ae;
@@ -88,13 +89,12 @@ void Color_Table::parse_CLP(Command_Line_Parameters & clp) {
 
 String Color_Table::report_parameters() {
   String res("Color table: ");
-  cout << ctname[7] << ctname[8] << ctname[9] << '\n';
+  report(String(ctname[7])+String(ctname[8])+String(ctname[9])+'\n');
   for (int i = 0; i<CT_ARRAY_SIZE; i++) {
     res += ctname[i];
     res += "=0x";
     res += RGBstr(ct[i].coldef);
-    if (i==7) cout << res << '\n'; cout.flush();
-    //if ((i+1)<CT_ARRAY_SIZE) res += ", "; else res += '\n';
+    if (i==7) report(res+'\n');
   }
   return res;
 }
@@ -119,9 +119,43 @@ void Color_Table::set_culture_stain() {
   ct[CT_GABAR].coldef = 0xFF0000;
 }
 
+unsigned int Color_Table::get_color(long cn) {
+  // get a color definition from the additional list, where
+  // cn is the assigned numerical color ID
+  if ((cn<(CT_ARRAY_SIZE+32)) || (cn>=definedcolors) || (cn>extracolorsmax)) {
+    warning("Warning: Requested color outside of 'extra colors' range with color ID number "+String(cn)+", setting to black.\n");
+    return 0;
+  }
+  return extracolor[cn-(CT_ARRAY_SIZE+32)];
+}
+
+void Color_Table::set_color(long cn, unsigned int cd) {
+  // set a color or add a color definition according to
+  // the assigned numerical ID in the additional colors list
+  if (cn>255) error("Error: Attempted to define more than 256 colors.\n");
+  if (cn<(CT_ARRAY_SIZE+32)) {
+    warning("Warning: Ignoring attempt to set an 'extra color' at a color ID number below the 'extra colors' range.\n");
+    return;
+  }
+  if (cn<=extracolorsmax) {
+    extracolor[cn-(CT_ARRAY_SIZE+32)] = cd;
+    return;
+  }
+  unsigned int * newextracolor = new unsigned int[(cn-(CT_ARRAY_SIZE+32))+1];
+  if (extracolor) {
+    for (long i = (extracolorsmax-(CT_ARRAY_SIZE+32)); i>=0; i--) newextracolor[i] = extracolor[i];
+    delete[] extracolor;
+  }
+  extracolor = newextracolor;
+  extracolorsmax = cn;
+  definedcolors = extracolorsmax+1;
+  extracolor[cn-(CT_ARRAY_SIZE+32)] = cd;
+}
+
 String Color_Table::Fig_str() {
   String figstr;
   for (int i=0; i<CT_ARRAY_SIZE; i++) figstr += Fig_Color(ct[i].colnum,ct[i].coldef).str();
+  for (long i=(CT_ARRAY_SIZE+32); i<=extracolorsmax; i++) figstr += Fig_Color(i,extracolor[i-(CT_ARRAY_SIZE+32)]).str();
   return figstr;
 }
 

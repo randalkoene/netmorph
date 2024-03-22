@@ -30,6 +30,10 @@
 #include "slice.hh"
 #include "StringList.hh"
 #include "BigRegex.hh"
+#include "Fig_Object.hh"
+#include "global.hh"
+
+#ifdef VECTOR3D
 
 // The minimum width, height or depth of a slice volume is 0.001 micron (1 nanometer).
 #define MINSLICESPAN 0.001
@@ -60,10 +64,10 @@ String spatial_str(const spatial & p, char sep = ',') {
 void range_check(double & res, double min, double max, char warnchar, const char * warn = NULL) {
   if (res<min) {
     res = min;
-    if (warn) cout << warn << ", setting " << warnchar << " to minimum value " << res << ".\n";
+    if (warn) warning(String(warn)+", setting "+String(warnchar)+" to minimum value "+String(res,"%.3f")+".\n");
   } else if (res>max) {
     res = max;
-    if (warn) cout << warn << ", setting " << warnchar << " to maximum value " << res << ".\n";
+    if (warn) warning(String(warn)+", setting "+String(warnchar)+" to maximum value "+String(res,"%.3f")+".\n");
   }
 }
 
@@ -71,11 +75,11 @@ void get_spatial(Command_Line_Parameters & clp, int n, spatial & res, double min
   const BigRegex BRXspatialxy("\\(-?\\(\\([0-9]+\\.[0-9]*\\)\\|\\([0-9]+\\)\\|\\(\\.[0-9]+\\)\\)\\([eE][---+]?[0-9]+\\)?\\)[ \t,;]+\\(-?\\(\\([0-9]+\\.[0-9]*\\)\\|\\([0-9]+\\)\\|\\(\\.[0-9]+\\)\\)\\([eE][---+]?[0-9]+\\)?\\)",1,400); // [***NOTE] We cannot check directly for x, y and z, since regex-gnu or BigRegex does not seem to be able to handle more than 16 match registers.
   String v(clp.ParValue(n));
   if (v.index(BRXspatialxy)<0) { // check x and y
-    if (warn) cout << warn << ", spatial coordinates (" << spatial_str(res) << ") unmodified\n";
+    if (warn) warning(String(warn)+", spatial coordinates ("+spatial_str(res)+") unmodified\n");
     return;
 #ifdef VECTOR3D
   } else if (v.index(BRXdouble,BRXspatialxy.subpos(0)+BRXspatialxy.sublen(0))<0) { // check z
-    if (warn) cout << warn << ", spatial coordinates (" << spatial_str(res) << ") unmodified\n";
+    if (warn) warning(String(warn)+", spatial coordinates ("+spatial_str(res)+") unmodified\n");
     return;
 #endif
   }
@@ -171,7 +175,7 @@ void Slice::parse_CLP(Command_Line_Parameters & clp) {
   if ((swidth+sheight)>0.0) sdepth = 1.0; // so that sdepth is not the cause of a warning
 #endif
   if ((swidth+sheight+sdepth)>0.0) { // attempt relative slice volume extension
-    if ((swidth<=0.0) || (sheight<=0.0) || (sdepth<=0.0)) cout << "Warning: Relative slice volume extension for " << thisslice << " did not specify all extents\n";
+    if ((swidth<=0.0) || (sheight<=0.0) || (sdepth<=0.0)) warning("Warning: Relative slice volume extension for "+thisslice+" did not specify all extents\n");
     else {
       // Adjust to origin
       switch (relto) {
@@ -187,6 +191,48 @@ void Slice::parse_CLP(Command_Line_Parameters & clp) {
       set_relative_to(swidth,sheight,sdepth);
     }
   }
+  inner_normals();
+}
+
+void Slice::inner_normals() {
+  // SASSPSSPDSAD
+  spatial e1(vertex[SPS]); e1 -= vertex[SAS];
+  spatial e2(vertex[SPD]); e2 -= vertex[SPS];
+  innernormal[SASSPSSPDSAD] = e1; innernormal[SASSPSSPDSAD] ^= e2;
+  //innernormal[SASSPSSPDSAD] = e1 ^ e2;
+  // Testing to see if the innernormal is properly pointing inward (see figure 4.4 of http://www.doc.ic.ac.uk/~dfg/graphics/GraphicsLecture04.pdf)
+  spatial tst(vertex[IPS]); tst -= vertex[SAS]; // This is "(B-A)"
+  if ((innernormal[SASSPSSPDSAD]*tst) <= 0) innernormal[SASSPSSPDSAD].Negate();
+  // IASIADIPDIPS
+  e1 = vertex[IAD]; e1 -= vertex[IAS];
+  e2 = vertex[IPD]; e2 -= vertex[IAD];
+  innernormal[IASIADIPDIPS] = e1; innernormal[IASIADIPDIPS] ^= e2;
+  tst = vertex[SPS]; tst -= vertex[IAS];
+  if ((innernormal[IASIADIPDIPS]*tst) <= 0) innernormal[IASIADIPDIPS].Negate();
+  // SASIASIPSSPS
+  e1 = vertex[IAS]; e1 -= vertex[SAS];
+  e2 = vertex[IPS]; e2 -= vertex[IAS];
+  innernormal[SASIASIPSSPS] = e1; innernormal[SASIASIPSSPS] ^= e2;
+  tst = vertex[SAD]; tst -= vertex[IAS];
+  if ((innernormal[SASIASIPSSPS]*tst) <= 0) innernormal[SASIASIPSSPS].Negate();
+  // SASSADIADIAS
+  e1 = vertex[SAD]; e1 -= vertex[SAS];
+  e2 = vertex[IAD]; e2 -= vertex[SAD];
+  innernormal[SASSADIADIAS] = e1; innernormal[SASSADIADIAS] ^= e2;
+  tst = vertex[IPS]; tst -= vertex[SAS];
+  if ((innernormal[SASSADIADIAS]*tst) <= 0) innernormal[SASSADIADIAS].Negate();
+  // SADSPDIPDIAD
+  e1 = vertex[SPD]; e1 -= vertex[SAD];
+  e2 = vertex[IPD]; e2 -= vertex[SPD];
+  innernormal[SADSPDIPDIAD] = e1; innernormal[SADSPDIPDIAD] ^= e2;
+  tst = vertex[IAS]; tst -= vertex[SAD];
+  if ((innernormal[SADSPDIPDIAD]*tst) <= 0) innernormal[SADSPDIPDIAD].Negate();
+  // SPSIPSIPDSPD
+  e1 = vertex[IPS]; e1 -= vertex[SPS];
+  e2 = vertex[IPD]; e2 -= vertex[IPS];
+  innernormal[SPSIPSIPDSPD] = e1; innernormal[SPSIPSIPDSPD] ^= e2;
+  tst = vertex[IAS]; tst -= vertex[SPS];
+  if ((innernormal[SPSIPSIPDSPD]*tst) <= 0) innernormal[SPSIPSIPDSPD].Negate();
 }
 
 Slice * Slice::iterator_first() {
@@ -214,12 +260,22 @@ bool Slice::contains(const spatial & centerpoint, double radius) {
   return false;
 }
 
+Fig_Group * Slice::Outlines_Fig() { // [***INCOMPLETE]
+  Fig_Group * fg = NULL;
+  return fg;
+}
+
 void general_slice_parameters_interface::parse_CLP(Command_Line_Parameters & clp) {
   Slice::parse_CLP(clp);
   slice = (!label.empty());
+  int n;
+  if ((n=clp.Specifies_Parameter("outattr_slice_outlines"))>=0) showsliceoutlines = (downcase(clp.ParValue(n))==String("true"));
 }
 
 String general_slice_parameters_interface::report_parameters() {
   String res("Slice specification: ");
   return res;
 }
+
+// VECTOR3D
+#endif

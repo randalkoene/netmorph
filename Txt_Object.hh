@@ -47,6 +47,13 @@ cellnr , xcenter , ycenter , zcenter"
 
 // definitions
 
+#define COLUMN_LABELS_NEURONS "#  neuron index number, neuron label, neuron type, region ID, soma center x coordinate, soma center y coordinate, soma center z coordinate\n"
+#define COLUMN_LABELS_SYNAPSES "#  synapse index number, postsynaptic receptor type, presynaptic x coordinate, presynaptic y coordinate, presynaptic z coordinate, postsynaptic x coordinate, postsynaptic y coordinate, postsynaptic z coordinate, presynaptic axon fiber piece ID, postsynaptic dendrite fiber piece ID, presynaptic neuron label, postsynaptic neuron label, simulated time of synaptogenesis\n"
+#define COLUMN_LABELS_ROOT_NODES "#  node index number, fiber piece label, fiber structure type, x coordinate, y coordinate, z coordinate, soma neuron label, simulated time of node genesis\n"
+#define COLUMN_LABELS_FIBER_NODES "#  node index number, fiber piece label, fiber structure type, x coordinate, y coordinate, z coordinate, soma neuron label, parent label, simulated time of node genesis\n"
+#define COLUMN_LABELS_TUFT_NODES "#  fiber piece label\n"
+#define COLUMN_LABELS_OBLIQUE_NODES "#  fiber piece label\n"
+
 // functions
 
 // classes
@@ -82,6 +89,8 @@ extern String * Txt_fiberrootlist;
 extern String * Txt_continuationnodelist;
 extern String * Txt_bifurcationnodelist;
 extern String * Txt_terminalgrowthconelist;
+extern String * Txt_tuftrootbranchnodelist;
+extern String * Txt_obliquerootbranchnodelist;
 extern long Txt_neuronindex;
 extern long Txt_synapseindex;
 extern long Txt_nodeindex;

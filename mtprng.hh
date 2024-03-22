@@ -69,7 +69,7 @@
 #include <vector>
 #include <cstddef>
 // Added by Randal A. Koene, 20070703
-//#include <stdint.h>
+#include <stdint.h>
 //typedef unsigned long uint32_t;
 //typedef long int32_t;
 

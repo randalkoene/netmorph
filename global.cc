@@ -28,7 +28,10 @@
 #include <math.h>
 #include <time.h>
 #include "global.hh"
+#include "file.hh"
 #include "Fig_Object.hh"
+
+#define STRVECBUFSIZE 256
 
 #ifdef TESTING_AEM_RANDOM_DISTRIBUTION
 unsigned long int aemrandomdist[21] = {0,0,0,0,0,0,0,0,0,0,0};
@@ -41,16 +44,18 @@ bool outattr_show_stats = true;
 bool outattr_track_synaptogenesis = false;
 bool outattr_track_nodegenesis = false;
 bool outattr_make_full_Txt = false;
+bool outattr_Txt_sequence = false;
 bool outattr_Txt_separate_files = false;
+bool outattr_make_full_X3D = false;
+bool outattr_make_full_Catacomb = false;
+fibre_structure_class_id statsattr_fan_in_analysis = NUM_fs; // default, implies "none"
 bool outattr_synapse_distance_frequency = false;
 bool outattr_connection_distance_frequency = false;
 double outattr_distance_frequency_distbinsize = 50.0;
 
-double tex_textwidth = 6.5;
-double figscale = 1.0;
-bool figattr_show_electrodes = true;
+bool figattr_show_electrodes = false;
 bool figattr_show_neurons = true;
-bool figattr_show_abstract_connections = true;
+bool figattr_show_abstract_connections = false;
 bool figattr_show_presynaptic_structure = true;
 bool figattr_show_postsynaptic_structure = true;
 bool figattr_show_synapse_structure = true;
@@ -62,8 +67,8 @@ bool figattr_update_terminal_segments_visibly = false;
 bool figattr_zoom = false;
 bool figattr_fibres_nobox = false;
 bool figattr_box_fibre_independently = true;
-bool figattr_make_full_Fig = true;
-bool figattr_make_zoom_Fig = true;
+bool figattr_make_full_Fig = false;
+bool figattr_make_zoom_Fig = false;
 bool figattr_make_connections_Fig = false;
 bool figattr_make_abstract_Fig = false;
 bool figattr_make_neurons_Figs = false;
@@ -90,17 +95,16 @@ bool reduce_rand_calls = false;
 
 bool random_orientation = true;
 double random_orientation_amplitude = 0.2*M_PI;
+bool apical_specified_overrides_centroid = false;
 bool use_specified_basal_direction = false;
 double specified_basal_direction_theta = 0.0;
 double specified_basal_direction_phi = 0.0;
-int multipolar_mintrees = 1;
-int multipolar_maxtrees = 8;
 double multipolar_initangledevratio = 0.3;
-int multipolar_axon_mintrees = 1;
-int multipolar_axon_maxtrees = 2;
 double multipolar_axon_initangledevratio = 0.3;
 
 double pyramidaltreesmaxdeviation = 0.1*M_PI; // = M_PI/2.0; // variation around designated positions for the axon and apical dendrite // *** this should be in Pyramidal_statistics or in the pspreadmin/pspreadmax initialization
+double bipolartreesmaxdeviation = 0.1*M_PI;
+double multipolartreesmaxdeviation = 0.1*M_PI;
 
 double branchanglemin = M_PI/8.0; // *** this should be in Multipolar_Statistics
 double branchanglemax = M_PI/4.0; // *** this should be in Multipolar_Statistics
@@ -113,9 +117,8 @@ bool dendrite_two_branch_types = true; // *** this should be in Multipolar_Stati
 bool axon_two_branch_types = true; // *** this should be in Multipolar_Statistics
 double turnanglemin = M_PI/16.0; // *** this should be in Multipolar_Statistics
 double turnanglemax = M_PI/4.0; // *** this should be in Multipolar_Statistics
-double turnmaxdeviationfromnormal = M_PI/10.0; // *** this should be in Multipolar_Statistics
-bool dendrite_Samsonovich_hypothesis = true; // *** this should be in Multipolar_Statistics
-bool axon_Samsonovich_hypothesis = false; // *** this should be in Multipolar_Statistics
+
+bool fibreswithturns = true;
 bool initiallengthatactualfirstbranch = false;
 bool branchsomewhereinsegment = true;
 
@@ -128,7 +131,13 @@ bool evaluate_connectivity_immediately = true; // (see remark in nibr.hh)
 
 unsigned long warning_fibre_segment_net_Fig_zero_length = 0;
 unsigned long warning_Spatial_Segment_Subset_intersects_zero_length = 0;
-bool warnings_on = true;
+int warnings_on = WARN_FILE;
+int reports_on = WARN_FILE;
+int progress_on = WARN_STDOUT;
+
+#ifdef TESTQUOTAS
+String quotas;
+#endif
 
 // A superior that is the same set means the set has no superior, which can only
 // be true for the universal set.
@@ -136,6 +145,10 @@ natural_schema_parent_set superior_natural_set[NUM_NATURAL_SPS] = {
   universal_sps,
   universal_sps,
   universal_sps,
+  all_axons_sps,
+  all_dendrites_sps,
+  all_axons_sps,
+  all_dendrites_sps,
   all_axons_sps,
   all_dendrites_sps,
   all_axons_sps,
@@ -155,6 +168,10 @@ rng X_synapses(X_turn.get_rand());
 String outputdirectory("");
 String absoluteoutputURL("http://rak.minduploading.org/nibr/output/"); // default when called from a form
 
+String warningfile("");
+String reportfile("");
+String progressfile("");
+
 // functions
 
 void error(String msg) {
@@ -163,7 +180,21 @@ void error(String msg) {
 }
 
 void warning(String msg) {
-  if (warnings_on) cerr << msg;
+  if (warnings_on<=WARN_OFF) return;
+  if ((warnings_on<WARN_FILE) || (warningfile.empty())) { cerr << msg; cerr.flush(); }
+  if ((warnings_on>WARN_STDOUT) && (!warningfile.empty())) append_file_from_String(warningfile,msg);
+}
+
+void report(String msg) {
+  if (reports_on<=WARN_OFF) return;
+  if ((reports_on<WARN_FILE) || (reportfile.empty())) { cout << msg; cout.flush(); }
+  if ((reports_on>WARN_STDOUT) && (!reportfile.empty())) append_file_from_String(reportfile,msg);
+}
+
+void progress(String msg) {
+  if (progress_on<=WARN_OFF) return;
+  if ((progress_on<WARN_FILE) || (progressfile.empty())) { cout << msg; cout.flush(); }
+  if ((progress_on>WARN_STDOUT) && (!progressfile.empty())) append_file_from_String(progressfile,msg);
 }
 
 void global_parse_CLP(Command_Line_Parameters & clp) {
@@ -181,19 +212,15 @@ void global_parse_CLP(Command_Line_Parameters & clp) {
     if (turnanglemax<0.0) error("Error: (global_parse_CLP) turnanglemax must be > 0.0\n");
   }
   if (turnanglemax<=turnanglemin) error("Error: (global_parse_CLP) turnanglemax must be > turnanglemin\n");
-  if ((n=clp.Specifies_Parameter("dendrite_Samsonovich_hypothesis"))>=0) dendrite_Samsonovich_hypothesis = (downcase(clp.ParValue(n))==String("true"));
-  if ((n=clp.Specifies_Parameter("axon_Samsonovich_hypothesis"))>=0) axon_Samsonovich_hypothesis = (downcase(clp.ParValue(n))==String("true"));
   if ((n=clp.Specifies_Parameter("dendrite_two_branch_types"))>=0) dendrite_two_branch_types = (downcase(clp.ParValue(n))==String("true"));
   if ((n=clp.Specifies_Parameter("axon_two_branch_types"))>=0) axon_two_branch_types = (downcase(clp.ParValue(n))==String("true"));
+  if ((n=clp.Specifies_Parameter("figattr_Fig_rescale"))>=0) figattr_Fig_rescale = (downcase(clp.ParValue(n))==String("true"));
   if ((n=clp.Specifies_Parameter("figattr_fibres_nobox"))>=0) figattr_fibres_nobox = (downcase(clp.ParValue(n))==String("true"));
   if ((n=clp.Specifies_Parameter("figattr_box_fibre_independently"))>=0) figattr_box_fibre_independently = (downcase(clp.ParValue(n))==String("true"));
   if (figattr_box_fibre_independently) figattr_fibres_nobox=false; // for sanity
   if ((n=clp.Specifies_Parameter("figattr_fill_somas"))>=0) figattr_fill_somas = (downcase(clp.ParValue(n))==String("true"));  
   if ((n=clp.Specifies_Parameter("figattr_show_scale"))>=0) figattr_show_scale = (downcase(clp.ParValue(n))==String("true"));  
   if ((n=clp.Specifies_Parameter("figattr_show_axis_arrows"))>=0) figattr_show_axis_arrows = (downcase(clp.ParValue(n))==String("true"));  
-  // The turnmaxdeviationfromnormal parameter is used by legacy_dm in the non-standard calls to turn() and turn_free() in dendritic_growth_model.cc
-  if ((n=clp.Specifies_Parameter("legacy_dm_turnmaxdeviationfromnormal"))>=0) turnmaxdeviationfromnormal = atof(clp.ParValue(n));
-  if ((n=clp.Specifies_Parameter("warnings_on"))>=0) warnings_on = (downcase(clp.ParValue(n))==String("true"));
   if ((n=clp.Specifies_Parameter("partition_to_synapses"))>=0) evaluate_connectivity_immediately = (downcase(clp.ParValue(n))==String("true"));
   if ((n=clp.Specifies_Parameter("max_spatial_segment_subsets"))>=0) maxnumberofspatialsegmentsubsets = atoi(clp.ParValue(n));
   if ((n=clp.Specifies_Parameter("min_spatial_segment_span"))>=0) minimum_span_spatialsegmentsubset = atof(clp.ParValue(n));
@@ -207,15 +234,13 @@ String global_report_parameters() {
   String res("Global parameters:\n  Initial somatic locations of dendrites and axons are ");
   if (random_orientation) res += "randomly oriented\n";
   else res += "not randomly oriented, but perturbed with an angular amplitude of "+String(random_orientation_amplitude,"%.3f\n");
-  res += "  turnanglemin = " + String(turnanglemin,"%.3f turnanglemax = ") + String(turnanglemax,"%.3f\n  turns");
-  if (!dendrite_Samsonovich_hypothesis) res += " do not";
-  res += " bring dendrites back to a somatic normal vector\n  turns";
-  if (!axon_Samsonovich_hypothesis) res += " do not";
-  res += " bring axons back to a somatic normal vector\n  dendrite branches are of";
+  res += "  turnanglemin = " + String(turnanglemin,"%.3f turnanglemax = ") + String(turnanglemax,"%.3f\n") + "  dendrite branches are of";
   if (dendrite_two_branch_types) res += " two types\n  axon branches are of";
   else res += " one type\n  axon branches are of";
   if (axon_two_branch_types) res += " two types\n";
   else res += " one type\n  ";
+  if (!figattr_Fig_rescale) res +="do note ";
+  res += "rescale final Fig output coordinates to match specified figureTeXwidth\n";
   if (!figattr_box_fibre_independently) res += "do not ";
   res += "show fibres of neurons outside the focus box\n  ";
   if (!figattr_fibres_nobox) res += "do not ";
@@ -226,7 +251,6 @@ String global_report_parameters() {
   res += "draw a scale bar\n";
   if (!figattr_show_axis_arrows) res += "do not ";
   res += "draw x-, y-, and z- axis arrows\n";
-  res += "Legacy Direction Model parameters:\n  turnmaxdeviationfromnormal = " + String(turnmaxdeviationfromnormal,"%.3f\n");
   if (warnings_on) res += "Global NETMORPH parameters:\n  Messages classified as NETMORPH warnings are displayed.\n";
   else res += "Global NETMORPH parameters:\n  Messages classified as NETMORPH warnings are NOT displayed.\n";
   if (evaluate_connectivity_immediately) res += "Global synapse parameters:\n  Candidate synapses are sought as soon as fibers are allocated to spatial segments.\n";
@@ -242,7 +266,7 @@ String global_report_parameters() {
 
 void set_random_seed(unsigned int seed) {
   random_seed = seed;
-  cout << "random seed set to " << random_seed << '\n';
+  report("random seed set to "+String((long) random_seed)+'\n');
   X_misc.init(seed);
   X_elongate.init(X_misc.get_rand());
   X_branch.init(X_elongate.get_rand());
@@ -464,9 +488,11 @@ String spline_normal_pdf_with_min::report_parameters() {
 normal_pdf::normal_pdf(String thislabel, Command_Line_Parameters & clp, rng & _X_uni): probability_distribution_function(_X_uni), mean(0.0), std(1.0), trunc(DBL_MAX) {
   if (!thislabel.empty()) if (thislabel.lastchar()!='.') thislabel += '.';
   int n;
+  //if (thislabel==String("all_axons.eri.PDF.")) cout << "LOOKING FOR SPECIFIC NORMAL PARAMETERS ";
   if ((n=clp.Specifies_Parameter(thislabel+"mean"))>=0) mean = atof(clp.ParValue(n));
   if ((n=clp.Specifies_Parameter(thislabel+"std"))>=0) std = atof(clp.ParValue(n));
   if ((n=clp.Specifies_Parameter(thislabel+"trunc"))>=0) trunc = atof(clp.ParValue(n));
+  //if (thislabel==String("all_axons.eri.PDF.")) cout << "mean = " << mean << " std = " << std << " trunc = " << trunc << '\n';
   zigset();
   set_mean_std(mean,std,trunc);
 }
@@ -553,9 +579,9 @@ double normal_pdf::random_selection_calculation() {
 }
 
 String normal_pdf::report_local_parameters() {
-  String res(mean,"mean=%.3f ");
-  res += String(std,"std=%.3f ");
-  res += String(trunc,"trunc=%.3f");
+  String res(mean,"mean=%.5f ");
+  res += String(std,"std=%.5f ");
+  res += String(trunc,"trunc=%.5f");
   return res;
 }
 
@@ -615,6 +641,82 @@ String exponential_pdf::report_parameters() {
   return String("exponential_pdf: "+report_local_parameters());
 }
 
+discinv_pdf::discinv_pdf(String thislabel, Command_Line_Parameters & clp, rng & _X_uni): probability_distribution_function(_X_uni), p(0), q(0), r(0), n(0), r_min(0.0), r_max(1.0), r_mean(0.0), r_std(0.0) {
+  if (!thislabel.empty()) if (thislabel.lastchar()!='.') thislabel += '.';
+  int n_cmd;
+  int N = 0;
+  if ((n_cmd=clp.Specifies_Parameter(thislabel+"N"))>=0) N = clp.get_int(n_cmd,1,STRVECBUFSIZE,"Warning: The Discrete PDF requires 1<N<=256.\n");
+  double * P = 0; int P_len = 0;
+  if ((n_cmd=clp.Specifies_Parameter(thislabel+"P"))>=0) P = str2vec(clp.ParValue(n),&P_len);
+  if (P_len<N) {
+    warning("Warning: List of P values shorter than N="+String((long) N)+" in discinv_pdf::discinv_pdf(), setting N="+String((long) P_len)+".\n");
+    N = P_len;
+  }
+  if (P_len>N) warning("Warning: Only using N="+String((long) N)+" values from list of P values with length "+String((long) P_len)+"in discinv_pdf::discinv_pdf().\n");
+  double R_min = 0.0, R_max = 1.0;
+  if ((n_cmd=clp.Specifies_Parameter(thislabel+"R_min"))>=0) R_min = atof(clp.ParValue(n));
+  if ((n_cmd=clp.Specifies_Parameter(thislabel+"R_max"))>=0) R_max = atof(clp.ParValue(n));
+  if (N>0) set_discrete_pdf(P,N,R_min,R_max);
+  if (P) delete[] P;
+}
+
+void discinv_pdf::set_discrete_pdf(double * P, int N, double R_min, double R_max) {
+  if ((!P) || (N<=0)) return;
+  if (p) delete[] p;
+  if (q) delete[] q;
+  if (r) delete[] r;
+  p = new double[N];
+  q = new double[N];
+  r = new double[N];
+  n = N;
+  r_min = R_min;
+  r_max = R_max;
+  double P_sum = 0.0;
+  for (int i = 0; i<n; i++) P_sum += P[i];
+  double p_sum = 0.0;
+  for (int i = 0; i<n; i++) { p[i] = P[i]/P_sum; p_sum += p[i]; q[i] = p_sum; }
+  r[0] = r_min;
+  if (n>1) {
+    double r_step = (r_max-r_min)/((double) (n-1));
+    for (int i = 1; i<n; i++) r[i] = r[i-1] + r_step;
+    r[n-1] = r_max; // just to make sure it is exact
+  }
+  r_mean = 0.0;
+  double E_rsq = 0.0;
+  for (int i = 0; i<n; i++) {
+    double rp = r[i]*p[i];
+    r_mean += rp; // calculate the discrete mean
+    E_rsq += r[i]*rp; // calculate the expectation of r squared
+  }
+  double var_r = E_rsq - (r_mean*r_mean); // calculate the variance
+  if (var_r<0) error("Error: Negative variance computed in discinv_pdf().\n");
+  r_std = sqrt(var_r);
+}
+
+double discinv_pdf::random_positive() {
+  return abs(random_selection());
+}
+
+double discinv_pdf::random_selection() {
+  if (n<1) return r_min;
+  double u = X_uni->get_rand_real1();
+  for (int i=0; i<n; i++) if (q[i]>=u) return r[i];
+  return r_max;
+}
+
+String discinv_pdf::report_local_parameters() {
+  String res("N="+String((long) n));
+  res += ", R_min="+String(r_min,"%.2f");
+  res += ", R_max="+String(r_max,"%.2f");
+  res += ", P value list with discrete mean "+String(r_mean,"%.2f");
+  res += " and standard deviation "+String(r_std,"%.2f");
+  return res;
+}
+
+String discinv_pdf::report_parameters() {
+  return String("discinv_pdf: "+report_local_parameters());
+}
+
 probability_distribution_function * pdfselection(String basecommand, Command_Line_Parameters & clp, rng & _X_uni) {
   // This function aids in the selection of a specific PDF class.
   // basecommand specifies that command that is used to specify a PDF class, e.g. a growth model.
@@ -624,11 +726,12 @@ probability_distribution_function * pdfselection(String basecommand, Command_Lin
   if (basecommand.empty()) basecommand = "PDF";
   else if (basecommand.lastchar()=='.') basecommand += "PDF";
   else basecommand += ".PDF";
+  //if (basecommand==String("all_axons.eri.PDF")) cout << "REGISTERED PDF COMMAND\n";
   int n;
   if ((n=clp.Specifies_Parameter(basecommand))>=0) {
     String PDFstr(downcase(clp.ParValue(n)));
     if (PDFstr.empty()) {
-      cout << "Warning: Empty value specified for " << basecommand << '\n';
+      warning("Warning: Empty value specified for "+basecommand+'\n');
       return NULL;
     } else {
       if (PDFstr.matches("delta")) return new delta_pdf(basecommand,clp,_X_uni);
@@ -638,8 +741,9 @@ probability_distribution_function * pdfselection(String basecommand, Command_Lin
       else if (PDFstr.matches("spline_normal_with_min")) return new spline_normal_pdf_with_min(basecommand,clp,_X_uni);
       else if (PDFstr.matches("normal")) return new normal_pdf(basecommand,clp,_X_uni);
       else if (PDFstr.matches("exponential")) return new exponential_pdf(basecommand,clp,_X_uni);
+      else if (PDFstr.matches("discrete")) return new discinv_pdf(basecommand,clp,_X_uni);
     }
-    cout << "Warning: Unrecognized " << basecommand << " class " << clp.ParValue(n) << '\n';
+    warning("Warning: Unrecognized "+basecommand+" class "+clp.ParValue(n)+'\n');
     return NULL;
   }
   return NULL; // No warning is given if no PDF specification is found
@@ -650,7 +754,6 @@ double * str2vec(const char * vecstr, int * veclen) {
   // return in a newly allocated array of doubles. The numbers may
   // be separated by any non-numerical characters. Consequently,
   // this function does not detect "INF" or "NAN".
-  #define STRVECBUFSIZE 256
   double tmpbuf[STRVECBUFSIZE];
   int numfound = 0;
   const char * vecptr = vecstr;

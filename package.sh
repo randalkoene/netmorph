@@ -49,7 +49,7 @@ mkdir $PACKAGE
 mkdir $PACKAGE/mac
 mkdir $PACKAGE/cygwin
 
-cp README INSTALL VERSION LICENSE GPLHEADER Makefile Makefile.linux Makefile.mac Makefile.cygwin *.hh *.cc *.sh .nibr2Drc .nibrrc .nibrrc-form-defaults nibr.m evaluate-partitioning.present.m *.ascii $PACKAGE/
+cp README INSTALL VERSION LICENSE GPLHEADER Makefile Makefile.linux *.hh *.cc *.sh .nibr2Drc .nibrrc .nibrrc-form-defaults nibr.m evaluate-partitioning.present.m *.ascii $PACKAGE/
 cp mac/* $PACKAGE/mac/
 cp cygwin/* $PACKAGE/cygwin/
 rm -f $PACKAGE/BigRegex.hh $PACKAGE/BigString.hh

@@ -27,8 +27,7 @@
 
 #include "Command_Line_Parameters.hh"
 #include "file.hh"
-
-//#include "file.hh"
+#include "global.hh"
 
 Command_Line_Parameters * main_clp;
 
@@ -42,18 +41,20 @@ int fixedrecognizedarray[10240];
 //STLstd::vector<int> nullrecognized;
 bool initbatchaddparams = false; // This flag is used to prevent inefficient array expansion.
 
-Command_Line_Parameters::Command_Line_Parameters(int _clpargc, char * _clpargv[], const char helpstr[], const char rcfile[]): calledbyforminput(false), clpargc(_clpargc), clpargv(_clpargv), numparameters(0), includefileerrors(0), recognized(NULL), recognizedsize(0) {
+Command_Line_Parameters::Command_Line_Parameters(int _clpargc, char * _clpargv[], const char helpstr[], const char rcfile[]): calledbyforminput(false), clpargc(_clpargc), clpargv(_clpargv), numparameters(0), includefileerrors(0), recognized(NULL), recognizedsize(0), numsubstitutions(0) {
   //STLrecognized(&nullrecognized) {
   initbatchaddparams = true;
 #ifdef FIXED_TRACKING_ARRAY
   recognized = fixedrecognizedarray;
 #endif
 #else
-Command_Line_Parameters::Command_Line_Parameters(int _clpargc, char * _clpargv[], const char helpstr[], const char rcfile[]): calledbyforminput(false), clpargc(_clpargc), clpargv(_clpargv), numparameters(0), includefileerrors(0) {
+Command_Line_Parameters::Command_Line_Parameters(int _clpargc, char * _clpargv[], const char helpstr[], const char rcfile[]): calledbyforminput(false), clpargc(_clpargc), clpargv(_clpargv), numparameters(0), includefileerrors(0), numsubstitutions(0) {
 #endif
   Parse_File(rcfile);
   if ((!Parse_Command_Line()) || (!Detect_Form_Input())) {
     cout << helpstr;
+    cout << '\n';
+    report_compiler_directives();
     exit(0);
   }
 #ifdef TRACK_RECOGNIZED_COMMANDS
@@ -71,9 +72,6 @@ Command_Line_Parameters::Command_Line_Parameters(int _clpargc, char * _clpargv[]
     for (int i=0; i<recognizedsize; i++) recognized[i] = 0;
   }
   initbatchaddparams = false;
-#endif
-#ifdef DEBUG_COMMAND_LINE_PARAMETERS
-  for (int i=0; i<numparameters; i++) cout << parname[i] << ':' << parvalue[i] << '\n' << "~~~~~~~~~\n";
 #endif
 }
 
@@ -97,6 +95,20 @@ void Command_Line_Parameters::Expand_Recognized(unsigned int oldlen, unsigned in
 }
 #endif
 
+void Command_Line_Parameters::Add_to_Substitutions(String subs) {
+  // Add another line to the list of substitutions to be applied before parsing commands.
+  if (subs.index(':')<0) error("Error: A substitution string ("+subs+") must consist of two parts separated by a colon ':'.\n");
+  substitutionpat[numsubstitutions] = subs.before(':');
+  substitutionstr[numsubstitutions] = subs.after(':');
+  numsubstitutions++;
+}
+
+void Command_Line_Parameters::Apply_Substitutions(String & pname) {
+  // A list of substitutions is applied to command names before parsing them for addition
+  // to the list of commands.
+  for (int i=0; i<numsubstitutions; i++) pname.gsub(substitutionpat[i],substitutionstr[i]);
+}
+
 #ifdef TRACK_RECOGNIZED_COMMANDS
 void Command_Line_Parameters::Add_Parameter(String pname, String pvalue, String co) {
 #else
@@ -108,6 +120,11 @@ void Command_Line_Parameters::Add_Parameter(String pname, String pvalue) {
     Parse_File(pvalue);
     return;
   }
+  if (pname=="substitute") {
+    Add_to_Substitutions(pvalue);
+    return;
+  }
+  Apply_Substitutions(pname);
   if ((n=Specifies_Parameter(pname))>=0) {
     parvalue[n] = pvalue; // new value takes precedence over old value
 #ifdef TRACK_RECOGNIZED_COMMANDS
@@ -249,25 +266,25 @@ int Command_Line_Parameters::get_int(int n, int min, int max, const char * warn)
   int res = atoi(ParValue(n));
   if (res<min) {
     res = min;
-    if (warn) cout << warn << ", setting to minimum value " << res << ".\n";
+    if (warn) warning(String(warn)+", setting to minimum value "+String((long) res)+".\n");
   } else if (res>max) {
     res = max;
-    if (warn) cout << warn << ", setting to maximum value " << res << ".\n";
+    if (warn) warning(String(warn)+", setting to maximum value "+String((long) res)+".\n");
   }
   return res;
 }
 
 double Command_Line_Parameters::get_double(int n, double min, double max, const char * warn) {
   char * endptr = NULL;
-  const char * dblstr = ParValue(n);
+  const char * dblstr = ParValue(n).chars();
   double res = 0.0;
   if (!ParValue(n).empty()) res = strtod(dblstr,&endptr);
   if ((res<min) || (endptr!=(dblstr+ParValue(n).length()))) {
     res = min;
-    if (warn) cout << warn << ", setting to minimum value " << res << ".\n";
+    if (warn) warning(String(warn)+", setting to minimum value "+String(res,"%f")+".\n");
   } else if (res>max) {
     res = max;
-    if (warn) cout << warn << ", setting to maximum value " << res << ".\n";
+    if (warn) warning(String(warn)+", setting to maximum value "+String(res,"%f")+".\n");
   }
   return res;
 }
@@ -319,4 +336,153 @@ String Command_Line_Parameters::unrecognized_str(String sep) {
   }
   return s;
 }
+
+void report_compiler_directives() {
+  String res("Compiler directives:\n");
+  res += "  USE_RCFILE: ";
+#ifdef USE_RCFILE
+  res += "yes\n";
+#else
+  res += "no\n";
+#endif
+  res += "  MEMTESTS: ";
+#ifdef MEMTESTS
+  res += "yes\n";
+#else
+  res += "no\n";
+#endif
+  res += "  PRECISE_RNG / FAST_RNG / GNUC_RNG:\n";
+#ifdef PRECISE_RNG
+  res += "     yes           no         no\n";
+#else
+#ifdef FAST_RNG
+  res += "     no            yes        no\n";
+#else
+  res += "     no            no         yes\n";
+#endif
+#endif
+  res += "  EVALUATE_POSSIBLE_CONNECTION_PROFILING: ";
+#ifdef EVALUATE_POSSIBLE_CONNECTION_PROFILING
+  res += "yes\n";
+#else
+  res += "no\n";
+#endif
+  res += "  SYNAPTOGENESIS_AND_LOSS_INVENTORY: ";
+#ifdef SYNAPTOGENESIS_AND_LOSS_INVENTORY
+  res += "yes\n";
+#else
+  res += "no\n";
+#endif
+  res += "  SAMPLES_INCLUDE_NETWORK_GENERATED_STATISTICS: ";
+#ifdef SAMPLES_INCLUDE_NETWORK_GENERATED_STATISTICS
+  res += "yes\n";
+#else
+  res += "no\n";
+#endif
+  res += "  SAMPLES_INCLUDE_NETWORK_STATISTICS_BASE: ";
+#ifdef SAMPLES_INCLUDE_NETWORK_STATISTICS_BASE
+  res += "yes\n";
+#else
+  res += "no\n";
+#endif
+  res += "  ADM_PRIORITIZE_SPEED_OVER_SPACE: ";
+#ifdef ADM_PRIORITIZE_SPEED_OVER_SPACE
+  res += "yes\n";
+#else
+  res += "no\n";
+#endif
+  res += "  TESTING_SIMPLE_ATTRACTION: ";
+#ifdef TESTING_SIMPLE_ATTRACTION
+  res += "yes\n";
+#else
+  res += "no\n";
+#endif
+  res += "  TESTING_SPIKING: ";
+#ifdef TESTING_SPIKING
+  res += "yes\n";
+#else
+  res += "no\n";
+#endif
+  res += "  ENABLE_FIXED_STEP_SIMULATION: ";
+#ifdef ENABLE_FIXED_STEP_SIMULATION
+  res += "yes\n";
+#else
+  res += "no\n";
+#endif
+  res += "  FIXED_STEP_SIMULATION_START_AT_DT: ";
+#ifdef FIXED_STEP_SIMULATION_START_AT_DT
+  res += "yes\n";
+#else
+  res += "no\n";
+#endif
+  res += "  LEGACY_ELONGATION: ";
+#ifdef LEGACY_ELONGATION
+  res += "yes\n";
+#else
+  res += "no\n";
+#endif
+  res += "  TESTING_ELONGATION_TOTAL: ";
+#ifdef TESTING_ELONGATION_TOTAL
+  res += "yes\n";
+#else
+  res += "no\n";
+#endif
+  res += "  DEBUGGING_ELONGATION: ";
+#ifdef DEBUGGING_ELONGATION
+  res += "yes\n";
+#else
+  res += "no\n";
+#endif
+  res += "  DEBUGGING_DIRECTION: ";
+#ifdef DEBUGGING_DIRECTION
+  res += "yes\n";
+#else
+  res += "no\n";
+#endif
+  res += "  DEBUG_SPHERICAL_BOUNDARY: ";
+#ifdef DEBUG_SPHERICAL_BOUNDARY
+  res += "yes\n";
+#else
+  res += "no\n";
+#endif
+  res += "  INCLUDE_PDF_SAMPLING: ";
+#ifdef INCLUDE_PDF_SAMPLING
+  res += "yes\n";
+#else
+  res += "no\n";
+#endif
+  res += "  TRACK_RECOGNIZED_COMMANDS: ";
+#ifdef TRACK_RECOGNIZED_COMMANDS
+  res += "yes\n";
+#else
+  res += "no\n";
+#endif
+  res += "  CHECK_XFIG_RANGES: ";
+#ifdef CHECK_XFIG_RANGES
+  res += "yes\n";
+#else
+  res += "no\n";
+#endif
+  res += "  STRICTLY_ADHERE_TO_TAU_C_BINF_RELATION: ";
+#ifdef STRICTLY_ADHERE_TO_TAU_C_BINF_RELATION
+  res += "yes\n";
+#else
+  res += "no\n";
+#endif
+  res += "  DIVIDE_INITLENGTHS_OVER_ARBORS: ";
+#ifdef DIVIDE_INITLENGTHS_OVER_ARBORS
+  res += "yes\n";
+#else
+  res += "no\n";
+#endif
+  res += "  INCLUDE_SIMPLE_FIBER_DIAMETER:";
+#ifdef INCLUDE_SIMPLE_FIBER_DIAMETER
+  res += "yes\n";
+#else
+  res += "no\n";
+#endif
+  res += '\n';
+  report(res);
+}
+
 #endif

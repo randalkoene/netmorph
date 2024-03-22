@@ -52,8 +52,10 @@
 using namespace std;
 #include "diagnostic.hh"
 #include "Sampled_Output.hh"
+#include "Txt_Object.hh"
 #include "file.hh"
 #include "nibr.hh"
+#include "prepost_structure.hh"
 #include "synapse.hh"
 #include "synapse_formation_model.hh"
 #include "axon_direction_model.hh"
@@ -67,143 +69,23 @@ using namespace std;
 #include "global.hh"
 #include "mtprng.hh"
 
-void report_compiler_directives() {
-  cout << "Compiler directives:\n  MEMTESTS: ";
-#ifdef MEMTESTS
-  cout << "yes\n";
-#else
-  cout << "no\n";
-#endif
-  cout << "  PRECISE_RNG / FAST_RNG / GNUC_RNG: ";
-#ifdef PRECISE_RNG
-  cout << "     yes           no         no\n";
-#else
-#ifdef FAST_RNG
-  cout << "     no            yes        no\n";
-#else
-  cout << "     no            no         yes\n";
-#endif
-#endif
-  cout << "  EVALUATE_POSSIBLE_CONNECTION_PROFILING: ";
-#ifdef EVALUATE_POSSIBLE_CONNECTION_PROFILING
-  cout << "yes\n";
-#else
-  cout << "no\n";
-#endif
-  cout << "  SYNAPTOGENESIS_AND_LOSS_INVENTORY: ";
-#ifdef SYNAPTOGENESIS_AND_LOSS_INVENTORY
-  cout << "yes\n";
-#else
-  cout << "no\n";
-#endif
-  cout << "  SAMPLES_INCLUDE_NETWORK_GENERATED_STATISTICS: ";
-#ifdef SAMPLES_INCLUDE_NETWORK_GENERATED_STATISTICS
-  cout << "yes\n";
-#else
-  cout << "no\n";
-#endif
-  cout << "  SAMPLES_INCLUDE_NETWORK_STATISTICS_BASE: ";
-#ifdef SAMPLES_INCLUDE_NETWORK_STATISTICS_BASE
-  cout << "yes\n";
-#else
-  cout << "no\n";
-#endif
-  cout << "  ADM_PRIORITIZE_SPEED_OVER_SPACE: ";
-#ifdef ADM_PRIORITIZE_SPEED_OVER_SPACE
-  cout << "yes\n";
-#else
-  cout << "no\n";
-#endif
-  cout << "  TESTING_SIMPLE_ATTRACTION: ";
-#ifdef TESTING_SIMPLE_ATTRACTION
-  cout << "yes\n";
-#else
-  cout << "no\n";
-#endif
-  cout << "  TESTING_SPIKING: ";
-#ifdef TESTING_SPIKING
-  cout << "yes\n";
-#else
-  cout << "no\n";
-#endif
-  cout << "  ENABLE_FIXED_STEP_SIMULATION: ";
-#ifdef ENABLE_FIXED_STEP_SIMULATION
-  cout << "yes\n";
-#else
-  cout << "no\n";
-#endif
-  cout << "  FIXED_STEP_SIMULATION_START_AT_DT: ";
-#ifdef FIXED_STEP_SIMULATION_START_AT_DT
-  cout << "yes\n";
-#else
-  cout << "no\n";
-#endif
-  cout << "  LEGACY_ELONGATION: ";
-#ifdef LEGACY_ELONGATION
-  cout << "yes\n";
-#else
-  cout << "no\n";
-#endif
-  cout << "  TESTING_ELONGATION_TOTAL: ";
-#ifdef TESTING_ELONGATION_TOTAL
-  cout << "yes\n";
-#else
-  cout << "no\n";
-#endif
-  cout << "  DEBUGGING_ELONGATION: ";
-#ifdef DEBUGGING_ELONGATION
-  cout << "yes\n";
-#else
-  cout << "no\n";
-#endif
-  cout << "  DEBUGGING_DIRECTION: ";
-#ifdef DEBUGGING_DIRECTION
-  cout << "yes\n";
-#else
-  cout << "no\n";
-#endif
-  cout << "  DEBUG_SPHERICAL_BOUNDARY: ";
-#ifdef DEBUG_SPHERICAL_BOUNDARY
-  cout << "yes\n";
-#else
-  cout << "no\n";
-#endif
-  cout << "  INCLUDE_PDF_SAMPLING: ";
-#ifdef INCLUDE_PDF_SAMPLING
-  cout << "yes\n";
-#else
-  cout << "no\n";
-#endif
-  cout << "  TRACK_RECOGNIZED_COMMANDS: ";
-#ifdef TRACK_RECOGNIZED_COMMANDS
-  cout << "yes\n";
-#else
-  cout << "no\n";
-#endif
-  cout << "  CHECK_XFIG_RANGES: ";
-#ifdef CHECK_XFIG_RANGES
-  cout << "yes\n";
-#else
-  cout << "no\n";
-#endif
-  cout << "  STRICTLY_ADHERE_TO_TAU_C_BINF_RELATION: ";
-#ifdef STRICTLY_ADHERE_TO_TAU_C_BINF_RELATION
-  cout << "yes\n";
-#else
-  cout << "no\n";
-#endif
-  cout << "  ENABLE_APICAL_TUFTING_TRIGGER_DISTANCE:";
-#ifdef ENABLE_APICAL_TUFTING_TRIGGER_DISTANCE
-  cout << "yes\n";
-#else
-  cout << "no\n";
-#endif
-  cout << "  INCLUDE_SIMPLE_FIBER_DIAMETER:";
-#ifdef INCLUDE_SIMPLE_FIBER_DIAMETER
-  cout << "yes\n";
-#else
-  cout << "no\n";
-#endif
+void reliability_checklist() {
+  // This function is used to check some essential variables
+  // before attempting a simulation. This is necessary, because
+  // some issues are not caught by the compiler. For example,
+  // if a new neuron type was added, but the synapse formation
+  // maxtrices were not initialized with the new number of
+  // neurons, then remaining array entries are automatically
+  // initialized to 0, which can cause unexpected results.
+  if (superior_natural_set[NUM_NATURAL_SPS-1]<=universal_sps) error("Compile-Time Error: Not all elements of global:superior_natural_set[] have been correctly initialized.\n");
+  if (natural_subset_idstr[NUM_NATURAL_SPS-1][0]=='\0') error("Compile-Time Error: Not all elements of neuron:natural_subset_idstr[] have been correctly initialized.\n");
+  if (min_basal[UNTYPED_NEURON]<1) error("Compile-Time Error: Not all elements of neuron:min_basal[] have been correctly initialized.\n");
+  if (max_basal[UNTYPED_NEURON]<1) error("Compile-Time Error: Not all elements of neuron:max_basal[] have been correctly initialized.\n");
+  if (max_angle[UNTYPED_NEURON]<=0.0) error("Compile-Time Error: Not all elements of neuron:max_angle[] have been correctly initialized.\n");
+  if (max_axons[UNTYPED_NEURON]<1) error("Compile-Time Error: Not all elements of neuron:max_axons[] have been correctly initialized.\n");
+  if (possible_syntypes[UNTYPED_NEURON][UNTYPED_NEURON][syntype_candidate-1]>-9.0) error("Compile-Time Error: Not all elements of synapse_formation_model:possible_syntypes[][][] have been correctly initialized.\n");
+  if (axons_most_specific_natural_set[UNTYPED_NEURON]<=universal_sps) error("Compile-Time Error: Not all elements of prepost_structure:axons_most_specific_natural_set[] have been correctly initialized.\n");
+  if (dendrites_most_specific_natural_set[UNTYPED_NEURON]<=universal_sps) error("Compile-Time Error: Not all elements of prepost_structure:dendrites_most_specific_natural_set[] have been correctly initialized.\n");
 }
 
 electrodearray * make_electrodes_hexagon(const spatial & center) {
@@ -279,16 +161,16 @@ void report_form_aware(Command_Line_Parameters & clp, CLP_Modifiable * clpm) {
   // a command line terminal or HTML output following form input.
   // The reporting text is properly encapsulated and where necessary,
   // control characters are replaced.
-  if (clp.IsFormInput()) cout << "</PRE>\n<!-- ";
-  cout << clpm->report_parameters();
-  if (clp.IsFormInput()) cout << "-->\n<PRE>";
+  if (clp.IsFormInput()) report("</PRE>\n<!-- ");
+  report(clpm->report_parameters());
+  if (clp.IsFormInput()) report("-->\n<PRE>");
 }
 
 void report_form_aware(Command_Line_Parameters & clp, String s) {
   // The same as above, but can present any string.
-  if (clp.IsFormInput()) cout << "</PRE>\n<!-- ";
-  cout << s;
-  if (clp.IsFormInput()) cout << "-->\n<PRE>";
+  if (clp.IsFormInput()) report("</PRE>\n<!-- ");
+  report(s);
+  if (clp.IsFormInput()) report("-->\n<PRE>");
 }
 
 void devsim_present_HTML_graphical_output(String & statsdatafile, String & netfigfile, String & zoomfigfile, String & abstractfigfile, String & statsfile, bool figsequenceflag, bool combineflag, String & combinetype) {
@@ -298,6 +180,7 @@ void devsim_present_HTML_graphical_output(String & statsdatafile, String & netfi
   if (statsdataURL.empty()) statsdataURL=statsdatabase;
   statsdataURL.prepend(absoluteoutputURL);
 
+#ifndef COMPILE_WITHOUT_FIG2DEV
   // prepare network structure PDF files
   if (outattr_show_figure && figattr_make_full_Fig) system(String(FIG2DEV)+" -L pdf "+netfigfile+' '+outputdirectory+"net.pdf");
   if (outattr_show_figure && figattr_make_zoom_Fig) system(String(FIG2DEV)+" -L pdf "+zoomfigfile+' '+outputdirectory+"zoom.pdf");
@@ -323,25 +206,14 @@ void devsim_present_HTML_graphical_output(String & statsdatafile, String & netfi
 	   );
 
   // network structure development animated sequence
-  if (figsequenceflag && combineflag) cout << "<BR><IMG SRC=\""+absoluteoutputURL+"sample."+combinetype+"\">\n";
+  if (figsequenceflag && combineflag) progress("<BR><IMG SRC=\""+absoluteoutputURL+"sample."+combinetype+"\">\n");
 
   // network statistics figures
   if (outattr_show_stats)
-    cout
-      << "<TABLE>"
-      << "<TR><TD><A HREF=\""+statsdataURL+"-dendritent.fig\">Mean dendrite terminal segment numbers</A>:<BR><IMG SRC=\""+statsdataURL+"-dendritent.png\">\n"
-      << "<TD><A HREF=\""+statsdataURL+"-axonnt.fig\">Mean axon terminal segment numbers</A>:<BR><IMG SRC=\""+statsdataURL+"-axonnt.png\">\n"
-      << "<TR><TD><A HREF=\""+statsdataURL+"-dendritelength.fig\">Mean dendrite length</A>:<BR><IMG SRC=\""+statsdataURL+"-dendritelength.png\">\n"
-      << "<TD><A HREF=\""+statsdataURL+"-axonlength.fig\">Mean axon length</A>:<BR><IMG SRC=\""+statsdataURL+"-axonlength.png\">\n"
-      << "<TR><TD><A HREF=\""+statsdataURL+"-dendritetermlength.fig\">Mean dendrite terminal segment length</A>:<BR><IMG SRC=\""+statsdataURL+"-dendritetermlength.png\">\n"
-      << "<TD><A HREF=\""+statsdataURL+"-axontermlength.fig\">Mean axon terminal segment length</A>:<BR><IMG SRC=\""+statsdataURL+"-axontermlength.png\">\n"
-      << "<TR><TD><A HREF=\""+statsdataURL+"-dendriteinterlength.fig\">Mean dendrite intermediate segment length</A>:<BR><IMG SRC=\""+statsdataURL+"-dendriteinterlength.png\">\n"
-      << "<TD><A HREF=\""+statsdataURL+"-axoninterlength.fig\">Mean axon intermediate segment length</A>:<BR><IMG SRC=\""+statsdataURL+"-axoninterlength.png\">\n"
-      << "<TR><TD><A HREF=\""+statsdataURL+"-dendritebranchangles.fig\">Mean dendrite branch angles</A>:<BR><IMG SRC=\""+statsdataURL+"-dendritebranchangles.png\">\n"
-      << "<TD><A HREF=\""+statsdataURL+"-axonbranchangles.fig\">Mean axon branch angles</A>:<BR><IMG SRC=\""+statsdataURL+"-axonbranchangles.png\">\n"
-      << "<TR><TD><A HREF=\""+statsdataURL+"-dendriteturnangles.fig\">Mean dendrite turn angles</A>:<BR><IMG SRC=\""+statsdataURL+"-dendriteturnangles.png\">\n"
-      << "<TD><A HREF=\""+statsdataURL+"-axonturnangles.fig\">Mean axon turn angles</A>:<BR><IMG SRC=\""+statsdataURL+"-axonturnangles.png\">\n"
-      << "</TABLE>";
+    progress("<TABLE><TR><TD><A HREF=\""+statsdataURL+"-dendritent.fig\">Mean dendrite terminal segment numbers</A>:<BR><IMG SRC=\""+statsdataURL+"-dendritent.png\">\n<TD><A HREF=\""+statsdataURL+"-axonnt.fig\">Mean axon terminal segment numbers</A>:<BR><IMG SRC=\""+statsdataURL+"-axonnt.png\">\n<TR><TD><A HREF=\""+statsdataURL+"-dendritelength.fig\">Mean dendrite length</A>:<BR><IMG SRC=\""+statsdataURL+"-dendritelength.png\">\n<TD><A HREF=\""+statsdataURL+"-axonlength.fig\">Mean axon length</A>:<BR><IMG SRC=\""+statsdataURL+"-axonlength.png\">\n<TR><TD><A HREF=\""+statsdataURL+"-dendritetermlength.fig\">Mean dendrite terminal segment length</A>:<BR><IMG SRC=\""+statsdataURL+"-dendritetermlength.png\">\n<TD><A HREF=\""+statsdataURL+"-axontermlength.fig\">Mean axon terminal segment length</A>:<BR><IMG SRC=\""+statsdataURL+"-axontermlength.png\">\n<TR><TD><A HREF=\""+statsdataURL+"-dendriteinterlength.fig\">Mean dendrite intermediate segment length</A>:<BR><IMG SRC=\""+statsdataURL+"-dendriteinterlength.png\">\n<TD><A HREF=\""+statsdataURL+"-axoninterlength.fig\">Mean axon intermediate segment length</A>:<BR><IMG SRC=\""+statsdataURL+"-axoninterlength.png\">\n<TR><TD><A HREF=\""+statsdataURL+"-dendritebranchangles.fig\">Mean dendrite branch angles</A>:<BR><IMG SRC=\""+statsdataURL+"-dendritebranchangles.png\">\n<TD><A HREF=\""+statsdataURL+"-axonbranchangles.fig\">Mean axon branch angles</A>:<BR><IMG SRC=\""+statsdataURL+"-axonbranchangles.png\">\n<TR><TD><A HREF=\""+statsdataURL+"-dendriteturnangles.fig\">Mean dendrite turn angles</A>:<BR><IMG SRC=\""+statsdataURL+"-dendriteturnangles.png\">\n<TD><A HREF=\""+statsdataURL+"-axonturnangles.fig\">Mean axon turn angles</A>:<BR><IMG SRC=\""+statsdataURL+"-axonturnangles.png\">\n</TABLE>");
+#else
+  progress("<P><B>COMPILED WITHOUT FIG2DEV - FIGURES NOT EMBEDDED IN HTML PAGE.</B><P>");
+#endif
 }
 
 // The following function is a built-in example of command sequences as they
@@ -371,7 +243,17 @@ void developmental_simulation(Command_Line_Parameters & clp) {
   if ((outattr_track_nodegenesis) || (outattr_make_full_Txt)) outattr_track_synaptogenesis = true;
   if (outattr_track_synaptogenesis) SynaptoGenesis_Data = new synaptogenesis_data;
   if (outattr_track_nodegenesis) NodeGenesis_Data = new nodegenesis_data;
+  if (outattr_make_full_Txt) {
+    if ((n=clp.Specifies_Parameter("outattr_Txt_sequence"))>=0) outattr_Txt_sequence = (downcase(clp.ParValue(n))==String("true"));
+  } else outattr_Txt_sequence = false;
   if ((n=clp.Specifies_Parameter("outattr_Txt_separate_files"))>=0) outattr_Txt_separate_files = (downcase(clp.ParValue(n))==String("true"));
+  if ((n=clp.Specifies_Parameter("outattr_make_full_X3D"))>=0) outattr_make_full_X3D = (downcase(clp.ParValue(n))==String("true"));
+  if ((n=clp.Specifies_Parameter("outattr_make_full_Catacomb"))>=0) outattr_make_full_Catacomb = (downcase(clp.ParValue(n))==String("true"));
+  if ((n=clp.Specifies_Parameter("statsattr_fan_in_analysis"))>=0) {
+    if (downcase(clp.ParValue(n))==String("axons")) statsattr_fan_in_analysis = axon_fs;
+    else if (downcase(clp.ParValue(n))==String("dendrites")) statsattr_fan_in_analysis = dendrite_fs;
+    else warning("Warning: Unknown fiber structure reference '"+clp.ParValue(n)+"', assuming statsattr_fan_in_analysis=none.\n");
+  }
   if ((n=clp.Specifies_Parameter("figattr_use_color"))>=0) figattr_use_color = (downcase(clp.ParValue(n))==String("true"));
   if ((n=clp.Specifies_Parameter("figattr_tsupd_visibly"))>=0) figattr_update_terminal_segments_visibly = (downcase(clp.ParValue(n))==String("true"));
   if ((n=clp.Specifies_Parameter("figattr_neurons"))>=0) figattr_show_neurons = (downcase(clp.ParValue(n))==String("true"));
@@ -394,9 +276,9 @@ void developmental_simulation(Command_Line_Parameters & clp) {
     else if (figattrstr==String("bar")) figattr_sample_show_progress = 2;
   }
   switch (figattr_sample_show_progress) {
-  case 0: cout << "\nFigure Attribute: No progress indicator.\n"; break;;
-  case 1: cout << "\nFigure Attribute: Textual progress indicator.\n"; break;;
-  case 2: cout << "\nFigure Attribute: Bar progress indicator.\n"; break;;
+  case 0: report("\nFigure Attribute: No progress indicator.\n"); break;;
+  case 1: report("\nFigure Attribute: Textual progress indicator.\n"); break;;
+  case 2: report("\nFigure Attribute: Bar progress indicator.\n"); break;;
   }
   if ((n=clp.Specifies_Parameter("figattr_make_full_Fig"))>=0) figattr_make_full_Fig = (downcase(clp.ParValue(n))==String("true"));
   if ((n=clp.Specifies_Parameter("figattr_make_zoom_Fig"))>=0) figattr_make_zoom_Fig = (downcase(clp.ParValue(n))==String("true"));
@@ -412,12 +294,12 @@ void developmental_simulation(Command_Line_Parameters & clp) {
     sampleinterval = atof(clp.ParValue(n));
     if (sampleinterval==0.0) {
       sampleinterval = 24.0*60.0*60.0;
-      cout << "Warning: Parameter sample_dt was set to 0.0, defaulting to " << sampleinterval << " seconds.\n";
+      warning("Warning: Parameter sample_dt was set to 0.0, defaulting to "+String(sampleinterval,"%.1f")+" seconds.\n");
     }
   }
   colortable->parse_CLP(clp);
   report_form_aware(clp,colortable);
-  cout << '\n';
+  report('\n');
   // NETWORK PARAMETERS
   if ((n=clp.Specifies_Parameter("days"))>=0) max_growth_time = atof(clp.ParValue(n))*24.0*60.0*60.0;
   if ((n=clp.Specifies_Parameter("seconds"))>=0) max_growth_time = atof(clp.ParValue(n));
@@ -432,7 +314,7 @@ void developmental_simulation(Command_Line_Parameters & clp) {
   double approxproportion[UNTYPED_NEURON+1];
   for (int i = 0; i<=UNTYPED_NEURON; i++) approxproportion[i] = 0.0;
   approxproportion[PYRAMIDAL] = 0.7; // default value
-  approxproportion[INTERNEURON] = 0.3; // default value
+  approxproportion[INTERNEURON] = 1.0 - approxproportion[PYRAMIDAL]; // default value
   for (int i = 0; i<=UNTYPED_NEURON; i++) {
     parname = "approxproportion";
     parname += neuron_type_name[i];
@@ -443,7 +325,7 @@ void developmental_simulation(Command_Line_Parameters & clp) {
       //      cout << "approxproportion[" << i << "] = " << approxproportion[i] << '\n';
       if (approxproportion[i] < 0.0) {
 	approxproportion[i] = 0.0;
-	cout << "Warning: The approximate proportion of neurons that are " << neuron_type_name[i] << " was set to < 0, defaulting to 0.0.\n";
+	warning("Warning: The approximate proportion of neurons that are "+String(neuron_type_name[i])+" was set to < 0, defaulting to 0.0.\n");
       }
     }
   }
@@ -454,7 +336,7 @@ void developmental_simulation(Command_Line_Parameters & clp) {
     double newtotal = approxproportiontotal - approxproportion[j];
     approxproportion[j] = 1.0 - newtotal;
     if (approxproportion[j]<0.0) approxproportion[j] = 0.0;
-    cout << "Warning: The sum of the proportions of specific types of neurons is " << approxproportiontotal << ". adjusting the proportion of " << neuron_type_name[j] << " to " << approxproportion[j] << '\n';
+    warning("Warning: The sum of the proportions of specific types of neurons is "+String(approxproportiontotal,"%.3f")+". adjusting the proportion of "+neuron_type_name[j]+" to "+String(approxproportion[j],"%.3f")+'\n');
   }
   // Neuron type numbers set directly
   int numneurons = 0;
@@ -470,37 +352,30 @@ void developmental_simulation(Command_Line_Parameters & clp) {
       populationsize[i] = atoi(clp.ParValue(n));
       if (populationsize[i] < 0) {
 	populationsize[i] = 0;
-	cout << "Warning: The population size for neurons that are " << neuron_type_name[i] << " was set to < 0, defaulting to 0.\n";
+	warning("Warning: The population size for neurons that are "+String(neuron_type_name[i])+" was set to < 0, defaulting to 0.\n");
       }
       numneurons += populationsize[i];
-      cout << "  Absolute size of " << neuron_type_name[i] << " population requested = " << populationsize[i] << " (total=" << numneurons << ")\n";
+      report("  Absolute size of "+String(neuron_type_name[i])+" population requested = "+String((long) populationsize[i])+" (total="+String((long) numneurons)+")\n");
     }
   }
   bool exactpopulationsizes = (numneurons > 0);
   // Number of neurons of all types
+  numneurons_is_default = false;
   if (numneurons == 0) {
-    numneurons = 100; // default value
+    numneurons = 9; // default value
     if ((n=clp.Specifies_Parameter("neurons"))>=0) {
       numneurons = atoi(clp.ParValue(n));
       if (numneurons<1) {
-	numneurons = 100;
-	cout << "Warning: The number of neurons was set to < 1, defaulting to " << numneurons << " neurons.\n";
+	numneurons = 9;
+	numneurons_is_default = true;
+	warning("Warning: The number of neurons was set to < 1, defaulting to "+String((long) numneurons)+" neurons.\n");
       }
-    } else cout << "Note: Using default network size (100 neurons).\n";
-  }
-  int Aturnsflag = 1, Dturnsflag = 1;
-  if ((n=clp.Specifies_Parameter("Afibreswithturns"))>=0) Aturnsflag = (downcase(clp.ParValue(n))==String("true"));
-  if ((n=clp.Specifies_Parameter("Dfibreswithturns"))>=0) Dturnsflag = (downcase(clp.ParValue(n))==String("true"));
-  int growthfunction = 0;
-  if ((n=clp.Specifies_Parameter("growthfunction"))>=0) {
-    if (downcase(clp.ParValue(n))==String("vanpelt")) growthfunction = 0;
-    else if (downcase(clp.ParValue(n))==String("polynomialo1")) { growthfunction = 1; Aturnsflag = 1; Dturnsflag = 1; }
-    else if (downcase(clp.ParValue(n))==String("polynomialo3")) { growthfunction = 2; Aturnsflag = 1; Dturnsflag = 1; }
-    else {
-      growthfunction = 0;
-      cout << "Warning: Unrecognized growthfunction selection, defaulting to van Pelt growth function.\n";
+    } else {
+      numneurons_is_default = true;
+      report("Note: Using default network size (9 neurons).\n");
     }
   }
+  if ((n=clp.Specifies_Parameter("fibreswithturns"))>=0) fibreswithturns = (downcase(clp.ParValue(n))==String("true"));
   double timesteps = 0.0;
   if ((n=clp.Specifies_Parameter("dt"))>=0) timesteps = atof(clp.ParValue(n));
   // GROWTH FUNCTION PARAMETERS
@@ -508,7 +383,7 @@ void developmental_simulation(Command_Line_Parameters & clp) {
     spatialsegmentsubsetsizelimit = atoi(clp.ParValue(n));
     if (spatialsegmentsubsetsizelimit<1) {
       spatialsegmentsubsetsizelimit = 65;
-      cout << "Warning: The preferred maximum number of segments per spatial partition was\nset to < 1, defaulting to 65 fibre segments.\n";
+      warning("Warning: The preferred maximum number of segments per spatial partition was\nset to < 1, defaulting to 65 fibre segments.\n");
     }
   }
   if ((n=clp.Specifies_Parameter("branchinsegment"))>=0) branchsomewhereinsegment = (downcase(clp.ParValue(n))==String("true"));
@@ -516,27 +391,20 @@ void developmental_simulation(Command_Line_Parameters & clp) {
   global_parse_CLP(clp);
   if (maxnumberofspatialsegmentsubsets<INT_MAX) {
     unsigned int sssmaxmem = (sizeof(Spatial_Segment_Subset)+(sizeof(fibre_segment_ptr)*spatialsegmentsubsetsizelimit))*maxnumberofspatialsegmentsubsets;
-    cout << "\nMemory consumption by Spatial Segment Subsets limited to: " << ((double) sssmaxmem)/(1024.0*1024.0) << " Mbytes + memory allocation overhead\n";
+    report("\nMemory consumption by Spatial Segment Subsets limited to: "+String(((double) sssmaxmem)/(1024.0*1024.0),"%.3f")+" Mbytes + memory allocation overhead\n");
   }
 
   // PARAMETER RECORDING BY PRINTING TO STDOUT
-  cout << "Generating a network with " << numneurons << " neurons.\n";
-  cout << "Creating presynaptic and postsynaptic structure over " << String(max_growth_time/(24.0*60.0*60.0),"%.2f") << " days.\n";
-  switch (growthfunction) {
-  case 1: cout << "Applying linear polynomial fitted growth functions.\n"; break;
-  case 2: cout << "Applying cubic polynomial fitted growth functions.\n"; break;
-  default: cout << "Applying van Pelt growth functions.\n"; break;
-  }
-  if (Dturnsflag) cout << "Dendrite fibre segments include turns at continuation points.\n";
-  else cout << "Dendrite fibre segments are straight.\n";
-  if (Aturnsflag) cout << "Axon fibre segments include turns at continuation points.\n";
-  else cout << "Axon fibre segments are straight.\n";
-  if (branchsomewhereinsegment) cout << "The branch points at bifurcating segments occur anywhere between steps of the growth function.\n";
-  else cout << "The branch points at bifurcating segments occur only at the end of a terminal segment during a growth function step.\n";
-  if (initiallengthatactualfirstbranch) cout << "A branch point must occur at the initial segment length.\n";
-  else cout << "Probabilistic branch point calculations apply at the initial segment length.\n";
-  cout << global_report_parameters();
-  if (figsequenceflag) cout << "A sequence of figures is produced during simulation.\n";
+  report("Generating a network with "+String((long) numneurons)+" general population neurons.\n(See below for additional region specific numbers of neurons of specific type added.)\n");
+  report("Creating presynaptic and postsynaptic structure over "+String(max_growth_time/(24.0*60.0*60.0),"%.2f")+" days.\n");
+  if (fibreswithturns) report("Dendrite and axon fibre segments include turns at continuation points.\n");
+  else report("Dendrite and axon fibre segments are straight between bifurcation points.\n");
+  if (branchsomewhereinsegment) report("The branch points at bifurcating segments occur anywhere between steps of the growth function.\n");
+  else report("The branch points at bifurcating segments occur only at the end of a terminal segment during a growth function step.\n");
+  if (initiallengthatactualfirstbranch) report("A branch point must occur at the initial segment length.\n");
+  else report("Probabilistic branch point calculations apply at the initial segment length.\n");
+  report(global_report_parameters());
+  if (figsequenceflag) report("A sequence of figures is produced during simulation.\n");
   //if (figsequenceflag && combineflag) cout << "The sequence is subsequently combined into an animation.\n";
   // [***INCOMPLETE] add clp test for evaluate_connectivity_immediately
 
@@ -544,13 +412,13 @@ void developmental_simulation(Command_Line_Parameters & clp) {
   else set_random_seed(rseed);
 
   spatial smin(-3.0,-3.0,-3.0), smax(3.0,3.0,3.0);
-  neuron pspreadmin(smin); pspreadmin.set_radius(4.0); // sample sets minimums of parameter spread
-  neuron pspreadmax(smax); pspreadmax.set_radius(6.0); // sample sets maximums of parameter spread
+  principal pspreadmin(smin); pspreadmin.set_radius(4.0); // sample sets minimums of parameter spread
+  principal pspreadmax(smax); pspreadmax.set_radius(6.0); // sample sets maximums of parameter spread
   // *** --> Can move to Network_Statistics::initialize();
   Network_Statistics_Root nsr(exactpopulationsizes);
   if (nsr.UseExactPopulationSizes()) for (int i = 0; i<=UNTYPED_NEURON; i++) nsr.link_before(new Network_Statistics(static_cast<neuron_type>(i),populationsize[i]));
   else for (int i = 0; i<=UNTYPED_NEURON; i++) nsr.link_before(new Network_Statistics(static_cast<neuron_type>(i),approxproportion[i]));
-  cout << nsr.head()->all_str() << '\n'; cout.flush();
+  report(nsr.head()->all_str()+'\n');
   // [***NOTE] The Connection Statistics, i.e. statistics that indicate the
   // desired connectivity, are currently not in use.
   Connection_Statistics_Root cstats;
@@ -559,22 +427,8 @@ void developmental_simulation(Command_Line_Parameters & clp) {
   cstats.link_before(new Connection_Statistics(INTERNEURON,PRINCIPAL_NEURON,60,88,82.0)); 
   cstats.link_before(new Connection_Statistics(INTERNEURON,INTERNEURON,5,7,82.0));
   // selecting growth functions
-  van_Pelt_dendritic_growth_model * vPdgm;
-  switch (growthfunction) {
-  case 1: vPdgm = new Polynomial_O1_dendritic_growth_model(clp); break;
-  case 2: vPdgm = new Polynomial_O3_dendritic_growth_model(clp); break;
-  default:
-    if (Dturnsflag) vPdgm = new van_Pelt_dendritic_growth_plus_turns_model(clp);
-    else vPdgm = new van_Pelt_dendritic_growth_model(clp);
-  }
-  van_Peltlike_axonal_growth_model * vPagm;
-  switch (growthfunction) {
-  case 1: vPagm = new Polynomial_O1_axonal_growth_model(clp); break;
-  case 2: vPagm = new Polynomial_O3_axonal_growth_model(clp); break;
-  default:
-    if (Aturnsflag) vPagm = new van_Peltlike_axonal_growth_plus_turns_model(clp);
-    else vPagm = new van_Peltlike_axonal_growth_model(clp);
-  }
+  van_Pelt_dendritic_growth_model * vPdgm = new van_Pelt_dendritic_growth_model(true,clp);
+  van_Pelt_dendritic_growth_model * vPagm = new van_Pelt_dendritic_growth_model(false,clp);
   if (timesteps>0.0) {
     vPdgm->set_fixed_time_step_size(timesteps);
     vPagm->set_fixed_time_step_size(timesteps);
@@ -587,15 +441,17 @@ void developmental_simulation(Command_Line_Parameters & clp) {
   report_form_aware(clp,&general_direction_model_parameters);
   general_synapse_formation_model_parameters.parse_CLP(clp);
   report_form_aware(clp,&general_synapse_formation_model_parameters);
+#ifdef VECTOR3D
   general_slice_parameters.parse_CLP(clp);
   report_form_aware(clp,&general_slice_parameters);
-  cout << "The simulation time step size is " << vPdgm->get_fixed_time_step_size() << " seconds.\n";
-  cout << "The output sample interval size is " << sampleinterval << " seconds.\n";
-  cout << "The preferred maximum number of segments per spatial partition is " << spatialsegmentsubsetsizelimit << ".\n"; cout.flush();
+#endif
+  report("The simulation time step size is "+String(vPdgm->get_fixed_time_step_size(),"%.1")+" seconds.\n");
+  report("The output sample interval size is "+String(sampleinterval,"%.1")+" seconds.\n");
+  report("The preferred maximum number of segments per spatial partition is "+String((long) spatialsegmentsubsetsizelimit)+".\n");
   //reduce_rand_calls = true;
   bool autoplot = false;
   if (clp.IsFormInput()) autoplot = true;
-  String samplefigfiles(outputdirectory+"sample"), netfigfile(outputdirectory+"net.fig"), zoomfigfile(outputdirectory+"zoom.fig"), connectionexamplefigfile(outputdirectory+"connections-example.fig"), abstractfigfile(outputdirectory+"abstract.fig"), neuronfigfilesbase(outputdirectory+"neuron-XXXXX.fig"), statsdatafile(outputdirectory+"stats.m"), statsfile(outputdirectory+"nibr.m"), nettxtfile(outputdirectory+"net.txt"), slicefile(outputdirectory+"slice"), netdatasyndistfile(outputdirectory+"netdata-synapsedistance.m"), netdataconndistfile(outputdirectory+"netdata-connectiondistance.m");
+  String samplefigfiles(outputdirectory+"sample"), netfigfile(outputdirectory+"net.fig"), zoomfigfile(outputdirectory+"zoom.fig"), connectionexamplefigfile(outputdirectory+"connections-example.fig"), abstractfigfile(outputdirectory+"abstract.fig"), neuronfigfilesbase(outputdirectory+"neuron-XXXXX.fig"), statsdatafile(outputdirectory+"stats.m"), statsfile(outputdirectory+"nibr.m"), nettxtfile(outputdirectory+"net.txt"), netvrmlfile(outputdirectory+"net.x3d"), netccmfile(outputdirectory+"net.ccm"), slicefile(outputdirectory+"slice"), netdatasyndistfile(outputdirectory+"netdata-synapsedistance.m"), netdataconndistfile(outputdirectory+"netdata-connectiondistance.m"), faninfigfile(outputdirectory+"fanin.fig"), faninhistfile(outputdirectory+"fanin.m");
 
   // LOAD TEST FOR OPEN FORM ACCESS
   if (clp.IsFormInput()) {
@@ -606,44 +462,62 @@ void developmental_simulation(Command_Line_Parameters & clp) {
     }
   }
   // create network and electrode array
-  network * net = new network(numneurons,&pspreadmin,&pspreadmax,nsr); // ,false);
+  network * net = new network(numneurons,&pspreadmin,&pspreadmax,nsr); // ,false); // 1st call that can create neurons
   eq = net;
 
   // PARAMETERS THAT REQUIRE KNOWLEDGE OF THE NETWORK
   net->parse_CLP(clp);
   report_form_aware(clp,net);
-  general_neuron_parameters.parse_CLP(clp); // detect main direction/elongation/neuron model stuff
+  Shape_Result res = net->shape_network(clp,&pspreadmin,&pspreadmax); // 2nd call that can create neurons
+  if (net->PLLRoot<neuron>::length()<1) error("Error: The network does not appear to contain any neurons!\n");
+  general_neuron_parameters.parse_CLP(clp,*net); // detect main direction/elongation/neuron model stuff
   report_form_aware(clp,&general_neuron_parameters);
   /* *** uniform random connectivity or growth choice */
-  Shape_Result res = net->shape_network(clp);
-  cout << res << "Network creation completed.\n"; cout.flush();
+  report(res.message);
+  progress("Network creation completed.\n");
   spatial net_zoom_center(net->Center());
-  double net_zoom_disttoedge = 80.0;
+  double net_zoom_disttoedge = 80.0, net_zoomwidth=0.0, net_zoomheight=1.0, net_zoomdepth=1.0;
   parse_focus_box_CLP("net",clp,net_zoom_center,net_zoom_disttoedge);
+  parse_focus_volume_CLP("net",clp,net_zoomwidth,net_zoomheight,net_zoomdepth);
+  if (net_zoomwidth>0.0) net_zoom_disttoedge = net_zoomwidth;
 #ifdef VECTOR3D
   spat_map = spat_pres = new Spatial_Presentation(net->Center());
   spat_pres->parse_CLP(clp);
   report_form_aware(clp,spat_pres);
 #endif
-  bool electrodes = true;
+  bool electrodes = false;
   if ((n=clp.Specifies_Parameter("electrodes"))>=0) electrodes = (downcase(clp.ParValue(n))==String("true"));
   electrodearray * els = NULL;
   if (electrodes) {
     els = make_electrodes_hexagon(net->Center());
-    cout << "Electrode placement completed.\n";
+    progress("Electrode placement completed.\n");
   }
-  if (figsequenceflag) sampled_output = new Sampled_Growth_Fig_Output(net,max_growth_time,sampleinterval,statsdatafile,autoplot,samplefigfiles,res.displaywidth,false,false,true);
-  else sampled_output = new Sampled_Growth_Output(net,max_growth_time,sampleinterval,statsdatafile,autoplot,true);
+  if (figsequenceflag) sampled_output = new Sampled_Growth_Fig_Output(net,max_growth_time,sampleinterval,samplefigfiles,statsdatafile,autoplot,samplefigfiles,res.displaywidth,false,false,true);
+  else sampled_output = new Sampled_Growth_Output(net,max_growth_time,sampleinterval,samplefigfiles,statsdatafile,autoplot,true);
   sampled_output->parse_CLP(clp);
 #ifdef SAMPLES_INCLUDE_NETWORK_STATISTICS_BASE
   if (!sampled_output->Collecting_Statistics()) { // for sanity
     outattr_show_stats = false;
   }
 #endif
+  if ((outattr_track_nodegenesis) && (outattr_make_full_Txt)) {
+    int nlsize = net->PLLRoot<neuron>::length()*64;
+    if (Txt_tuftrootbranchnodelist) delete Txt_tuftrootbranchnodelist;
+    if (Txt_obliquerootbranchnodelist) delete Txt_obliquerootbranchnodelist;
+    if (outattr_Txt_separate_files) {
+      Txt_tuftrootbranchnodelist = new String(COLUMN_LABELS_TUFT_NODES);
+      Txt_obliquerootbranchnodelist = new String(COLUMN_LABELS_OBLIQUE_NODES);
+    } else {
+      Txt_tuftrootbranchnodelist = new String();
+      Txt_obliquerootbranchnodelist = new String();
+    }
+    Txt_tuftrootbranchnodelist->alloc(nlsize);
+    Txt_obliquerootbranchnodelist->alloc(nlsize*8);
+  }
   bool combineflag = false;
   if (figsequenceflag) combineflag = static_cast<Sampled_Growth_Fig_Output *>(sampled_output)->Combine();
   report_form_aware(clp,sampled_output);
-  system("rm "+samplefigfiles+"*fig "+samplefigfiles+"*png");
+  system("rm -f "+samplefigfiles+"*fig "+samplefigfiles+"*png");
   if (pb.select_physical_boundary("",clp)>0) report_form_aware(clp,&pb);
   
   // select synapse formation model (*** currently only one available)
@@ -653,8 +527,7 @@ void developmental_simulation(Command_Line_Parameters & clp) {
   net->develop_connection_structure(cstats,*vPdgm,*vPagm);
   if (warning_fibre_segment_net_Fig_zero_length>0) warning("nibr Warning: "+String((long) warning_fibre_segment_net_Fig_zero_length)+" occurrences of fibre_segment with length == 0.0 in fibre_segment::net_Fig()\n");
   if (warning_Spatial_Segment_Subset_intersects_zero_length>0) warning("nibr Warning: "+String((long) warning_Spatial_Segment_Subset_intersects_zero_length)+" occurrences of zero length segment in Spatial_Segment_Subset::intersects()\n");
-  cout << "Connections generated (total=" << net->number_of_connections() << ").\n";
-  cout.flush();
+  progress("Connections generated (total="+String((long) net->number_of_connections())+").\n");
 
 #ifdef TESTING_SPIKING
   // [***INCOMPLETE] The following temporary, as the proper implementation
@@ -662,7 +535,7 @@ void developmental_simulation(Command_Line_Parameters & clp) {
   // appropriate options for activity models.
   //actres = new Activity_Results_Output();
   if (eq->T_End()>max_growth_time) {
-    cout << "Simulating " << (eq->T_End()-max_growth_time) << " additional seconds of ACTIVITY in the generated network.\n";
+    report("Simulating "+String((eq->T_End()-max_growth_time),"%.1f")+" additional seconds of ACTIVITY in the generated network.\n");
     actres = new ARO_to_File(outputdirectory+"activity.ascii");
     net->abstract_connections();
     PLL_LOOP_FORWARD(neuron,net->PLLRoot<neuron>::head(),1) e->set_activity(new IFactivity(e));
@@ -671,36 +544,34 @@ void developmental_simulation(Command_Line_Parameters & clp) {
     eq->variablesteps();
     actres->postop();
     delete actres;
-  } else cout << "NOT simulating additional ACTIVITY events following network generation (parameters: event_seconds <= seconds).\n";
+  } else report("NOT simulating additional ACTIVITY events following network generation (parameters: event_seconds <= seconds).\n");
 #endif
 
   // output results data
-  cout << "Counting segments in final network structure...\n";
+  progress("Counting segments in final network structure...\n");
   int totaldendriticsegments = 0, totalaxonalsegments = 0;
   PLL_LOOP_FORWARD(neuron,net->PLLRoot<neuron>::head(),1) {
     totaldendriticsegments += e->total_input_segments();
     totalaxonalsegments += e->total_output_segments();
   }
-  cout << "Total number of dendritic segments = " << totaldendriticsegments << " (average per neuron = " << ((double) totaldendriticsegments)/((double) net->PLLRoot<neuron>::length()) << ")\n";
-  cout << "Total number of axonal segments    = " << totalaxonalsegments << " (average per neuron = " << ((double) totalaxonalsegments)/((double) net->PLLRoot<neuron>::length()) << ")\n";
-  cout.flush();
-  if (net->Seek_Candidate_Synapses()) cout << "Proximity threshold used to establish candidate synapses = " << sfm->Proximity_Threshold() << " microns\n";
-  else cout << "NO candidate synaptic sites were sought in this simulation, due to the chosen parameter value 'candidate_synapses=false'.\n";
+  progress("Total number of dendritic segments = "+String((long) totaldendriticsegments)+" (average per neuron = "+String(((double) totaldendriticsegments)/((double) net->PLLRoot<neuron>::length()),"%.2f")+")\n");
+  progress("Total number of axonal segments    = "+String((long) totalaxonalsegments)+" (average per neuron = "+String(((double) totalaxonalsegments)/((double) net->PLLRoot<neuron>::length()),"%.2f")+")\n");
+  if (net->Seek_Candidate_Synapses()) report("Proximity threshold used to establish candidate synapses = "+String(sfm->Proximity_Threshold(),"%.3f")+" microns\n");
+  else report("NO candidate synaptic sites were sought in this simulation, due to the chosen parameter value 'candidate_synapses=false'.\n");
 #ifdef EVALUATE_POSSIBLE_CONNECTION_PROFILING
   if (net->Seek_Candidate_Synapses()) {
     double brute_force = ((double) totaldendriticsegments)*((double) totalaxonalsegments);
-    cout << "Evaluated possible candidate synapses = " << evaluate_possible_connection_calls << " (compared to " << brute_force << " by brute force, i.e. " << ((((double) evaluate_possible_connection_calls)/brute_force)*100.0) << " percent)\n";
+    progress("Evaluated possible candidate synapses = "+String((long) evaluate_possible_connection_calls)+" (compared to "+String(brute_force,"%.3f")+" by brute force, i.e. "+String(((((double) evaluate_possible_connection_calls)/brute_force)*100.0),"%.3f")+" percent)\n");
   }
 #endif
 #ifdef SYNAPTOGENESIS_AND_LOSS_INVENTORY
   if (net->Seek_Candidate_Synapses()) {
-    cout << "Inventory of synapse genesis and loss:\n";
-    for (int i=0; i<syntype_IDs; i++) cout << "  " << synapse_type_name[i] << "\tgenesis=" << synapse_inventory[i][SYNGENESIS] << "\tloss=" << synapse_inventory[i][SYNLOSS] << '\n';
-    cout << "Attempted conversions of candidate synapses = " << candidates_conversion_attempted << '\n';
+    progress("Inventory of synapse genesis and loss:\n");
+    for (int i=0; i<syntype_IDs; i++) progress("  "+String(synapse_type_name[i])+"\tgenesis="+String((long) synapse_inventory[i][SYNGENESIS])+"\tloss="+String((long) synapse_inventory[i][SYNLOSS])+'\n');
+    progress("Attempted conversions of candidate synapses = "+String((long) candidates_conversion_attempted)+'\n');
   }
 #endif
   if (empty_data_samples>0) warning("During the collection of simulation statistics, "+String((long) empty_data_samples)+" samples were empty.\n");
-  cout.flush();
   int showprogresscache = 0;
 #ifdef TEST_FOR_NAN
   PLL_LOOP_FORWARD(neuron,net->PLLRoot<neuron>::head(),1)
@@ -720,6 +591,9 @@ void developmental_simulation(Command_Line_Parameters & clp) {
 	els->Fig_Output(netfigfile);
 	figattr_sample_show_progress=showprogresscache;
       }
+#ifdef VECTOR3D
+      if (general_slice_parameters.show_slice_outlines()) net->Slice_Outlines_Output(netfigfile,general_slice_parameters);
+#endif
       if (figattr_connections_thresholdlistlength>1) { // make a set of connection figures
 	bool fsncache = figattr_show_neurons, fspscache = figattr_show_presynaptic_structure;
 	figattr_show_neurons = true; figattr_show_presynaptic_structure = false;
@@ -761,7 +635,9 @@ void developmental_simulation(Command_Line_Parameters & clp) {
       }
     }
     if (figattr_make_zoom_Fig) {
-      set_focus_box(net_zoom_center,net_zoom_disttoedge);
+      if (net_zoomwidth>0.0) set_focus_volume(net_zoom_center,net_zoomwidth,net_zoomheight,net_zoomdepth);
+      else set_focus_box(net_zoom_center,net_zoom_disttoedge);
+      //usewidth = figattr_focus_box_x2-figattr_focus_box_x1;
       net->Fig_Output(zoomfigfile,figattr_focus_box_x2-figattr_focus_box_x1,true);
       if (electrodes) {
 	showprogresscache=figattr_sample_show_progress;
@@ -807,10 +683,36 @@ void developmental_simulation(Command_Line_Parameters & clp) {
     }
   }
   if (outattr_make_full_Txt) net->Txt_Output(nettxtfile);
+  if (outattr_make_full_X3D) {
+    if (net_zoomwidth>0.0) set_focus_volume(net_zoom_center,net_zoomwidth,net_zoomheight,net_zoomdepth);
+    else set_focus_box(net_zoom_center,net_zoom_disttoedge);
+    net->VRML_Output(netvrmlfile);
+  }
+  if (outattr_make_full_Catacomb) net->Catacomb_Output(netccmfile);
   if (outattr_synapse_distance_frequency) net->Data_Output_Synapse_Distance(netdatasyndistfile);
   if (outattr_connection_distance_frequency) net->Data_Output_Connection_Distance(netdataconndistfile);
-  if (max_abstract_strength>0.0) cout << "Maximum abstract connection strength computed = " << max_abstract_strength << '\n';
+  if (max_abstract_strength>0.0) progress("Maximum abstract connection strength computed = "+String(max_abstract_strength,"%.3f")+'\n');
+#ifdef VECTOR3D
   if (general_slice_parameters.get_slice()) net->Slice_Output(slicefile,general_slice_parameters);
+#endif
+  // [***BEWARE] Unless a network copy is made, the following optional analysis changes the network.
+  if (statsattr_fan_in_analysis!=NUM_fs) { // [***NOTE] This should be moved into a separate function.
+    spatial * origpos = new spatial[net->PLLRoot<neuron>::length()];
+    int n_pos = 0;
+    PLL_LOOP_FORWARD(neuron,net->PLLRoot<neuron>::head(),1) origpos[n_pos++] = e->Pos();
+    spatial cpos;
+    net->move(cpos);
+    net->fanin_rot();
+    n_pos = 0;
+    PLL_LOOP_FORWARD(neuron,net->PLLRoot<neuron>::head(),1) e->move(origpos[n_pos++]);
+    delete[] origpos;
+    net_fanin_histogram.means();
+    write_file_from_String(faninhistfile,net_fanin_histogram.octave_output());
+    //set_focus_box(cpos,-1.0);
+    set_focus_box(net->Center(),-1.0);
+    net->Fig_Output(faninfigfile,res.displaywidth,true);
+    append_file_from_String(faninfigfile,net_fanin_histogram.fig_output()->str());
+  }
 
   //#ifdef VECTOR3D
   //  PLL_LOOP_FORWARD(neuron,net->head(),1) cout << e->Pos().X() << ',' << e->Pos().Y() << ',' << e->Pos().Z() << '\n'; 
@@ -825,7 +727,7 @@ void developmental_simulation(Command_Line_Parameters & clp) {
     nn++;
     }*/
 
-  if (zerocoordinateconversions>0) cout << "Conversion from Euler to Spherical coordinates was attempted for " << zerocoordinateconversions << " ZERO vectors.\n";
+  if (zerocoordinateconversions>0) progress("Conversion from Euler to Spherical coordinates was attempted for "+String((long) zerocoordinateconversions)+" ZERO vectors.\n");
 
   // clean up to make more memory available
   delete els;
@@ -837,22 +739,23 @@ void developmental_simulation(Command_Line_Parameters & clp) {
   // Place HTML output in advance
   String combinetype;
   if (clp.IsFormInput()) {
-    if (outattr_show_figure && figattr_make_full_Fig) cout << "The resulting network: <A HREF=\""+absoluteoutputURL+"net.pdf\">net.pdf</A>\n";
-    if (outattr_show_figure && figattr_make_zoom_Fig)  cout << "An enlargement of the center of the network: <A HREF=\""+absoluteoutputURL+"zoom.pdf\">zoom.pdf</A>\n";
-    if (outattr_show_figure && figattr_make_abstract_Fig) cout << "The abstracted connections: <A HREF=\""+absoluteoutputURL+"abstract.pdf\">abstract.pdf</A>\n";
+    if (outattr_show_figure && figattr_make_full_Fig) progress("The resulting network: <A HREF=\""+absoluteoutputURL+"net.pdf\">net.pdf</A>\n");
+    if (outattr_show_figure && figattr_make_zoom_Fig)  progress("An enlargement of the center of the network: <A HREF=\""+absoluteoutputURL+"zoom.pdf\">zoom.pdf</A>\n");
+    if (outattr_show_figure && figattr_make_abstract_Fig) progress("The abstracted connections: <A HREF=\""+absoluteoutputURL+"abstract.pdf\">abstract.pdf</A>\n");
     if (figsequenceflag && combineflag) {
       combinetype = static_cast<Sampled_Growth_Fig_Output *>(sampled_output)->CombineType();
-      cout << "The combined and animated sequence: <A HREF=\""+absoluteoutputURL+"sample."+combinetype+"\">sample."+combinetype+"</A>\n";
+      progress("The combined and animated sequence: <A HREF=\""+absoluteoutputURL+"sample."+combinetype+"\">sample."+combinetype+"</A>\n");
     }
-    if (outattr_show_figure && figattr_make_neurons_Figs)  cout << "A set of morphology .fig plots of individual neurons has also been prepared with base name " << neuronfigfilesbase << ".\n";
+    if (outattr_show_figure && figattr_make_neurons_Figs)  progress("A set of morphology .fig plots of individual neurons has also been prepared with base name "+neuronfigfilesbase+".\n");
     //if (outattr_show_stats) cout << "Resulting network statistics: <A HREF=\""+absoluteoutputURL+"stats.png\">stats.png</A>\n";
-    cout << "(Please wait for network output to complete before accessing files at the links above.)\n";
-    cout.flush();
+    progress("(Please wait for network output to complete before accessing files at the links above.)\n");
   }
 
   sampled_output->Output(outattr_show_stats);
 
   // more clean up
+  if (Txt_tuftrootbranchnodelist) delete Txt_tuftrootbranchnodelist;
+  if (Txt_obliquerootbranchnodelist) delete Txt_obliquerootbranchnodelist;
   delete sampled_output;
 #ifdef VECTOR3D
   delete spat_pres;
@@ -906,12 +809,12 @@ void developmental_simulation(Command_Line_Parameters & clp) {
   // *** normal_random():
   // mean + sqrt(variance)*randn() uses F77 normal_dist
 
-  warnings_on = false; // avoids the unnecessary warning about attempting to destruct the Null_Activity object
-  cout << "DEVELOPMENTAL (MORPHOGENESIS) SIMULATION: Successful, clean exit.\n";
+  progress("DEVELOPMENTAL (MORPHOGENESIS) SIMULATION: Successful, clean exit.\n");
 }
 
 const char helpstr[] = "\
-Usage: nibr [parameter=value]\n\
+Usage: netmorph [parameter=value]\n\
+       netmorph2D [parameter=value]\n\
 \n\
   parameters:\n\
 \n\
@@ -932,18 +835,19 @@ Usage: nibr [parameter=value]\n\
                                          that are of type:\n\
                                          principal_neuron, interneuron,\n\
                                          pyramidal, multipolar_nonpyramidal,\n\
-                                         untyped_neuron\n\
+                                         bipolar, untyped_neuron\n\
     populationsize<type>=<integer#>      number of neurons of type:\n\
                                          principal_neuron, interneuron,\n\
                                          pyramidal, multipolar_nonpyramidal,\n\
-                                         untyped_neuron\n\
+                                         bipolar, untyped_neuron\n\
     random_orientation=<true/decimal#>   orientation of axon and dendrites\n\
-    use_specified_basal_direction=<true/false>\n\
+    use_specified_basal_direction=<true/false> align as specified\n\
     specified_basal_direction_theta=<decimal#>\n\
     specified_basal_direction_phi=<decimal#>\n\
     specified_basal_direction_relx=<decimal#>\n\
     specified_basal_direction_rely=<decimal#>\n\
     specified_basal_direction_relz=<decimal#>\n\
+    apical_specified_overrides_centroid=<true/false> use negated specified\n\
     shape=<shape name>                   a shape selection: rectangle, box,\n\
                                          regions, circle, hexagon\n\
 \n\
@@ -957,11 +861,15 @@ Usage: nibr [parameter=value]\n\
     shape_randompolar=<true/false>       randomize allocation in polar crds.\n\
 \n\
     regions=<space separated list>       list of region labels\n\
-    <region>.shape=<disc/box>            shape of a specific region\n\
+    <region>.<neuron-type>=<integer#>    specify additional neurons of type:\n\
+                                         principal_neuron, interneuron,\n\
+                                         pyramidal, multipolar_nonpyramidal,\n\
+                                         bipolar\n\
+    <region>.shape=<disc/box/sphere>     shape of a specific region\n\
     <region>.neurons=<integer#>          number of neurons in region\n\
     <region>.minneuronseparation=<decimal#> minimum separation > cell sizes\n\
     <region>.center<X/Y/Z>=<decimal#>    region center location\n\
-    [region.]shape.radius=<decimal#>     radius of disc region shape\n\
+    [region.]shape.radius=<decimal#>     radius of disc/sphere region shape\n\
     [region.]shape.thickness=<decimal#>  thickness of disc region shape\n\
     [region.]shape.width=<decimal#>      horizontal size of box region shape\n\
     [region.]shape.height=<decimal#>     vertical size of box region shape\n\
@@ -969,10 +877,13 @@ Usage: nibr [parameter=value]\n\
 \n\
     electrodes=<true/false>              include electrodes\n\
     pia_attraction_repulsion_hypothesis=<true/false> axon/apical locations\n\
-    pyramidal.min_basal=<integer#>       minimum number of basal dendrites\n\
-    pyramidal.max_basal=<integer#>       maximum number of basal dendrites\n\
-    pyramidal.basal.minangle=<decimal#>  minimum initial angular deviation\n\
-    pyramidal.basal.maxangle=<decimal#>  maximum initial angular deviation\n\
+    <neuron-type>.min_basal=<integer#>   minimum number of basal dendrites\n\
+    <neuron-type>.max_basal=<integer#>   maximum number of basal dendrites\n\
+    <neuron-type>.basal.minangle=<decimal#> minimum initial angular deviation\n\
+    <neuron-type>.basal.maxangle=<decimal#> maximum initial angular deviation\n\
+    <neuron-type>.basal.force_model=<label> placement: unrestricted,\n\
+                                         surface_division\n\
+    multipolar.max_axons=<integer#>      maximum number of axons\n\
 \n\
     [label.]environment_physics=<label[ ... ]>   physical constraints\n\
       <label>.physical_boundary=<label>  spherical, point_attractor\n\
@@ -1012,13 +923,26 @@ Usage: nibr [parameter=value]\n\
     <schema.>terminal_segment_elongation_model=  simple, inertia, second_order,\n\
       <model-id>                         constrained_second_order,\n\
                                          decaying_second_order,\n\
-                                         initialized_cso, BESTL\n\
+                                         initialized_cso, BESTL, nonnorm_BESTL,\n\
+                                         pyrAD_BESTLNN\n\
       second_order parameters:\n\
         .tsem_inertia=<decimal#>         first order (speed) inertia\n\
       decaying_second_order parameters:\n\
         .tsem_decay=<decimal#>           decay time constant (seconds)\n\
       initialized_cso parameters:\n\
         .tsem_initial_acceleration=<decimal#> initial quota acceleration\n\
+      BESTL parameters:\n\
+        .tsem.branch.PDF=<PDF-id>        initial elongation at branches\n\
+      pyrAD_BESTLNN parameters:\n\
+        .tsem.trunklength.PDF=<PDF-id>   length of apical dendrite trunk\n\
+        .tsem.obliques.PDF=<PDF-id>      number of oblique branches\n\
+        .tsem.prefix                     label for oblique and tuft parameters\n\
+          <prefix.>oblique.<model-parameters> various model parameters for\n\
+                                         oblique branches, e.g.\n\
+                                         terminal_segment_elongation_model\n\
+          <prefix.>tuft.<model-parameters> various model parameters for\n\
+                                         tuft branches, e.g.\n\
+                                         terminal_segment_elongation_model\n\
       .tsem.PDF=<PDF-id>                 delta, uniform, linear, spline_normal,\n\
                                          spline_normal_with_min, normal,\n\
                                          exponential\n\
@@ -1026,8 +950,10 @@ Usage: nibr [parameter=value]\n\
       .terminal_segment_elongation_model_label\n\
       .tsem_label\n\
     <schema.>elongation_rate_initialization_model =\n\
-      <model-id>                         length_distribution, pure_stochastic\n\
-                                         zero, unitary, continue_defaults\n\
+      <model-id>                         length_distribution,\n\
+                                         nonnorm_BESTL_length_distribution,\n\
+                                         pure_stochastic, zero, unitary,\n\
+                                         continue_defaults\n\
       unitary parameters:\n\
         .eri_initialquota                elongation quota to initialize each to\n\
       .eri.PDF=<PDF-id>                  delta, uniform, linear, spline_normal,\n\
@@ -1039,38 +965,8 @@ Usage: nibr [parameter=value]\n\
 \n\
     Morphological Development - Growth Cone Bifurcation:\n\
 \n\
-    growthfunction=<selection>           select: vanPelt, polynomialO1,\n\
-                                         polynomialO3\n\
-    <Agrowth_id>=<decimal#>              Axon growth parameters:\n\
-                                         Agrowth_E, Agrowth_tau,\n\
-                                         Agrowth_B_inf,\n\
-                                         Agrowth_c,\n\
-                                         Agrowth_L0_min, Agrowth_L0_max,\n\
-                                         Agrowth_tf, Agrowth_c1, Agrowth_c2,\n\
-                                         Amin_node_interval\n\
-    <Dgrowth_id>=<decimal#>              Dendrite growth parameters:\n\
-                                         Dgrowth_E, Dgrowth_tau,\n\
-                                         Dgrowth_B_inf,\n\
-                                         Dgrowth_c,\n\
-                                         Dgrowth_L0_min, Dgrowth_L0_max,\n\
-                                         Dgrowth_tf, Dgrowth_c1, Dgrowth_c2,\n\
-                                         Dmin_node_interval,\n\
-                                         Dturn_rate, Dturn_separation\n\
-    <Dapical_growth_id>=<decimal#>       Apical dendrite growth parameters:\n\
-                                         Dgrowth_E_apicaltrunc,\n\
-                                         Dgrowth_tau_apicaltrunc,\n\
-                                         Dgrowth_B_inf_apicaltrunc,\n\
-                                         Dgrowth_c_apicaltrunc,\n\
-                                         Dgrowth_E_apicaltuft,\n\
-                                         Dgrowth_tau_apicaltuft,\n\
-                                         Dgrowth_B_inf_apicaltuft,\n\
-                                         Dgrowth_c_apicaltuft\n\
-    apical_tufting_trigger_time=<decimal#> time threshold to trigger tufting\n\
-    apical_tufting_trigger_distance=<decimal#> apical tufting distance\n\
+    <schema.>L0=<#decimal[,#decimal]>    range of initial arbor lengths\n\
 \n\
-    Dcompetition_with_all_trees=<true/false> compete with all dendrites\n\
-    Acompetition_with_all_trees=<true/false> compete with all axons\n\
-    A/Dcompetition_with_whole_neuron=<true/false> compete with all growth cones\n\
     branchinsegment=<true/false>         branches occur between steps\n\
     branchatinitlength=<true/false>      first branch at initial length\n\
     Abranchesatturns=<true/false>        branches may occur at existing turns\n\
@@ -1078,16 +974,27 @@ Usage: nibr [parameter=value]\n\
 \n\
     <schema.>branching_model=            van_Pelt, polynomial_O1, polynomial_O3\n\
       <model-id>                         \n\
-      van_Pelt parameters:\n\
+      general parameters:\n\
         .min_node_interval=<decimal#>    min.length (microns) of segment pieces\n\
-      .bm.PDF=<PDF-id>                   delta, uniform, linear, spline_normal,\n\
-                                         spline_normal_with_min, normal,\n\
-                                         exponential\n\
+      van_Pelt parameters:\n\
+        .B_inf=<decimal#>                asymptotic value\n\
+        .tau=<decimal#>                  time coefficient (seconds)\n\
+        .E=<decimal#>                    competition coefficient\n\
+        .E_competes_with=                whole_neuron, all_axons,\n\
+                                         all_dendrites, same_arbor\n\
       .bm_weight\n\
       .branching_model_label\n\
       .bm_label\n\
+    <schema.>TSBM=<model-id>             van_Pelt, van_Pelt_specBM\n\
+      van_Pelt parameters:\n\
+        .S=<decimal#>                    Centrifugal order dependency\n\
+      .tsbm_weight\n\
+      .TSBM_label\n\
+      .tsbm_label\n\
     <schema.>branch_angle_model=         Balanced_Forces, Fork_Main_Daughter\n\
       <model-id>                         \n\
+      Balanced_Forces parameters:\n\
+        .bam.bfbam.PDF=<PDF-id>          angle in the branching parallelogram\n\
       .bam.PDF=<PDF-id>                  delta, uniform, linear, spline_normal,\n\
                                          spline_normal_with_min, normal,\n\
                                          exponential\n\
@@ -1097,21 +1004,33 @@ Usage: nibr [parameter=value]\n\
 \n\
     Morphological Development - Growth Cone Change of Direction:\n\
 \n\
-    A/Dfibreswithturns=<true/false>      fibre segments with turns\n\
-    <A/D>growth.turn_model=<selection>   model to determin probability of\n\
-                                         direction change: each_dt,\n\
-                                         linear_rate, branch_coupled\n\
-    <A/D>turn_rate=<decimal#>            turn probability per second or\n\
-                                         1/turn_separation\n\
-    <A/D>turn_separation=<decimal#>      expected micrometers between turns\n\
+    fibreswithturns=<true/false>         fibre segments with turns\n\
+    <schema.>TSTM=<model-id>             terminal segment turn event selection\n\
+                                         model: none, each_dt, linear_rate,\n\
+                                         branch_coupled\n\
+      linear_rate parameters:\n\
+        .turn_rate                       turns per micrometer (or second)\n\
+        .turn_separation                 microns (or seconds) between turns\n\
+      branch_coupled parameters:\n\
+        .tf=<decimal#>                   turnfactor likelihood multiplier\n\
+      .tstm_weight\n\
+      .TSTM_label\n\
+      .tstm_label\n\
 \n\
     <schema.>direction_model=<model-id>  segment_history_tension,\n\
-                                         cell_attraction, radial\n\
+                                         cell_attraction, radial, vector\n\
       .veeranglemin=<decimal#>           minimum and maximum pitch veer angles\n\
       .veeranglemax=<decimal#>           that perturb expected turn direction\n\
       .dm_weight\n\
       .direction_model_label\n\
       .dm_label\n\
+    tension parameters:\n\
+      .history_power=<decimal#>          history has increasing (<0),equal (0)\n\
+                                         or decreasing (>0) influence\n\
+    radial parameters:\n\
+      .Samsonovich_hypothesis=<true/false> do turns return to a normal vector\n\
+    vector parameters:\n\
+      .direction=<vector>                expected direction vector\n\
     dirhistory_selection=                dynamic changes of the segment history\n\
       <none/random_truncation>           used in the direction model\n\
     general_rtdhs_probability=<decimal#> probability of history truncation\n\
@@ -1119,9 +1038,6 @@ Usage: nibr [parameter=value]\n\
     general_rtdhs_maxfraction=<decimal#> max. truncated history fraction\n\
     turnanglemin=<decimal#>              minimum angle at continuation node\n\
     turnanglemax=<decimal#>              maximum angle at continuation node\n\
-    legacy_dm_turnmaxdeviationfromnormal=<decimal#> for legacy Direction Model\n\
-    dendrite_Samsonovich_hypothesis=<true/false> do turns direct to normal\n\
-    axon_Samsonovich_hypothesis=<true/false>     do turns direct to normal\n\
 \n\
     Morphological Development - Neurite Fiber Diameter:\n\
 \n\
@@ -1131,12 +1047,17 @@ Usage: nibr [parameter=value]\n\
       ndm.asymptotic_proportion=<decimal#>  proportion of soma diameter\n\
       ndm.asymptotic_lambda=<decimal#>      exponential lambda decay factor\n\
       Rall Power Law:\n\
-      ndm.e_power=<decimal#>             power exponent\n\
-      ndm.d_term=<decimal#>              terminal segment diameter\n\
+      ndm.e_power.PDF=<PDF-id>           delta, uniform, linear, spline_normal,\n\
+                                         spline_normal_with_min, normal,\n\
+                                         exponential\n\
+      ndm.d_term.PDF=<PDF-id>            delta, uniform, linear, spline_normal,\n\
+                                         spline_normal_with_min, normal,\n\
+                                         exponential\n\
 \n\
     Connectivity Development - Synapse formation:\n\
 \n\
     candidate_synapses=<true/false>      seek candidate synapses\n\
+    no_autapses=<true/false>             (dis)allow synapses onto same neuron\n\
     partition_to_synapses=<true/false>   seek candidate syn. once partitioned\n\
     synapses_during_development=<true/false>     synapses during or after\n\
     partitionsubsetsize=<integer#>       max.segments preferred per partition\n\
@@ -1149,10 +1070,12 @@ Usage: nibr [parameter=value]\n\
        exponential>\n\
     D_synmax.<pre>.<post>=<decimal#>     Max. dist. between fibers at synapse\n\
                                          pre/post: principal, interneuron,\n\
-                                         multipolar, pyramidal, untyped\n\
+                                         multipolar, pyramidal, bipolar,\n\
+                                         untyped\n\
     P_receptor.<pre>.<post>.<receptor type>=<decimal#> receptor probability\n\
                                          pre/post: principal, interneuron,\n\
-                                         multipolar, pyramidal, untyped\n\
+                                         multipolar, pyramidal, bipolar,\n\
+                                         untyped\n\
                                          recentor type: AMPAR, NMDAR, GABAR\n\
 \n\
     Simulation Output - Histological Slice Generation:\n\
@@ -1177,9 +1100,12 @@ Usage: nibr [parameter=value]\n\
     Simulation Output - Network Data:\n\
 \n\
     outattr_make_full_Txt=<true/false>   create .txt of network structure\n\
+    outattr_Txt_sequence=<true/false>    produce sequence of .txt data\n\
     outattr_Txt_separate_files=<true/false> store full_Txt in separate files\n\
     outattr_track_synaptogenesis=<true/false> track times of synapse creation\n\
     outattr_track_nodegenesis=<true/false> track times of node creation\n\
+    outattr_make_full_X3D=<true/false>   create .x3d of network structure\n\
+    outattr_make_full_Catacomb=<true/false> create .ccm of network structure\n\
     outattr_synapse_distance_frequency=<true/false> synapses by distance\n\
     outattr_connection_distance_frequency=<true/false> connection by distance\n\
     outattr_distance_frequency_distbinsize=<decimal#> distance bin size\n\
@@ -1200,13 +1126,18 @@ Usage: nibr [parameter=value]\n\
                                          Aturnsbetweenbifurcations,\n\
                                          Dbranchangles, Abranchangles,\n\
                                          Dturnangles, Aturnangles,\n\
-                                         Dtermsomadistance, Atermsomadistance,\n\
-                                         Dtermbranchdistance,\n\
-                                         Atermbranchdistance,\n\
-                                         Dbifurcationpointseparation,\n\
-                                         Abifurcationpointseparation\n\
+                                         Dtermlensincesoma, Atermlensincesoma,\n\
+                                         Dcartratiobetweenbifurcations,\n\
+                                         Acartratiobetweenbifurcations,\n\
+                                         Dcartratiobifurcationtoterm,\n\
+                                         Acartratiobifurcationtoterm,\n\
+                                         Dcartratiosomatoterm,\n\
+                                         Acartratiosomatoterm,\n\
+                                         Dsevenmicronbranchangles\n\
+                                         Asevenmicronbranchangles\n\
     statsattr_autoplot=<true/false>      preset output format of statistics\n\
     statsattr_store_raw_data=<true/false> store raw data for each sample age\n\
+    statsattr_fan_in_analysis=<true/false> perform fan-in angle analysis\n\
     outattr_show_stats=<true/false>      show statistics of resulting network\n\
     outattr_count_segments=<true/false/sample> \n\
     outattr_count_synapse_search=<true/false/sample>\n\
@@ -1214,7 +1145,9 @@ Usage: nibr [parameter=value]\n\
 \n\
     Simulation Output - Runtime Options:\n\
 \n\
-    warnings_on=<true/false>             display warning messages\n\
+    warnings_on=<off/stdout/stdoutfile/file> where to send warning messages\n\
+    reports_on=<off/stdout/stdoutfile/file> where to send report messages\n\
+    progress_on=<off/stdout/stdoutfile/file> where to send progress messages\n\
     outattr_show_progress=<true/false>   verbose progress indication\n\
     outattr_directory=<directory path>   path to output directory\n\
     outattr_URL=<output URL>             absolute output URL\n\
@@ -1244,11 +1177,13 @@ Usage: nibr [parameter=value]\n\
     figattr_make_abstract_Fig=<true/false> create .fig(.pdf) of abstract conn.\n\
     figattr_make_neurons_Figs=<true/false> create .fig for each neuron\n\
     net_zoom_disttoedge                  net zoom box radius (default=-1)\n\
+    net_zoom_<width/height/depth>        net zoom volume extents\n\
     net_zoom_center<X/Y/Z>               net zoom box center coordinates\n\
     figattr_fibres_nobox=<true/false>    draw fibres regardless of focus box\n\
     figattr_box_fibre_independently=<true/false> show fibres of unshown n.\n\
     figattr_show_axis_arrows=<true/fasle> show axes in 3D\n\
     figureTeXwidth=<decimal#>            figure .fig width in inches\n\
+    figattr_Fig_rescale=<true/false>     rescale .fig output for figureTeXwidth\n\
     color_table=<default/culturestain>   select a standard color table\n\
     <CT_id>=<[0x]integer#>               color table RGB entry with CT_id:\n\
                                          CT_background, CT_neuron_untyped,\n\
@@ -1264,6 +1199,7 @@ Usage: nibr [parameter=value]\n\
                                          CT_partition_evaluated,\n\
                                          CT_progress_text,\n\
                                          CT_AMPAR, CT_NMDAR, CT_GABAR\n\
+    <schema.>color=<[0x]integer#>        A display color RGB specification\n\
 \n\
     Simulation Output - Sequences and Animation:\n\
 \n\
@@ -1275,6 +1211,7 @@ Usage: nibr [parameter=value]\n\
     sequence_zoom_<width/height/depth>   sequence zoom volume extents\n\
     sequence_zoom_center<X/Y/Z>          sequence zoom box center coordinates\n\
     autorotatesequence=<true/false>      rotate the 3D view in a sequence\n\
+    ROT_origin[_x/_y/_z]=<v/d#>          origin of rotation by samples\n\
     ROT[_x/_y/_z]=<vector/decimal#>      initial rotation angles around axes\n\
     ROT_interval[_x/_y/_z]=<v/d#>        total interval of rotation by samples\n\
     camera[_x/_y/_z]=<vector/decimal#>   projection camera location\n\
@@ -1287,7 +1224,11 @@ Usage: nibr [parameter=value]\n\
 \n\
     General:\n\
 \n\
+    substitute=<regular-expression>      RegEx substitution applied to commands\n\
     include=<file-name>                  include commands from file\n\
+\n\
+    type IDs of <neuron-type>:\n\
+      principal, interneuron, multipolar, bipolar, pyramidal, untyped\n\
 \n\
     natural sets of <schema.>:\n\
       (empty universal set), all_axons., all_dendrites., all_pyramidal_axons.,\n\
@@ -1305,12 +1246,13 @@ Usage: nibr [parameter=value]\n\
         <label>.PDF.min_x\n\
       normal: <label>.PDF.mean, <label>.PDF.std, <label>.PDF.trunc\n\
       exponential: (none)\n\
+      discrete: <label>.PDF.N, <label>.PDF.P, <label>.PDF.R_min,\n\
+        <lable>.PDF.R_max\n\
 \n\
   files:\n\
 \n\
     .nibr(2D)rc contains commands included at initialization if the file exists.\n\
 ";
-
 /* Former commands:
     sidelength=<decimal#>                length of side of network shape\n\
     Agrowth_n_inf
@@ -1321,6 +1263,31 @@ Usage: nibr [parameter=value]\n\
     <axon/dendrite>_direction_model_label identifier at root when chained\n\
     dendrite_two_branch_types=<true/false> use main and daughter branching\n\
     axon_two_branch_types=<true/false>     use main and daughter branching\n\
+
+    <Agrowth_id>=<decimal#>              Axon growth parameters:\n\
+                                         Agrowth_E, Agrowth_tau,\n\
+                                         Agrowth_B_inf,\n\
+                                         Agrowth_c,\n\
+                                         Agrowth_c1, Agrowth_c2,\n\
+    <Dgrowth_id>=<decimal#>              Dendrite growth parameters:\n\
+                                         Dgrowth_E, Dgrowth_tau,\n\
+                                         Dgrowth_B_inf,\n\
+                                         Dgrowth_c,\n\
+                                         Dgrowth_c1, Dgrowth_c2,\n\
+    <Dapical_growth_id>=<decimal#>       Apical dendrite growth parameters:\n\
+                                         Dgrowth_E_apicaltrunc,\n\
+                                         Dgrowth_tau_apicaltrunc,\n\
+                                         Dgrowth_B_inf_apicaltrunc,\n\
+                                         Dgrowth_c_apicaltrunc,\n\
+                                         Dgrowth_E_apicaltuft,\n\
+                                         Dgrowth_tau_apicaltuft,\n\
+                                         Dgrowth_B_inf_apicaltuft,\n\
+                                         Dgrowth_c_apicaltuft\n\
+
+    The following does not yet appear to exist in the model implementation:
+      .bm.PDF=<PDF-id>                   delta, uniform, linear, spline_normal,\n\
+                                         spline_normal_with_min, normal,\n\
+                                         exponential\n\
 */
 
 /* An example of tests to perform with INCLUDE_PDF_SAMPLING:
@@ -1340,9 +1307,24 @@ void copyright() {
   cout << "NETMORPH Copyright (C) 2008 Randal A. Koene <randalk@netmorph.org>\nThis program comes with ABSOLUTELY NO WARRANTY; for details see the\nincluded LICENSE file or <http://www.gnu.org/licenses/>.\nThis is free software, and you are welcome to redistribute it\nunder certain conditions; see the included LICENSE file or\n<http://www.gnu.org/licenses/> for details.\n\n";
 }
 
+
+/*!
+  \mainpage NETMORPH Class Documentation and UML
+
+  \section Entry function main()
+
+  \image html /home/randalk/src/nnmodels/nibr/doc/main.png "[UML] Actions of the NETMORPH program entry function main()."
+  \image latex /home/randalk/src/nnmodels/nibr/doc/main.png "[UML] Actions of the NETMORPH program entry function main()."
+
+  \section The simulation loop
+ */
 int main(int argc, char * argv[]) {
   copyright();
+#ifdef USE_RCFILE
   Command_Line_Parameters clp(argc,argv,helpstr,RCFILE);
+#else
+  Command_Line_Parameters clp(argc,argv,helpstr);
+#endif
   main_clp = &clp;
 
   if (clp.IsFormInput()) outputdirectory = "../nibr/output/"; // the default when called by a form
@@ -1364,31 +1346,82 @@ int main(int argc, char * argv[]) {
   time_t t = time(NULL);
   strftime(dstr,80,"%Y%m%d%H%M_",localtime(&t));
   outputdirectory += dstr;
+  // At this point "outputdirectory" is fully available
+
+  if ((n=clp.Specifies_Parameter("warnings_on"))>=0) {
+    if (downcase(clp.ParValue(n))==String("off")) {
+      warnings_on = WARN_OFF;
+    } else if (downcase(clp.ParValue(n))==String("stdout")) {
+      warnings_on = WARN_STDOUT;
+    } else if (downcase(clp.ParValue(n))==String("stdoutfile")) {
+      warnings_on = WARN_STDOUTFILE;
+    } else if (downcase(clp.ParValue(n))==String("file")) {
+      warnings_on = WARN_FILE;
+    }
+  }
+  if (warnings_on>WARN_STDOUT) {
+    warningfile = outputdirectory + "warnings";
+  }
+  if ((n=clp.Specifies_Parameter("reports_on"))>=0) {
+    if (downcase(clp.ParValue(n))==String("off")) {
+      reports_on = WARN_OFF;
+    } else if (downcase(clp.ParValue(n))==String("stdout")) {
+      reports_on = WARN_STDOUT;
+    } else if (downcase(clp.ParValue(n))==String("stdoutfile")) {
+      reports_on = WARN_STDOUTFILE;
+    } else if (downcase(clp.ParValue(n))==String("file")) {
+      reports_on = WARN_FILE;
+    }
+  }
+  if (reports_on>WARN_STDOUT) {
+    reportfile = outputdirectory + "report";
+  }
+  if ((n=clp.Specifies_Parameter("progress_on"))>=0) {
+    if (downcase(clp.ParValue(n))==String("off")) {
+      progress_on = WARN_OFF;
+    } else if (downcase(clp.ParValue(n))==String("stdout")) {
+      progress_on = WARN_STDOUT;
+    } else if (downcase(clp.ParValue(n))==String("stdoutfile")) {
+      progress_on = WARN_STDOUTFILE;
+    } else if (downcase(clp.ParValue(n))==String("file")) {
+      progress_on = WARN_FILE;
+    }
+  }
+  if (progress_on>WARN_STDOUT) {
+    progressfile = outputdirectory + "progress";
+  }
+  report_compiler_directives();
+  reliability_checklist();
 
   write_file_from_String(outputdirectory+LASTCLPFILE,clp.str(";\n")); // log command line
   if (clp.IsFormInput()) {
     single_instance_restriction();
-    cout << "Content-Type: text/html\n\n<HTML>\n<BODY>\n<H1>Network Generation: Simulation</H1>\n\n<PRE>\n";
+    progress("Content-Type: text/html\n\n<HTML>\n<BODY>\n<H1>Network Generation: Simulation</H1>\n\n<PRE>\n");
   }
   if (clp.IncludeFileErrors()>0) {
-    if (clp.IsFormInput()) cout << "\n<B>";
-    cout << "Warning: The simulation was unable to read " << clp.IncludeFileErrors() << " include file(s).\n";
-    if (clp.IsFormInput()) cout << "\n</B>";
+    if (clp.IsFormInput()) progress("\n<B>");
+    warning("Warning: The simulation was unable to read "+String((long) clp.IncludeFileErrors())+" include file(s).\n");
+    if (clp.IsFormInput()) progress("\n</B>");
   }
-  report_compiler_directives();
 
   //read_commands();
   developmental_simulation(clp);
 
   global_debug_report();
   if (clp.IsFormInput()) {
-    cout << "</PRE>\n\n</BODY>\n</HTML>\n";
+    progress("</PRE>\n\n</BODY>\n</HTML>\n");
     running_instance_postop();
   }
 
 #ifdef TRACK_RECOGNIZED_COMMANDS
-  cout << clp.unrecognized_str();
+  warning(clp.unrecognized_str());
 #endif
 
+#ifdef TESTQUOTAS
+  warning("BEWARE: TESTQUOTAS is still on and included!\n");
+  write_file_from_String("quotas.txt",quotas);
+#endif
+
+  warnings_on = WARN_OFF; // avoids the unnecessary warning about attempting to destruct the Null_Activity object
   exit(0);
 }

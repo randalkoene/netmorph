@@ -26,6 +26,7 @@
 // Randal A. Koene, 20041230
 
 #include "file.hh"
+#include "global.hh"
 
 bool read_file_into_String(ifstream & sfl, String & filestr, bool warnnoopen) {
 // read from an open file stream into the string filestr,
@@ -36,7 +37,7 @@ bool read_file_into_String(ifstream & sfl, String & filestr, bool warnnoopen) {
     sfl.close();
     return true;
   } else {
-    if (warnnoopen) cerr << "nibr: Unable to open file in read_file_into_String()\n";
+    if (warnnoopen) warning("Warning: Unable to open file in read_file_into_String()\n");
     return false;
   }
 }
@@ -48,7 +49,7 @@ bool read_file_into_String(String filename, String & filestr, bool warnnoopen) {
   ifstream sfl(filename);
   if (read_file_into_String(sfl,filestr,false)) return true;
   else {
-    if (warnnoopen) cerr << "nibr: Unable to open " << filename << " in read_file_into_String()\n";
+    if (warnnoopen) warning("Warning: Unable to open "+filename+" in read_file_into_String()\n");
     return false;
   }
 }
@@ -59,7 +60,7 @@ bool write_file_from_String(String filename, const String & filestr) {
   String newfilename = filename;
   ofstream ntl(newfilename);
   if (!ntl) {
-    cerr << "nibr: Unable to create " << newfilename << " in write_file_from_String()\n";
+    warning("Warning: Unable to create "+newfilename+" in write_file_from_String()\n");
     return false;
   }
   ntl << filestr;
@@ -73,7 +74,7 @@ bool append_file_from_String(String filename, const String & filestr) {
   String newfilename = filename;
   ofstream ntl(newfilename,ios_base::out | ios_base::ate | ios_base::app);
   if (!ntl) {
-    cerr << "nibr: Unable to open " << newfilename << " in append_file_from_String()\n";
+    warning("Warning: Unable to open "+newfilename+" in append_file_from_String()\n");
     return false;
   }
   ntl << filestr;

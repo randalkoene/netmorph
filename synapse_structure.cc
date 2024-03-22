@@ -30,6 +30,20 @@
 #include "Sampled_Output.hh"
 #include "global.hh"
 
+void synapse_structure::move_add(spatial & addvec) {
+  P0 += addvec;
+  P1 += addvec;
+}
+
+void synapse_structure::fanin_rot() {
+  P0.convert_to_spherical();
+  P0.set_Y(0.0);
+  P0.convert_from_spherical();
+  P1.convert_to_spherical();
+  P1.set_Y(0.0);
+  P1.convert_from_spherical();
+}
+
 Fig_Object * synapse_structure::net_Fig() {
   if ((!figattr_fibres_nobox) && ((!fig_in_zoom(P0)) || (!fig_in_zoom(P1)))) return NULL;
   double x1, y1, x2, y2;

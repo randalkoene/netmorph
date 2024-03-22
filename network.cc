@@ -35,21 +35,82 @@
 #include "connection.hh"
 #include "synapse_structure.hh"
 #include "network.hh"
+#include "neuron.hh"
+
+// variables
+
+bool numneurons_is_default = false; // flag to indicate that numneurons was set by a fallback to default
 
 // classes
 
+region & region::append(String _name, neuron & n) {
+  if (_name==name) return append(n);
+  if (head()) return head()->conditional_create(_name,n);
+  else return seek_head()->conditional_create(_name,n);
+}
+
+region & region::conditional_create(String _name, neuron & n) {
+  if (_name==name) return append(n);
+  if (Next()) return Next()->conditional_create(_name,n);
+  if (Root()) {
+    region * reg = new region(_name,n);
+    Root()->link_before(reg);
+    return *reg;
+  } else {
+    warning("Error: Unable to add regions without a PLLRoot<region> object in region::conditional_create()!\n");
+    return *this;
+  } 
+}
+
+int region::find(neuron & n) {
+  // Returns the element number of the neuron in a region.
+  // Returns -1 if not found.
+  int i=0;
+  PLL_LOOP_FORWARD(neuronptrlist,nlist.head(),1) {
+    if (e->N()==&n) return i;
+    i++;
+  }
+  return -1;
+}
+
+spatial region::center() {
+  spatial regioncenter;
+  PLL_LOOP_FORWARD(neuronptrlist,nlist.head(),1) regioncenter += e->N()->Pos();
+  regioncenter /= (double) nlist.length();
+  return regioncenter;
+}
+
+Catacomb_Group * region::net_Catacomb() {
+  spatial C(center());
+#define CATACOMBSCALE 0.5
+  ccmregionsgroup->Add_Catacomb_Object(new Catacomb_Region(name,nlist.length(),CATACOMBSCALE*C.X(),CATACOMBSCALE*C.Y()));
+  return ccmregionsgroup;
+}
+
+int regionslist::find(neuron & n) {
+  // Returns the element number of the region in a list of
+  // regions, which contains the neuron.
+  // Returns -1 if not found.
+  int i=0;
+  PLL_LOOP_FORWARD(region,head(),1) {
+    if (e->find(n)>=0) return i;
+    i++;
+  }
+  return -1;
+}
+
 network::network(int numneurons, bool e): Event_Queue(this), netinfo("initialized with "+String((long) numneurons)+" neurons\n"), edges(e), candidate_synapses(true), synapses_during_development(true), paramspreadmin(NULL), paramspreadmax(NULL), nsr(NULL), sss(NULL), ndm(NULL) {
   // creates untyped neurons
-  netinfo += "neurons have no type\n";
+  netinfo += "principal neurons\n";
   if (edges) netinfo += "with functional edges (possible edge effects)\n";
   else netinfo += "no functional edges (connections loop around)\n";
-  for (int i=0; i<numneurons; i++) PLLRoot<neuron>::link_before(new neuron());
+  for (int i=0; i<numneurons; i++) PLLRoot<neuron>::link_before(new principal());
 }
 
 network::network(int numneurons, double principalprobability, bool e): Event_Queue(this), netinfo("initialized with "+String((long) numneurons)+" neurons\n"), edges(e), candidate_synapses(true), synapses_during_development(true), paramspreadmin(NULL), paramspreadmax(NULL), nsr(NULL), sss(NULL), ndm(NULL) {
   // creates principal neurons and interneurons
   if (principalprobability>1.0) principalprobability=1.0;
-  netinfo += "random principal neurona and interneurons, with a probability "+String(principalprobability,"%.2f")+" to generate a principal neuron\n";
+  netinfo += "random principal neurons and interneurons, with a probability "+String(principalprobability,"%.2f")+" to generate a principal neuron\n";
   if (edges) netinfo += "with functional edges (possible edge effects)\n";
   else netinfo += "no functional edges (connections loop around)\n";
   unsigned int threshold = (unsigned int) (((double) X_misc.get_max())*principalprobability);
@@ -107,14 +168,16 @@ String network::report_parameters() {
 void network::add_typed_neuron(neuron_type nt, neuron * psmin, neuron * psmax) {
   // adds a specific type of neuron to the network and prepares its
   // parameters
-  neuron * n;
+  principal * n;
   switch (nt) {
   case PRINCIPAL_NEURON: n = new principal(); break;
   case INTERNEURON: n = new interneuron(); break;
   case MULTIPOLAR_NONPYRAMIDAL: n = new multipolar_nonpyramidal(); break;
+  case BIPOLAR: n = new bipolar(); break;
   case PYRAMIDAL: n = new pyramidal(); break;
-  default: n = new neuron(); break;
+  default: n = new principal(); break; //neuron(); break;
   }
+  n->parse_CLP(*main_clp);
   if ((psmin) && (psmax)) if (psmin->Radius()<psmax->Radius()) {
      n->set_radius(X_misc.get_rand_range_real1(psmin->Radius(),psmax->Radius()));
    }
@@ -141,9 +204,9 @@ void network::remove_abstract_connections_without_synapses() {
   }
 }
 
-network::network(int numneurons, neuron * psmin, neuron * psmax, Network_Statistics_Root & netstats, bool _edges): Event_Queue(this), netinfo("initialized with "+String((long) numneurons)+" neurons\n"), edges(_edges), candidate_synapses(true), synapses_during_development(true), paramspreadmin(psmin), paramspreadmax(psmax), nsr(&netstats), sss(NULL), ndm(NULL) {
+network::network(int numneurons, neuron * psmin, neuron * psmax, Network_Statistics_Root & netstats, bool _edges): Event_Queue(this), netinfo("initialized with "+String((long) numneurons)+" general population neurons\n"), edges(_edges), candidate_synapses(true), synapses_during_development(true), paramspreadmin(psmin), paramspreadmax(psmax), nsr(&netstats), sss(NULL), ndm(NULL) {
   // creates multiple types of neurons
-  netinfo += "multiple neuron typs with the following network statistics where\nratios are values in a probability distribution:\n";
+  netinfo += "multiple neuron types with the following network statistics where\nratios are values in a probability distribution:\n";
   netinfo += netstats.head()->all_str() + '\n';
   if (edges) netinfo += "with functional edges (possible edge effects)\n";
   else netinfo += "no functional edges (connections loop around)\n";
@@ -152,6 +215,8 @@ network::network(int numneurons, neuron * psmin, neuron * psmax, Network_Statist
   if (netstats.UseExactPopulationSizes()) {
     PLL_LOOP_FORWARD(Network_Statistics,netstats.head(),1) for (int i = e->PopulationSize(); i>0; i--) add_typed_neuron(e->TypeID(),psmin,psmax);
   } else {
+    // Alternatively, allocate by proportions if there are any general population neurons
+    if (numneurons<1) return;
     int * cumprobdist = new int[numneurontypes];
     neuron_type * ntypesarray = new neuron_type[numneurontypes];
     int netstatidx = 0, cumprob = 0; double sumratio = 0.0;
@@ -184,6 +249,7 @@ Shape_Hexagon_Result network::shape_hexagon(Command_Line_Parameters & clp) {
   if ((n=clp.Specifies_Parameter("shape_sidelength"))>=0) sidelength = atof(clp.ParValue(n));
   res.displaywidth = 2.0*sidelength;
   int numneurons = PLLRoot<neuron>::length();
+  if (numneurons<1) return res;
   netinfo += "shape hexagon with "+String(sidelength,"%.2f")+" micrometer sides\n";
   // hegaxon = 6 equilateral triangles
   // rectangular area = 1.5*length of side of triangle * 2*height of triangle
@@ -251,6 +317,10 @@ Shape_Hexagon_Result network::shape_hexagon(Command_Line_Parameters & clp) {
     }
   }
   // 3. insure that no more than one neuron occupies one position
+  // Allocate to one network region
+  neuron * rootneuron = PLLRoot<neuron>::head();
+  region & reg = regions.append("net",*rootneuron);
+  if (rootneuron) PLL_LOOP_FORWARD(neuron,rootneuron->Next(),1) reg.append(*e);
   res.message += "Number of neurons per line = "+String((long) res.neuronsperline)+'\n';
   return res;
 }
@@ -266,6 +336,7 @@ Shape_Rectangle_Result network::shape_rectangle(Command_Line_Parameters & clp) {
   if ((n=clp.Specifies_Parameter("shape_vertical"))>=0) vertlength = atof(clp.ParValue(n));
   res.displaywidth = horizlength;
   int numneurons = PLLRoot<neuron>::length();
+  if (numneurons<1) return res;
   netinfo += "shape rectangle with "+String(horizlength,"%.2f")+"horizontal and "+String(vertlength,"%.2f")+"vertical micrometer sides\n";
   res.rectangulararea = horizlength*vertlength;
   netinfo += "area "+String(res.rectangulararea,"%.3f")+" micrometers^2\n";
@@ -313,6 +384,10 @@ Shape_Rectangle_Result network::shape_rectangle(Command_Line_Parameters & clp) {
   center.set_X(neuronx/2.0);
   center.set_Y(neurony/2.0);
   // 3. insure that no more than one neuron occupies one position
+  // Allocate to one network region
+  neuron * rootneuron = PLLRoot<neuron>::head();
+  region & reg = regions.append("net",*rootneuron);
+  if (rootneuron) PLL_LOOP_FORWARD(neuron,rootneuron->Next(),1) reg.append(*e);
   res.message += "Number of neurons per line = "+String((long) res.neuronsperline)+'\n';
   return res;
 }
@@ -331,6 +406,7 @@ Shape_Box_Result network::shape_box(Command_Line_Parameters & clp) {
   if ((n=clp.Specifies_Parameter("shape_depth"))>=0) depth = atof(clp.ParValue(n));
   res.displaywidth = horizlength;
   int numneurons = PLLRoot<neuron>::length();
+  if (numneurons<1) return res;
   netinfo += "shape box with "+String(horizlength,"%.2f")+" horizontal, "+String(vertlength,"%.2f")+" vertical and "+String(depth,"%.2f")+" depth micrometer sides\n";
   res.boxvolume = horizlength*vertlength*depth;
   //[***REMOVE]res.rectangulararea = horizlength*vertlength;
@@ -388,6 +464,10 @@ Shape_Box_Result network::shape_box(Command_Line_Parameters & clp) {
   }
   npos /= 2.0; center = npos;
   // 3. insure that no more than one neuron occupies one position
+  // Allocate to one network region
+  neuron * rootneuron = PLLRoot<neuron>::head();
+  region & reg = regions.append("net",*rootneuron);
+  if (rootneuron) PLL_LOOP_FORWARD(neuron,rootneuron->Next(),1) reg.append(*e);
   res.message += "Number of neurons per line = "+String((long) res.neuronsperline)+'\n';
   res.message += "Number of neurons deep     = "+String((long) res.neuronsdeep)+'\n';
   return res;
@@ -463,7 +543,39 @@ spatial box_shaped_volume::random_location() {
   return res;
 }
 
-region_parameters::region_parameters(const char * l, Command_Line_Parameters & clp): label(l), sv(NULL), memberneurons(NULL), nummemberneurons(1), minneuronseparation(10.0) {
+void sphere_shaped_volume::parse_CLP(Command_Line_Parameters & clp) {
+  int n;
+  String idstr("shape.");
+  if (label) {
+    if ((n=clp.Specifies_Parameter(*label+".centerX"))>=0) center.set_X(atof(clp.ParValue(n)));
+    if ((n=clp.Specifies_Parameter(*label+".centerY"))>=0) center.set_Y(atof(clp.ParValue(n)));
+    if ((n=clp.Specifies_Parameter(*label+".centerZ"))>=0) center.set_Z(atof(clp.ParValue(n)));
+    idstr.prepend(*label+'.');
+  }
+  if ((n=clp.Specifies_Parameter(idstr+"radius"))>=0) radius = atof(clp.ParValue(n));
+}
+
+String sphere_shaped_volume::report_parameters() {
+  String res;
+  if (label) res = *label + ' ';
+  res += "sphere shape: center = ("+String(center.X(),"%.3f,")+String(center.Y(),"%.3f,")+String(center.Z(),"%.3f) radius = ")+String(radius,"%.3f\n");
+  return res;
+}
+
+spatial sphere_shaped_volume::random_location() {
+  // Returns a random location within the sphere.
+  //spatial res(radius*X_misc.get_rand_real1(),2.0*M_PI*X_misc.get_rand_real1(),M_PI*X_misc.get_rand_real1()); // *** This way favors locations in the center.
+  spatial res;
+  double diameter = 2.0*radius;
+  double radiusSQ = radius*radius;
+  do {
+    res.set_all((diameter*X_misc.get_rand_real1())-radius,(diameter*X_misc.get_rand_real1())-radius,(diameter*X_misc.get_rand_real1())-radius);
+  } while (res.len2()>radiusSQ);
+  res += center;
+  return res;
+}
+
+region_parameters::region_parameters(const char * l, Command_Line_Parameters & clp): label(l), sv(NULL), memberneurons(NULL), nummemberneurons(0), generalandspecificneurons(0), minneuronseparation(10.0) {
   int n;
   if ((n=clp.Specifies_Parameter(label+".shape"))>=0) {
     String shape(clp.ParValue(n));
@@ -473,9 +585,20 @@ region_parameters::region_parameters(const char * l, Command_Line_Parameters & c
     } else if (shape=="box") {
       sv = new box_shaped_volume(&label);
       sv->parse_CLP(clp);
+    } else if (shape=="sphere") {
+      sv = new sphere_shaped_volume(&label);
+      sv->parse_CLP(clp);
     } else error("Unknown region shape ("+shape+").\n");
   }
   if ((n=clp.Specifies_Parameter(label+".neurons"))>=0) nummemberneurons = atoi(clp.ParValue(n));
+  generalandspecificneurons = nummemberneurons;
+  for (neuron_type nt = neuron_type(0); nt < UNTYPED_NEURON; nt = neuron_type(nt+1)) { // Read the number of neurons of a specific type to be added to the region.
+    if ((n=clp.Specifies_Parameter((label+'.')+neuron_short_name[nt]))>=0) {
+      specificneurons[nt] = atoi(clp.ParValue(n));
+      //cout << label << '.' << neuron_short_name[nt] << '=' << specificneurons[nt] << '\n'; cout.flush();
+    } else specificneurons[nt] = 0;
+    generalandspecificneurons += specificneurons[nt];
+  }
   if ((n=clp.Specifies_Parameter(label+".minneuronseparation"))>=0) minneuronseparation = atof(clp.ParValue(n));
   if (!sv) {
     warning("Warning: Region "+label+" has no specific shape, defaulting to disc.\n");
@@ -484,14 +607,23 @@ region_parameters::region_parameters(const char * l, Command_Line_Parameters & c
   }
 }
 
+String region_parameters::report_parameters() {
+  String res((' '+String((long) nummemberneurons))+" general pool neurons");
+  for (neuron_type nt = neuron_type(0); nt < UNTYPED_NEURON; nt = neuron_type(nt+1))
+    if (specificneurons[nt]>0) res += (((" + "+String((long) specificneurons[nt]))+' ')+neuron_short_name[nt]) + " cells";
+  return res;
+}
+
 #ifdef TESTING_SIMPLE_ATTRACTION
 int attracts = 0;
 #endif
 
-neuron * region_parameters::add_neurons(neuron * all, neuron * n) {
+neuron * region_parameters::add_neurons(PLLRoot<neuron> * all, neuron * n, neuron * psmin, neuron * psmax) {
   // The requisite number of neurons are recruited from the available
   // list in n and are given positions in the region.
-  if ((nummemberneurons<1) || (!n) || (!all)) {
+  // Also, specific neuron types allocated to the region are created,
+  // initialized and added to the master list of neurons. (See TL#200807040256.1.)
+  if ((generalandspecificneurons<1) || (!all)) {
     warning("Warning: Region "+label+" is not associated with any neurons.\n");
     return n;
   }
@@ -499,27 +631,55 @@ neuron * region_parameters::add_neurons(neuron * all, neuron * n) {
     warning("Warning: Region "+label+" attempted to add_neurons() more than once.\n");
     return n;
   }
-  if (n->length()<nummemberneurons) {
-    nummemberneurons = n->length();
-    warning("Warning: Insufficient neurons available for region "+label+".\n");
+  if (nummemberneurons) if ((!n) || (n->length()<nummemberneurons)) {
+    int n_num = 0;
+    if (n) n_num = n->length();
+    generalandspecificneurons -= (nummemberneurons-n_num); // remove what cannot be allocated
+    nummemberneurons = n_num;
+    warning("Warning: Insufficient general pool neurons available for region "+label+".\n");
   }
-  memberneurons = new neuronptr[nummemberneurons];
+  memberneurons = new neuronptr[generalandspecificneurons];
   int i = 0, attempts;
   PLL_LOOP_FORWARD(neuron,n,i<nummemberneurons) memberneurons[i++] = e;
+  neuron * generalnext;
+  if (nummemberneurons<1) generalnext = n;
+  else generalnext = memberneurons[nummemberneurons-1]->Next(); // store this, just in case
+  // Here add specific neurons and set their initial parameters as was done for the general pool neurons
+  for (neuron_type nt = neuron_type(0); nt < UNTYPED_NEURON; nt = neuron_type(nt+1)) {
+    for (int j = 0; j<specificneurons[nt]; j++) {
+      // create and add
+      switch (nt) {
+      case PRINCIPAL_NEURON: memberneurons[i] = new principal(); break;;
+      case INTERNEURON: memberneurons[i] = new interneuron(); break;;
+      case MULTIPOLAR_NONPYRAMIDAL: memberneurons[i] = new multipolar_nonpyramidal(); break;;
+      case BIPOLAR: memberneurons[i] = new bipolar(); break;;
+      case PYRAMIDAL: memberneurons[i] = new pyramidal(); break;;
+      default: memberneurons[i] = new principal(); break;; //neuron(); break;;
+      }
+      memberneurons[i]->parse_CLP(*main_clp);
+      // initialize
+      if ((psmin) && (psmax)) if (psmin->Radius()<psmax->Radius()) {
+	memberneurons[i]->set_radius(X_misc.get_rand_range_real1(psmin->Radius(),psmax->Radius()));
+      }
+      // add to the master list of neurons maintained by the network object (prepend to avoid interfering with parameter n)
+      all->link_after(memberneurons[i]);
+      i++;
+    }
+  }
 #ifdef TESTING_SIMPLE_ATTRACTION
-  for (i = 0; i<nummemberneurons; i++) {
+  for (i = 0; i<generalandspecificneurons; i++) {
     memberneurons[i]->attracts = attracts;
     memberneurons[i]->attractedto = 1 - attracts;
   }
 #endif
   // Set neuron positions.
   double SQminsep = minneuronseparation*minneuronseparation, sep, cellextents;
-  for (i = 0; i<nummemberneurons; i++) {
+  for (i = 0; i<generalandspecificneurons; i++) {
     for (attempts = 1000; attempts>0; attempts--) {
       spatial npos(sv->random_location());
       // Check distance to other neurons.
       bool validlocation = true;
-      PLL_LOOP_FORWARD(neuron,all,1) if (e!=memberneurons[i]) {
+      PLL_LOOP_FORWARD(neuron,all->head(),e!=generalnext) if (e!=memberneurons[i]) { // Check (e!=generalnext) in order not to test with unplaced general pool neurons.
 	if ((sep=distance2(e->Pos(),npos))<SQminsep) {
 	  validlocation = false;
 	  break;
@@ -541,7 +701,7 @@ neuron * region_parameters::add_neurons(neuron * all, neuron * n) {
     }
     if (attempts<=0) error("Unable to find room for another neuron in region "+label+" after 1000 attempts\n");
   }
-  return memberneurons[nummemberneurons-1]->Next();
+  return generalnext;
 }
 
 double region_parameters::average_distance_to_nearest_neighbor() {
@@ -552,10 +712,10 @@ double region_parameters::average_distance_to_nearest_neighbor() {
   double avdistnearest = 0.0;
   for (int i = 0; i<nummemberneurons; i++) {
     double nearest = MAXDOUBLE, newnearest;
-    for (int j = 0; j<nummemberneurons; j++) if (i!=j) if ((newnearest=distance2(memberneurons[i]->Pos(),memberneurons[j]->Pos()))<nearest) nearest = newnearest;
+    for (int j = 0; j<generalandspecificneurons; j++) if (i!=j) if ((newnearest=distance2(memberneurons[i]->Pos(),memberneurons[j]->Pos()))<nearest) nearest = newnearest;
     avdistnearest += sqrt(nearest);
   }
-  return avdistnearest /= (double) nummemberneurons;
+  return avdistnearest /= (double) generalandspecificneurons;
 }
 
 void region_parameters_root::parse_CLP(Command_Line_Parameters & clp) {
@@ -579,12 +739,12 @@ String region_parameters_root::report_parameters() {
   String res;
   if (numregions>0) {
     res = "Regions:\n";
-    PLL_LOOP_FORWARD(region_parameters,head(),1) res += "  " + e->Label() + " (" + e->shape().str() + ")\n";
+    PLL_LOOP_FORWARD(region_parameters,head(),1) res += "  " + e->Label() + " (" + e->shape().str() + "):" + e->report_parameters() + '\n';
   }
   return res;
 }
 
-Shape_Regions_Result network::shape_regions(Command_Line_Parameters & clp) {
+Shape_Regions_Result network::shape_regions(Command_Line_Parameters & clp,neuron * psmin,neuron * psmax) {
 // Distributes neurons randomly in network positions according to
 // specified regions. This is useful for the generation of cortical layers.
 // Neurons are evenly distributed.
@@ -596,17 +756,37 @@ Shape_Regions_Result network::shape_regions(Command_Line_Parameters & clp) {
   region_parameters_root rp;
   rp.parse_CLP(clp);
   res.message = rp.report_parameters();
+  if ((numneurons_is_default) && (rp.total_general_pool_N()>0)) warning("Warning: Regions expect general pool neurons, but no neurons were assigned to the general pool throught the 'neurons' command with approximate proportions or through exact population numbers. Attempting to allocate general pool neurons from a general pool of default size.\n");
+  if (rp.total_N()<1) {
+    warning("Warning: Regions were defined, but no general pool or neuron type specific populations of neurons specified. A default of one general pool neuron will be specified for each region.");
+    PLL_LOOP_FORWARD(region_parameters,rp.head(),1) e->set_general_pool(1);
+    if (numneurons_is_default) warning("Warning: Allocating general pool neurons from a general pool of default size.\n");
+  }
   neuron * nextavailable = PLLRoot<neuron>::head();
   double avnearestdist = 0.0;
   PLL_LOOP_FORWARD(region_parameters,rp.head(),1) {
     netinfo += e->shape().report_parameters();
     if (e->shape().displaywidth()>res.displaywidth) res.displaywidth = e->shape().displaywidth();
     // Feed the neurons into the region
-    nextavailable = e->add_neurons(PLLRoot<neuron>::head(),nextavailable);
-    avnearestdist += e->average_distance_to_nearest_neighbor();
+    nextavailable = e->add_neurons(this,nextavailable,psmin,psmax);
 #ifdef TESTING_SIMPLE_ATTRACTION
     attracts++;
 #endif
+    if (e->N()>0) {
+      avnearestdist += e->average_distance_to_nearest_neighbor();
+      // Allocate to one network region
+      neuronptr * nptrlist = e->neurons();
+      region & reg = regions.append(e->Label(),*(nptrlist[0]));
+      for (int i = 1; i<e->N(); i++) reg.append(*(nptrlist[i]));
+    }
+  }
+  if (nextavailable) { // There were more "general pool" neurons than the sum of all "general pool member neurons" in the specified regions
+    if (!numneurons_is_default) warning("Warning: More general pool neurons were provided to the network than the sum of general pool member neurons specified in all regions. The remaining general pool neurons will be discarded.\n");
+    neuron * next_n_remove = nextavailable;
+    for (neuron * n_remove = nextavailable; (n_remove); n_remove = next_n_remove) {
+      next_n_remove = n_remove->Next();
+      n_remove->remove();
+    }
   }
   avnearestdist /= (double) rp.length();
   netinfo += "average distance to the nearest neighbor neuron within a region is "+String(avnearestdist,"%.3f\n");
@@ -627,6 +807,7 @@ Shape_Circle_Result network::shape_circle(Command_Line_Parameters & clp) {
   if ((n=clp.Specifies_Parameter("minneuronseparation"))>=0) minneuronseparation = atof(clp.ParValue(n));
   res.displaywidth = 2.0*radius;
   int numneurons = PLLRoot<neuron>::length();
+  if (numneurons<1) return res;
   netinfo += "shape cicle with "+String(radius,"%.2f")+" micrometer radius\n";
   res.circlearea = M_PI*radius*radius;
   netinfo += "area "+String(res.circlearea,"%.3f")+" micrometers^2\n";
@@ -725,18 +906,22 @@ Shape_Circle_Result network::shape_circle(Command_Line_Parameters & clp) {
     center.set_X(0.0); // sumx/(double) numneurons
     center.set_Y(0.0); // sumy/(double) numneurons
   }
+  // Allocate to one network region
+  neuron * rootneuron = PLLRoot<neuron>::head();
+  region & reg = regions.append("net",*rootneuron);
+  if (rootneuron) PLL_LOOP_FORWARD(neuron,rootneuron->Next(),1) reg.append(*e);
   netinfo += "shaped network consists of "+String((long) numneurons)+" neurons\n";
   return res;
 }
 
-Shape_Result network::shape_network(Command_Line_Parameters & clp) {
+Shape_Result network::shape_network(Command_Line_Parameters & clp, neuron * psmin, neuron * psmax) {
   String shapename("rectangle");
   int n;
   if ((n=clp.Specifies_Parameter("shape"))>=0) shapename = downcase(clp.ParValue(n));
   if (shapename=="rectangle")  return shape_rectangle(clp);
 #ifdef VECTOR3D
   else if (shapename=="box") return shape_box(clp);
-  else if (shapename=="regions") return shape_regions(clp);
+  else if (shapename=="regions") return shape_regions(clp,psmin,psmax);
 #endif
   else if (shapename=="circle") return shape_circle(clp);
   else if (shapename=="hexagon") return shape_hexagon(clp);
@@ -799,12 +984,12 @@ void network::uniform_random_connectivity(double range, int minconn, int maxconn
   netinfo += "uniform random connectivity, random seed = " + String((long) random_seed) + "\nconnection range " + String(range,"%.1f") + ", with " + String((long) minconn) + " to " + String((long) maxconn) + " connections per neuron\n";
   if (outattr_show_progress) {
     progresscounter = progressfactor = (int) (((double) PLLRoot<neuron>::length())/25.0);
-    if (progressfactor!=0) { cout << "progress: "; cout.flush(); }
+    if (progressfactor!=0) progress("progress: ");
   }
   PLL_LOOP_FORWARD(neuron,PLLRoot<neuron>::head(),1) if ((sourcetype==UNTYPED_NEURON) || (sourcetype==e->TypeID())) {
     if (progressfactor!=0) {
       if ((progresscounter--)<=0) {
-	cout << "+"; cout.flush();
+	progress("+");
 	progresscounter = progressfactor;
       }
     }
@@ -841,7 +1026,7 @@ void network::uniform_random_connectivity(double range, int minconn, int maxconn
     for (i = 0; i < idxlen; i++) if (!cset[i]->Synapses()->head()) cset[i]->remove();
     delete[] cset;
   }
-  if (progressfactor!=0) cout << '\n'; cout.flush();
+  if (progressfactor!=0) progress('\n');
   netinfo += "actual number of connections in network is " + String((long) number_of_connections()) + "\nactual number of synapses in network is " + String((long) number_of_synapses()) +'\n';
 }
 
@@ -859,21 +1044,18 @@ void network::develop_connection_structure(Connection_Statistics_Root & cstats, 
 #ifdef FIXED_STEP_SIMULATION_START_AT_DT
   if ((!initiallengthatactualfirstbranch) && (t<dgm.get_fixed_time_step_size())) t = dgm.get_fixed_time_step_size(); // (See TL#200603160459.1.)
 #endif
-  if (dgm.get_fixed_time_step_size()!=agm.get_fixed_time_step_size()) cout << "nibr Warning: fixed step sizes for dendritic and axonal growth are not equal in network;:develop_connection_structure()\n";
+  if (dgm.get_fixed_time_step_size()!=agm.get_fixed_time_step_size()) warning("Warning: fixed step sizes for dendritic and axonal growth are not equal in network;:develop_connection_structure()\n");
   initialize_spatial_segment_subset(cstats,dgm,agm);
   // Note that sampled_output calls are made here, since sampling is done
   // at the same time points for the entire network structure.
-  if (outattr_show_progress) {
-    cout << "Growing dendrites and axons in time steps of " << dgm.get_fixed_time_step_size() << " seconds\nup to t = " << max_growth_time << " seconds:\n0%                     50%                    100%\n";
-    cout.flush();
-  }
-  double dt_mark = max_growth_time/50.0;
+  if (outattr_show_progress) progress("Growing dendrites and axons in time steps of "+String(dgm.get_fixed_time_step_size(),"%.1f")+" seconds\nup to t = "+String(max_growth_time,"%.1f")+" seconds:\n0%                                   50%                                 100%\n");
+  double dt_mark = max_growth_time/78.0; // 50.0;
   double t_nextmark = dt_mark;
   while (1) {
     //cout << "t=" << t << '\n';
     if (sampled_output) sampled_output->Sample(t);
     if (t>=t_nextmark) {
-      if (outattr_show_progress) { cout << '='; cout.flush(); }
+      if (outattr_show_progress) progress('=');
       t_nextmark += dt_mark;
     }
     dgm.grow(this,&cstats,t);
@@ -889,21 +1071,21 @@ void network::develop_connection_structure(Connection_Statistics_Root & cstats, 
     if (synapses_during_development) sfm->establish_connections();
     if (dgm.IsComplete(t)) break;
   }
-  if (outattr_show_progress) { cout << " done.\nPerforming growth post-op tasks.\n"; cout.flush(); }
+  if (outattr_show_progress) progress("\ndone.\nPerforming growth post-op tasks.\n");
   dgm.postop(this,&cstats,t);
-  if (outattr_show_progress) { cout << " Dendrites post-op complete.\n"; cout.flush(); }
+  if (outattr_show_progress) progress(" Dendrites post-op complete.\n");
   agm.postop(this,&cstats,t);
-  if (outattr_show_progress) { cout << " Axons post-op complete.\n"; cout.flush(); }
+  if (outattr_show_progress) progress(" Axons post-op complete.\n");
 #ifdef TEST_FOR_NAN
   cout << " TEST_FOR_NAN: Not performing synapses post-op."; cout.flush();
 #else
   sfm->establish_connections();
   remove_abstract_connections_without_synapses();
-  if (outattr_show_progress) { cout << " Synapses post-op complete.\n"; cout.flush(); }
+  if (outattr_show_progress) progress(" Synapses post-op complete.\n");
 #endif
   if (sampled_output) sampled_output->Sample(t);
   if (ndm) ndm->diameters();
-  if (outattr_show_progress) { cout << " Post-op complete.\n"; cout.flush(); }
+  if (outattr_show_progress) progress(" Post-op complete.\n");
 }
 
 void network::spatial_extents(spatial & minpoint, spatial & maxpoint) {
@@ -945,7 +1127,7 @@ void network::initialize_spatial_segment_subset(Connection_Statistics_Root & cst
   for (int i=0; i<=UNTYPED_NEURON; i++) for (int j=0; j<=UNTYPED_NEURON; j++) if (maxfibredistance[i][j]>proximity_threshold) proximity_threshold = maxfibredistance[i][j];
   double subminspan = 2.0*proximity_threshold;
   if (minimum_span_spatialsegmentsubset>subminspan) subminspan = minimum_span_spatialsegmentsubset;
-  cout << "Spatial segment subset minimum span distance: " << subminspan << " [micron]\n";
+  report("Spatial segment subset minimum span distance: "+String(subminspan,"%.3f")+" [micron]\n");
   spatial minpoint, maxpoint;
   spatial_extents(minpoint,maxpoint);
   minpoint.add_to_all(-mae);
@@ -1144,9 +1326,19 @@ double network::mean_postsynaptic_structure_length(network_statistics_data & ter
   return nsd.mean;
 }
 
+void network::move(spatial & pos) {
+  // Recenter all neurons on pos.
+  // This is useful, for example, as the first step in neurite angle analysis.
+  PLL_LOOP_FORWARD(neuron,PLLRoot<neuron>::head(),1) e->move(pos);
+}
+
+void network::fanin_rot() {
+  PLL_LOOP_FORWARD(neuron,PLLRoot<neuron>::head(),1) e->fanin_rot();
+}
+
 void network::abstract_connections() {
   PLL_LOOP_FORWARD(neuron,PLLRoot<neuron>::head(),1) e->abstract_connections();
-  cout << "Larges abstract connection strength calculated: " << max_abstract_strength << '\n';
+  progress("Largest abstract connection strength calculated: "+String(max_abstract_strength,"%.3f")+'\n');
 }
 
 Fig_Group * network::abstract_connections_Fig() {
@@ -1239,7 +1431,7 @@ Fig_Group * network::progress_bar_Fig() {
   Fig_Group * proggroup = new Fig_Group();
   double x, y;
 #ifdef VECTOR3D
-  cout << "center: " << center.X() << ',' << center.Y() << ',' << center.Z() << '\n';
+  report("center: "+String(center.X(),"%.3f,")+String(center.Y(),"%.3f,")+String(center.Z(),"%.3f\n"));
 #endif
   center.plane_mapped(x,y);
   long unitsy = FIGSCALED(2.7*y);
@@ -1371,30 +1563,59 @@ Fig_Group * network::Fig_Neurons(String figname, double width) {
 Txt_Group * network::net_Txt() {
   if (Txt_neuronlist) delete Txt_neuronlist;
   if (Txt_synapselist) delete Txt_synapselist;
-  Txt_neuronlist = new String();
-  Txt_synapselist = new String();
+  if (outattr_Txt_separate_files) {
+    Txt_neuronlist = new String(COLUMN_LABELS_NEURONS);
+    Txt_synapselist = new String(COLUMN_LABELS_SYNAPSES);
+  } else {
+    Txt_neuronlist = new String();
+    Txt_synapselist = new String();
+  }
   Txt_neuronindex = 0;
   Txt_synapseindex = 0;
-  int nlsize = PLLRoot<neuron>::length()*64;
+  int nlsize = (PLLRoot<neuron>::length()+2)*64; // estimated from measurements in output
   Txt_neuronlist->alloc(nlsize);
-  Txt_synapselist->alloc(nlsize*64); // pre-allocate some space to save time
+  long unsigned int totnumsynapses = 0;
+  for (synapse_type i = synapse_type(0); i<syntype_IDs; i=synapse_type(i+1)) totnumsynapses += (synapse_inventory[i][SYNGENESIS] - synapse_inventory[i][SYNLOSS]);
+  Txt_synapselist->alloc((totnumsynapses+3)*128); // estimated from measurements in output
   if (outattr_track_nodegenesis) {
     Txt_nodeindex = -1;
     if (Txt_fiberrootlist) delete Txt_fiberrootlist;
-    Txt_fiberrootlist = new String();
-    Txt_fiberrootlist->alloc(nlsize*8*64);
     if (Txt_continuationnodelist) delete Txt_continuationnodelist;
-    Txt_continuationnodelist = new String();
-    Txt_continuationnodelist->alloc(nlsize*64*64);
     if (Txt_bifurcationnodelist) delete Txt_bifurcationnodelist;
-    Txt_bifurcationnodelist = new String();
-    Txt_bifurcationnodelist->alloc(nlsize*32*64);
     if (Txt_terminalgrowthconelist) delete Txt_terminalgrowthconelist;
-    Txt_terminalgrowthconelist = new String();
-    Txt_terminalgrowthconelist->alloc(nlsize*32*64);
+    if (outattr_Txt_separate_files) {
+      Txt_fiberrootlist = new String(COLUMN_LABELS_ROOT_NODES);
+      Txt_continuationnodelist = new String(COLUMN_LABELS_FIBER_NODES);
+      Txt_bifurcationnodelist = new String(COLUMN_LABELS_FIBER_NODES);
+      Txt_terminalgrowthconelist = new String(COLUMN_LABELS_FIBER_NODES);
+    } else {
+      Txt_fiberrootlist = new String();
+      Txt_continuationnodelist = new String();
+      Txt_bifurcationnodelist = new String();
+      Txt_terminalgrowthconelist = new String();
+    }
+    long unsigned int totalnumroots = 0, continuation = 0, bifurcation = 0, terminal = 0;
+    PLL_LOOP_FORWARD(neuron,PLLRoot<neuron>::head(),1) {
+      totalnumroots += e->inputstructure.length() + e->outputstructure.length();
+      parsing_fs_type = dendrite_fs;
+      PLL_LOOP_FORWARD_NESTED(fibre_structure,e->inputstructure.head(),1,d) d->count_segment_types(continuation,bifurcation,terminal);
+      parsing_fs_type = axon_fs;
+      PLL_LOOP_FORWARD_NESTED(fibre_structure,e->outputstructure.head(),1,a) a->count_segment_types(continuation,bifurcation,terminal);
+    }
+    Txt_fiberrootlist->alloc((totalnumroots+3)*80);
+    Txt_continuationnodelist->alloc((continuation+3)*128);
+    Txt_bifurcationnodelist->alloc((bifurcation+3)*128);
+    Txt_terminalgrowthconelist->alloc((terminal+3)*128);
   }
   Txt_Group * txtgroup = new Txt_Group(netinfo);
-  PLL_LOOP_FORWARD(neuron,PLLRoot<neuron>::head(),1) e->net_Txt();
+  //***  PLL_LOOP_FORWARD(neuron,PLLRoot<neuron>::head(),1) e->net_Txt();
+  progress("Creating structure output files in text format:\n");
+  int nnum = 0;
+  PLL_LOOP_FORWARD(neuron,PLLRoot<neuron>::head(),1) {
+    progress("neuron "+String((long) nnum));
+    e->net_Txt();
+    nnum++;
+  }
   //PLL_LOOP_FORWARD(neuron,PLLRoot<neuron>::head(),1) txtgroup->Add_Txt_Object(e->net_Txt());
   return txtgroup;
 }
@@ -1419,6 +1640,10 @@ bool network::Txt_Output(String txtname) {
       delete Txt_bifurcationnodelist; Txt_bifurcationnodelist = NULL;
       write_file_from_String(txtname+".growthcones",*Txt_terminalgrowthconelist);
       delete Txt_terminalgrowthconelist; Txt_terminalgrowthconelist = NULL;
+      write_file_from_String(txtname+".tuftnodes",*Txt_tuftrootbranchnodelist);
+      //delete Txt_tuftrootbranchnodelist; Txt_tuftrootbranchnodelist = NULL; [***NOTE] Don't delete, in case sequence.
+      write_file_from_String(txtname+".obliquenodes",*Txt_obliquerootbranchnodelist);
+      //delete Txt_obliquerootbranchnodelist; Txt_obliquerootbranchnodelist = NULL; [***NOTE] Don't delete, in case sequence.
     }
   } else {
     String nettxt;
@@ -1446,11 +1671,18 @@ bool network::Txt_Output(String txtname) {
       nettxt += "terminal fiber growth cones:\n";
       nettxt += (*Txt_terminalgrowthconelist);
       delete Txt_terminalgrowthconelist; Txt_terminalgrowthconelist = NULL;
+      nettxt += "apical dendrite tuft root nodes:\n";
+      nettxt += (*Txt_tuftrootbranchnodelist);
+      //delete Txt_tuftrootbranchnodelist; Txt_tuftrootbranchnodelist = NULL; [***NOTE] Don't delete, in case sequence.
+      nettxt += "apical dendrite oblique root nodes:\n";
+      nettxt += (*Txt_obliquerootbranchnodelist);
+      //delete Txt_obliquerootbranchnodelist; Txt_obliquerootbranchnodelist = NULL; [***NOTE] Don't delete, in case sequence.
     }
     write_file_from_String(txtname,nettxt);
   }
   return true;
 }
+
 bool network::Data_Output_Synapse_Distance(String dataname) {
   int numbins = (int) (10000.0 / outattr_distance_frequency_distbinsize);
   unsigned long * axonbins = new unsigned long[numbins];
@@ -1528,6 +1760,133 @@ bool network::Data_Output_Connection_Distance(String dataname) {
   return true;
 }
 
+VRML_Group * network::net_VRML() {
+  if (VRML_neuronlist) delete VRML_neuronlist;
+  if (VRML_synapselist) delete VRML_synapselist;
+  VRML_neuronlist = new String();
+  VRML_synapselist = new String();
+  VRML_neuronindex = 0;
+  VRML_synapseindex = 0;
+  int nlsize = PLLRoot<neuron>::length()*64;
+  VRML_neuronlist->alloc(nlsize);
+  VRML_synapselist->alloc(nlsize*64); // pre-allocate some space to save time
+  VRML_nodeindex = -1;
+  if (VRML_fiberlist) delete VRML_fiberlist;
+  VRML_fiberlist = new String();
+  VRML_fiberlist->alloc(nlsize*8*64);
+  if (VRML_continuationnodelist) delete VRML_continuationnodelist;
+  VRML_continuationnodelist = new String();
+  VRML_continuationnodelist->alloc(nlsize*64*64);
+  if (VRML_bifurcationnodelist) delete VRML_bifurcationnodelist;
+  VRML_bifurcationnodelist = new String();
+  VRML_bifurcationnodelist->alloc(nlsize*32*64);
+  if (VRML_terminalgrowthconelist) delete VRML_terminalgrowthconelist;
+  VRML_terminalgrowthconelist = new String();
+  VRML_terminalgrowthconelist->alloc(nlsize*32*64);
+  VRML_Group * vrmlgroup = new VRML_Group(netinfo);
+  PLL_LOOP_FORWARD(neuron,PLLRoot<neuron>::head(),1) e->net_VRML();
+  //PLL_LOOP_FORWARD(neuron,PLLRoot<neuron>::head(),1) txtgroup->Add_VRML_Object(e->net_VRML());
+  return vrmlgroup;
+}
+
+bool network::VRML_Output(String vrmlname) {
+  // Overwrites .x3d output to the file vrmlname.
+  // This is intended to produce VRML compatible 3D output. From there,
+  // conversion to other file formats can take place.
+  String netvrml;
+  VRML_Header vrmlheader;
+  netvrml = vrmlheader.str();
+  netvrml += net_VRML()->str(); // processed 'netinfo'
+  netvrml += (*VRML_neuronlist);
+  delete VRML_neuronlist; VRML_neuronlist = NULL;
+  netvrml += (*VRML_synapselist);
+  delete VRML_synapselist; VRML_synapselist = NULL;
+  netvrml += (*VRML_fiberlist);
+  delete VRML_fiberlist; VRML_fiberlist = NULL;
+  netvrml += (*VRML_continuationnodelist);
+  delete VRML_continuationnodelist; VRML_continuationnodelist = NULL;
+  netvrml += (*VRML_bifurcationnodelist);
+  delete VRML_bifurcationnodelist; VRML_bifurcationnodelist = NULL;
+  netvrml += (*VRML_terminalgrowthconelist);
+  delete VRML_terminalgrowthconelist; VRML_terminalgrowthconelist = NULL;
+  //netvrml += "<NavigationInfo type='\"EXAMINE\"'/>\n</Scene>\n</X3D>\n";
+  netvrml += "</Scene>\n</X3D>\n";
+  write_file_from_String(vrmlname,netvrml);
+  return true;
+}
+
+Catacomb_projectionsmatrix * cpm = NULL;
+
+Catacomb_Group * network::net_Catacomb() {
+  // [***NOTE] This function may allocate a Catacomb_projectionsmatrix. That
+  // can be unallocated in the calling function.
+  Catacomb_neuronindex = 0;
+  Catacomb_connectionindex = 0;
+  Catacomb_Group * ccmgroup = new Catacomb_Group(netinfo);
+  // 1. Collect information about regions (one or more neurons)
+  if (ccmregionsgroup) delete ccmregionsgroup;
+  ccmregionsgroup = new Catacomb_Group();
+  PLL_LOOP_FORWARD(region,regions.head(),1) e->net_Catacomb();
+  // 2. Collect information about projections and connection tables within and between regions
+  if (ccmprojectionsgroup) delete ccmprojectionsgroup;
+  ccmprojectionsgroup = new Catacomb_Group();
+  if (ccmconnectionsgroup) delete ccmconnectionsgroup;
+  ccmconnectionsgroup = new Catacomb_Group();
+  // create a matrix of regions to regions
+  if (regions.length()>0) {
+    cpm = new Catacomb_projectionsmatrix(regions.length());
+    int i=0;
+    PLL_LOOP_FORWARD(region,regions.head(),1) { // in each region
+      PLL_LOOP_FORWARD_NESTED(neuronptrlist,e->Nlist().head(),1,nptrlist) { // for each neuron
+	PLL_LOOP_FORWARD_NESTED(connection,nptrlist->N()->OutputConnections()->head(),1,c) { // check all connections
+	  neuron * n_post = c->PostSynaptic();
+	  int j=regions.find(*n_post);
+	  if (j>=0) {
+	    if (cpm->el(i,j)==NULL) cpm->el(i,j) = new Catacomb_connectiontable(e->Nlist().length(),regions[j]->Nlist().length());
+	    cpm->el(i,j)->el(e->find(*nptrlist->N()),regions[j]->find(*n_post)) = 1;
+	  }
+	}
+      }
+      i++;
+    }
+    ccmprojectionsgroup->Add_Catacomb_Object(new Catacomb_Projection(*cpm,regions)); // [***NOTE] Alternatively, one object can be created for each projection or connection table.
+    ccmconnectionsgroup->Add_Catacomb_Object(new Catacomb_ConnectionTable(*cpm,regions));
+  }
+  // link all the data structures in the desired order
+  ccmgroup->Add_Catacomb_Object(ccmregionsgroup);
+  ccmgroup->Add_Catacomb_Object(ccmprojectionsgroup);
+  Catacomb_Neuron * ccmneurondef = new Catacomb_Neuron();
+  ccmgroup->Add_Catacomb_Object(ccmneurondef);
+  ccmgroup->Add_Catacomb_Object(ccmconnectionsgroup);
+  return ccmgroup;
+}
+
+bool network::Catacomb_Output(String ccmname) {
+  // Overwrites .ccm output to the file ccmname.
+  // This is intended to produce Catacomb compatible output.
+  // For the .ccm format, produce output as follows:
+  //   header (includes fixedsteprunner)
+  //     list of network + vectorrecorder + joinclonerelay + spike cables + vector cables
+  //     list of spike projections
+  //     close assembly items and workbench and list
+  //     neuron definition
+  //     define connection tables
+  //   close list and file
+  String netccm;
+  Catacomb_Header ccmheader;
+  netccm = ccmheader.str();
+  Catacomb_Group * ccmnet = net_Catacomb();
+  //cout << "SEGFAULT SEARCH: @5\n"; cout.flush();
+  netccm += ccmnet->str(); // processed 'netinfo'
+  //cout << "SEGFAULT SEARCH: @6\n"; cout.flush();
+  if (cpm) delete cpm;
+  delete ccmnet;
+  netccm += "</lists>\n<name>\"box\"</name>\n</org.enorg.catacomb.core.CcmbBox>\n";
+  write_file_from_String(ccmname,netccm);
+  return true;
+}
+
+#ifdef VECTOR3D
 void network::net_Slice(Slice & slice) { // [***INCOMPLETE] Change this to a different return type.
   // The iterator functions of the Slice class are used to walk through all defined slices and return those that are single slices with vertices, which are then given to the neuron::net_Slice() function. Iteration is done *within* the slice objects.
   for (Slice * s = slice.iterator_first(); (s); s = s->iterator_next()) PLL_LOOP_FORWARD(neuron,PLLRoot<neuron>::head(),1) e->net_Slice(s);
@@ -1539,6 +1898,34 @@ bool network::Slice_Output(String slicename, Slice & slice) {
   net_Slice(slice);
   return true;
 }
+
+Fig_Group * network::Slice_Outlines_Output(String figname, Slice & slice, double width, bool overwrite) {
+  // Appends (or overwrites) .fig output to the file figname with a network
+  // width specified in micrometers.
+  // Note: Regular XFig scale is 1200 dpi. To plot over a width of 6.5
+  // inches (1 inch margins on Letter paper) for a network box with specified
+  // width in micrometers, that width should equal 6.5*1200 XFig points.
+  // E.g. scale 4*292.0 micron = 6.5*1200 => 1 micron = 6.5*1200 / (4*292)
+  String netfig;
+  XFIG_RANGE_CHECK_INIT();
+  if ((overwrite) || (!read_file_into_String(figname,netfig,false))) {
+    Fig_Header figheader;
+    netfig = figheader.str();
+    netfig += colortable->Fig_str();
+  }
+  if (width>0.0) figscale = (tex_textwidth*1200.0)/width;
+  if (!netinfo.contains("figscale")) {
+    netinfo += "\nfigscale=" + String(figscale,"%.3f\n");
+    netinfo += "Normal XFig scale is 1200 dpi\n";
+  }
+  Fig_Group * figgroup = slice.Outlines_Fig();
+  netfig += figgroup->str();
+  write_file_from_String(figname,netfig);
+  if (Fig_output_modified>0) warning(XFIG_RANGE_CHECK_WARNING(figname,tex_textwidth));
+  return figgroup;
+}
+// VECTOR3D
+#endif
 
 void network::set_figattr(int fattr) {
   // set the figattr parameter for all neurons in the network

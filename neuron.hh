@@ -34,10 +34,15 @@
 class neuron;
 class multipolar_nonpyramidal;
 class pyramidal;
+class bipolar;
 class interneuron;
 class electrode;
 class neuronsetel;
 class neuronset;
+
+#ifndef __NETWORK_HH
+class network;
+#endif
 
 #ifndef __NETWORK_GENERATED_STATISTICS_HH
 class network_statistics_base;
@@ -55,8 +60,10 @@ class network_statistics_base;
 #include "Command_Line_Parameters.hh"
 #include "state_storable.hh"
 #include "Txt_Object.hh"
+#include "VRML_Object.hh"
+#include "Catacomb_Object.hh"
 
-enum neuron_type { PRINCIPAL_NEURON, INTERNEURON, MULTIPOLAR_NONPYRAMIDAL, PYRAMIDAL, UNTYPED_NEURON };
+enum neuron_type { PRINCIPAL_NEURON, INTERNEURON, MULTIPOLAR_NONPYRAMIDAL, BIPOLAR, PYRAMIDAL, UNTYPED_NEURON };
 // Note: Untyped is the last one in the enumeration list so that I can do
 // such things as int a[UNTYPED_NEURON+1] easily.
 
@@ -67,24 +74,29 @@ enum basal_force_model { unrestricted_bfm, surface_division_bfm, forced_drift_bf
 extern const char neuron_type_name[][25];
 extern const char neuron_short_name[][12];
 
-extern bool pia_attraction_repulsion_hypothesis;
+extern const char natural_subset_idstr[][40];
 
-#ifndef INCLUDE_SCHEMA_PARENT_SET_PROTOCOL_DIRECTION_MODELS
-extern direction_model general_axon_direction_model;
-extern direction_model general_dendrite_direction_model;
-extern String general_axon_direction_model_root;
-extern String general_dendrite_direction_model_root;
-#endif
+extern int min_basal[];
+extern int max_basal[];
+extern double min_angle[];
+extern double max_angle[];
+extern int max_axons[];
+
+extern bool pia_attraction_repulsion_hypothesis;
 
 class general_neuron_parameters_interface: public CLP_Modifiable {
   // This class serves to create the general_neuron_parameters object
   // for parameters that should apply to all neurons in generated networks.
   // [*** NOTE] This may be incorporated into network or neuron classes
   // if preferable.
+protected:
+  network * cached_net_ptr;
 public:
-  general_neuron_parameters_interface() {}
+  general_neuron_parameters_interface(): cached_net_ptr(NULL) {}
   virtual ~general_neuron_parameters_interface() {}
+  network * Cached_Net() { return cached_net_ptr; }
   virtual void parse_CLP(Command_Line_Parameters & clp);
+  virtual void parse_CLP(Command_Line_Parameters & clp, network & net);
   virtual String report_parameters();
 };
 
@@ -112,7 +124,8 @@ public:
   neuron(): radius(5.0), Vm(VmREST), abstracted_connections(false), a(&NullActivity), figneuroncolor(colortable->colnum(CT_neuron_untyped)), figconnectionscolor(colortable->colnum(CT_connection_excitatory)), figsynapsescolor(colortable->colnum(CT_synapses)), figdendritescolor(colortable->colnum(CT_dendrites)), figaxonscolor(colortable->colnum(CT_axon_excitatory)), figattr(0) { numberID = num_neurons_created; num_neurons_created++; }
   neuron(spatial & npos): P(npos), radius(5.0), Vm(VmREST), abstracted_connections(false), a(&NullActivity), figneuroncolor(colortable->colnum(CT_neuron_untyped)), figconnectionscolor(colortable->colnum(CT_connection_excitatory)), figdendritescolor(colortable->colnum(CT_dendrites)), figaxonscolor(colortable->colnum(CT_axon_excitatory)), figattr(0) { numberID = num_neurons_created; num_neurons_created++; }
   ~neuron() { if (a!=&NullActivity) delete a; }
-  // architecture geometry
+  // architecture geometry  
+  virtual void parse_CLP(Command_Line_Parameters & clp) = 0;
   void set_position(spatial & npos) { P = npos; }
   void set_position_in_Z_plane(double xpos, double ypos) { P.set_all(xpos,ypos); }
   long numerical_ID() { return numberID; }
@@ -135,17 +148,23 @@ public:
 #ifdef SAMPLES_INCLUDE_NETWORK_STATISTICS_BASE
   void Collect_Data(network_statistics_base & nsb);
 #endif
-  int number_of_synapses(); // (see nibr.cc)
-  int total_input_segments(); // (see nibr.cc)
-  int total_output_segments(); // (see nibr.cc)
-  int total_input_terminal_segments(); // (see nibr.cc)
-  int total_output_terminal_segments(); // (see nibr.cc)
+  int number_of_synapses();
+  int total_input_segments();
+  int total_output_segments();
+  int total_input_terminal_segments();
+  int total_output_terminal_segments();
   virtual double Membrane_Potential() { return Vm; }
+  void move(spatial & pos); // Recenter a neuron on pos
+  void fanin_rot(); // in spherical coordinates, rotate all points to theta=0
   void abstract_connections();
   bool has_abstracted_connections() { return abstracted_connections; }
-  virtual Fig_Object * net_Fig(); // (see nibr.cc)
-  virtual Txt_Object * net_Txt(); // (see nibr.cc)
+  virtual Fig_Object * net_Fig();
+  virtual Txt_Object * net_Txt();
+  virtual VRML_Object * net_VRML();
+  //virtual Catacomb_Object * net_Catacomb();
+#ifdef VECTOR3D
   virtual void net_Slice(Slice * slice);
+#endif
   virtual neuron_type TypeID() { return UNTYPED_NEURON; }
   long figneuroncolor;
   long figconnectionscolor;
@@ -166,12 +185,24 @@ public:
 
 typedef neuron * neuronptr;
 
+class neuronptrlist: public PLLHandle<neuronptrlist> {
+protected:
+  neuronptr nptr;
+public:
+  neuronptrlist(neuronptr _nptr): nptr(_nptr) {}
+  operator const neuronptr() const { return nptr; }
+  neuronptr N() { return nptr; }
+};
+
 class principal: public neuron {
 public:
-  principal() { set_fig_colors(colortable->colnum(CT_neuron_principal),colortable->colnum(CT_connection_excitatory),colortable->colnum(CT_dendrites),colortable->colnum(CT_axon_excitatory)); }
-  principal(spatial npos): neuron(npos) { figneuroncolor=colortable->colnum(CT_neuron_principal); figconnectionscolor=colortable->colnum(CT_connection_excitatory); }
+  principal() { set_fig_colors(colortable->colnum(CT_neuron_principal),colortable->colnum(CT_connection_excitatory),colortable->colnum(CT_dendrites),colortable->colnum(CT_axon_excitatory)); } //parse_CLP(*main_clp); }
+  principal(spatial npos): neuron(npos) { figneuroncolor=colortable->colnum(CT_neuron_principal); figconnectionscolor=colortable->colnum(CT_connection_excitatory); } //parse_CLP(*main_clp); }
   virtual neuron_type TypeID() { return PRINCIPAL_NEURON; }
+  virtual void parse_CLP(Command_Line_Parameters & clp);
 };
+
+typedef principal * principalptr;
 
 class multipolar_nonpyramidal: public principal {
 protected:
@@ -188,16 +219,25 @@ public:
   virtual neuron_type TypeID() { return MULTIPOLAR_NONPYRAMIDAL; }
   virtual void initialize_output_structure(double mintotlength, double maxtotlength); // (see nibr.cc)
   virtual void initialize_input_structure(double mintotlength, double maxtotlength); // (see nibr.cc)
+  virtual void parse_CLP(Command_Line_Parameters & clp);
+};
+
+class bipolar: public multipolar_nonpyramidal {
+public:
+  bipolar() {}
+  bipolar(spatial & npos): multipolar_nonpyramidal(npos) {}
+  virtual neuron_type TypeID() { return BIPOLAR; }
+  virtual void initialize_output_structure(double mintotlength, double maxtotlength); // (see nibr.cc)
+  virtual void initialize_input_structure(double mintotlength, double maxtotlength); // (see nibr.cc)
 };
 
 class pyramidal: public multipolar_nonpyramidal {
 public:
-  pyramidal() { parse_CLP(*main_clp); }
-  pyramidal(spatial & npos): multipolar_nonpyramidal(npos) { parse_CLP(*main_clp); }
+  pyramidal() {}
+  pyramidal(spatial & npos): multipolar_nonpyramidal(npos) {}
   virtual neuron_type TypeID() { return PYRAMIDAL; }
   virtual void initialize_output_structure(double mintotlength, double maxtotlength); // (see nibr.cc)
   virtual void initialize_input_structure(double mintotlength, double maxtotlength); // (see nibr.cc)
-  virtual void parse_CLP(Command_Line_Parameters & clp);
 };
 
 class interneuron: public multipolar_nonpyramidal {
@@ -213,6 +253,7 @@ class electrode: public neuron {
 public:
   electrode() { radius = 12.0/2.0; } // diameter from [PELT:LONGTERMDYN]
   electrode(double r) { radius = r; }
+  virtual void parse_CLP(Command_Line_Parameters & clp) {}
   virtual Fig_Object * net_Fig();
 };
 

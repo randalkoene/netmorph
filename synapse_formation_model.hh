@@ -102,6 +102,8 @@ extern double maxfibredistance[UNTYPED_NEURON+1][UNTYPED_NEURON+1];
 
 extern probability_distribution_function * sfmpdf;
 
+extern bool no_autapses;
+
 /*
 Selecting actual synapses (and their receptors) for each connection:
 (1) Initially, connections contains one candidate synapse each.

@@ -31,6 +31,7 @@
 #include "axon_direction_model.hh"
 #include "Sampled_Output.hh"
 #include "BigString.hh"
+#include "network.hh"
 
 //neuron * processing_neuron = NULL; // *** this cannot be global when parallel processing
 
@@ -38,6 +39,7 @@ const char neuron_type_name[][25] =
   {"Principal Neuron",
    "Interneuron",
    "Multipolar NonPyramidal",
+   "Bipolar",
    "Pyramidal",
    "Untyped Neuron"};
 
@@ -45,29 +47,25 @@ const char neuron_short_name[][12] =
   {"principal",
    "interneuron",
    "multipolar",
+   "bipolar",
    "pyramidal",
    "untyped"};
 
-#ifdef INCLUDE_SCHEMA_PARENT_SET_PROTOCOL_DIRECTION_MODELS
+// [UPDATE 20080702:] The case in which we define INCLUDE_SCHEMA_PARENT_SET_PROTOCOL_DIRECTION_MODELS is now REQUIRED for compilation.
+
 const char natural_subset_idstr[NUM_NATURAL_SPS][40] = {
   "",
   "all_axons.",
   "all_dendrites.",
+  "all_multipolar_axons.",
+  "all_multipolar_dendrites.",
+  "all_bipolar_axons.",
+  "all_bipolar_dendrites.",
   "all_pyramidal_axons.",
   "all_pyramidal_dendrites.",
   "all_interneuron_axons.",
   "all_interneuron_dendrites.",
   "all_apical_pyramidal_dendrites."};
-#else
-const char natural_subset_idstr[NUM_NATURAL_SUBSETS_AEM][40] = {
-  "all_axons.",
-  "all_dendrites.",
-  "all_pyramidal_axons.",
-  "all_pyramidal_dendrites.",
-  "all_interneuron_axons.",
-  "all_interneuron_dendrites.",
-  "all_apical_pyramidal_dendrites."};
-#endif
 
 // Whether to use the hypothesis that apical attraction to chemical at pia
 // and axonal repulsion from that same chemical not only affects growth
@@ -99,29 +97,15 @@ bool pia_attraction_repulsion_hypothesis = true;
    TL#200603140355.2.
 */
 
-// [***INCOMPLETE] Make this settable through the CLP interface.
-// [***INCOMPLETE] The model selection and parameter setting interface should
-// allow selection and setting at various resolutions, and a propagation
-// method (e.g. cloning) should facilitate it. See both DIL#20051105072005.1
-// and TL#200603111137.1 and the thread that precedes it.
-#ifndef INCLUDE_SCHEMA_PARENT_SET_PROTOCOL_DIRECTION_MODELS
-  direction_model general_axon_direction_model = segment_history_tension_dm;
-  direction_model general_dendrite_direction_model = legacy_dm;
-  String general_axon_direction_model_root;
-  String general_dendrite_direction_model_root;
-#endif
-
 general_neuron_parameters_interface general_neuron_parameters;
 
-// Local temporary variables used during initialization:
-#define PYRAMIDAL_MIN_BASAL 2
-#define PYRAMIDAL_MAX_BASAL 5
-int pyramidal_min_basal = PYRAMIDAL_MIN_BASAL;
-int pyramidal_max_basal = PYRAMIDAL_MAX_BASAL;
-#define PYRAMIDAL_BASAL_MINANGLE (0.1*M_PI)
-#define PYRAMIDAL_BASAL_MAXANGLE (0.5*M_PI)
-double pyramidal_basal_minangle = PYRAMIDAL_BASAL_MINANGLE;
-double pyramidal_basal_maxangle = PYRAMIDAL_BASAL_MAXANGLE;
+// Arrays containing compile-time default values
+// principal, interneuron, multipolar, bipolar, pyramidal, untyped
+int min_basal[UNTYPED_NEURON+1] = { 2, 2, 2, 1, 4, 2 };
+int max_basal[UNTYPED_NEURON+1] = { 5, 4, 5, 1, 8, 5 };
+double min_angle[UNTYPED_NEURON+1] = { 0.1*M_PI, 0.1*M_PI, 0.1*M_PI, 0.1*M_PI, 0.1*M_PI, 0.1*M_PI };
+double max_angle[UNTYPED_NEURON+1] = { 0.5*M_PI, 2.0*M_PI, 2.0*M_PI, 0.25*M_PI, 0.5*M_PI, 0.5*M_PI };
+int max_axons[UNTYPED_NEURON+1] = { 1, 1, 1, 1, 1, 1 };
 
 basal_force_model bfm = unrestricted_bfm;
 String bfmstr[NUM_bfm] = {
@@ -139,7 +123,26 @@ void natural_set_model_error(natural_schema_parent_set natural_set_id, String mo
   error("Error: Natural set '"+setstr+"' has no associated "+modelstr+" model schema.\n");
 }
 
+void region_natural_set_model_error(region * r, natural_schema_parent_set natural_set_id, String modelstr) {
+  // PROTOCOL: Do not allow sets with undefined model schemas.
+  String setstr(natural_subset_idstr[natural_set_id]);
+  if (natural_set_id==universal_sps) setstr = "universal";
+  String regstr;
+  if (!r) regstr = "universal network";
+  else regstr = r->Name();
+  error("Error: Region '"+regstr+"' natural set '"+setstr+"' has no associated "+modelstr+" model schema.\n");
+}
+
+int superior_schema_index(region * r, int schema_index) {
+  if (!r) return superior_natural_set[schema_index];
+  return schema_index; // same schema in universal network
+}
+
 void general_neuron_parameters_interface::parse_CLP(Command_Line_Parameters & clp) {
+  error("Error: Please use the general_neuron_parameters_interface::parse_CLP(Command_Line_Parameters & clp, network & net) function in order to access network regions.\n");
+}
+
+void general_neuron_parameters_interface::parse_CLP(Command_Line_Parameters & clp, network & net) {
   // PROTOCOL: Defined sets, including natural sets, receive schema objects, either due
   // to explicit specification, or by inheriting the model and parameter choices from
   // an immediate superior set. [See task log entries of DIL#20070612153815.1.]
@@ -169,34 +172,68 @@ void general_neuron_parameters_interface::parse_CLP(Command_Line_Parameters & cl
       }
     }
   }
+  if ((n=clp.Specifies_Parameter("apical_specified_overrides_centroid"))>=0) apical_specified_overrides_centroid = (downcase(clp.ParValue(n))==String("true"));
 
-  // General model selection (see TL#200603120422.1), and general parameters
-  String genmodel; // genmodel="" is the base model identifier
-  for (natural_schema_parent_set i = universal_sps; i<NUM_NATURAL_SPS; i = natural_schema_parent_set(i+1)) {
-    genmodel = natural_subset_idstr[i];
-#ifdef INCLUDE_SCHEMA_PARENT_SET_PROTOCOL_DIRECTION_MODELS
-    if (!direction_model_selection(genmodel,clp,direction_model_subset_schemas[superior_natural_set[i]],direction_model_subset_schemas[i])) natural_set_model_error(i,"direction");
-#endif
-    if (!branching_model_selection(genmodel,clp,branching_model_subset_schemas[superior_natural_set[i]],branching_model_subset_schemas[i])) natural_set_model_error(i,"branching");
-    if (!branch_angle_model_selection(genmodel,clp,branch_angle_model_subset_schemas[superior_natural_set[i]],branch_angle_model_subset_schemas[i])) natural_set_model_error(i,"branch angle");
-    if (!arbor_elongation_model_selection(genmodel,clp,general_arbor_elongation_model_base_subset_schemas[superior_natural_set[i]],general_arbor_elongation_model_base_subset_schemas[i])) natural_set_model_error(i,"arbor elongation");
-    if (!terminal_segment_elongation_model_selection(genmodel,clp,general_terminal_segment_elongation_model_base_subset_schemas[superior_natural_set[i]],general_terminal_segment_elongation_model_base_subset_schemas[i])) natural_set_model_error(i,"terminal segment elongation");
-    if (!elongation_rate_initialization_model_selection(genmodel,clp,elongation_rate_initialization_model_subset_schemas[superior_natural_set[i]],elongation_rate_initialization_model_subset_schemas[i])) natural_set_model_error(i,"elongation rate initialization");
+  // Population specific model selection (see TL#200807020156.12):
+  cached_net_ptr = &net;
+  String popid; // popid="" is the universal network model identifier
+  // 1. We prepare schema arrays according to the number of regions defined
+  int numschemasets = net.Regions().length()+1; // index 0 is for the universal network
+  structure_initialization_region_subset_schemas = new region_structure_initialization_ptr[numschemasets];
+  direction_model_region_subset_schemas = new region_direction_model_base_ptr[numschemasets];
+  branching_model_region_subset_schemas = new region_branching_model_base_ptr[numschemasets];
+  TSBM_region_subset_schemas = new region_TSBM_base_ptr[numschemasets];
+  TSTM_region_subset_schemas = new region_TSTM_base_ptr[numschemasets];
+  branch_angle_model_region_subset_schemas = new region_branch_angle_model_base_ptr[numschemasets];
+  arbor_elongation_model_region_subset_schemas = new region_arbor_elongation_model_base_ptr[numschemasets];
+  terminal_segment_elongation_model_region_subset_schemas = new region_terminal_segment_elongation_model_base_ptr[numschemasets];
+  elongation_rate_initialization_model_region_subset_schemas = new region_elongation_rate_initialization_model_base_ptr[numschemasets];
+  for (int i=0; i<numschemasets; i++) {
+    structure_initialization_region_subset_schemas[i] = new structure_initialization[NUM_NATURAL_SPS]; // self-clearing constructor
+    direction_model_region_subset_schemas[i] = new direction_model_base_ptr[NUM_NATURAL_SPS];
+    for (int j=0; j<NUM_NATURAL_SPS; j++) direction_model_region_subset_schemas[i][j] = NULL;
+    branching_model_region_subset_schemas[i] = new branching_model_base_ptr[NUM_NATURAL_SPS];
+    for (int j=0; j<NUM_NATURAL_SPS; j++) branching_model_region_subset_schemas[i][j] = NULL;
+    TSBM_region_subset_schemas[i] = new TSBM_base_ptr[NUM_NATURAL_SPS];
+    for (int j=0; j<NUM_NATURAL_SPS; j++) TSBM_region_subset_schemas[i][j] = NULL;
+    TSTM_region_subset_schemas[i] = new TSTM_base_ptr[NUM_NATURAL_SPS];
+    for (int j=0; j<NUM_NATURAL_SPS; j++) TSTM_region_subset_schemas[i][j] = NULL;
+    branch_angle_model_region_subset_schemas[i] = new branch_angle_model_base_ptr[NUM_NATURAL_SPS];
+    for (int j=0; j<NUM_NATURAL_SPS; j++) branch_angle_model_region_subset_schemas[i][j] = NULL;
+    arbor_elongation_model_region_subset_schemas[i] = new arbor_elongation_model_base_ptr[NUM_NATURAL_SPS];
+    for (int j=0; j<NUM_NATURAL_SPS; j++) arbor_elongation_model_region_subset_schemas[i][j] = NULL;
+    terminal_segment_elongation_model_region_subset_schemas[i] = new terminal_segment_elongation_model_base_ptr[NUM_NATURAL_SPS];
+    for (int j=0; j<NUM_NATURAL_SPS; j++) terminal_segment_elongation_model_region_subset_schemas[i][j] = NULL;
+    elongation_rate_initialization_model_region_subset_schemas[i] = new elongation_rate_initialization_model_base_ptr[NUM_NATURAL_SPS];
+    for (int j=0; j<NUM_NATURAL_SPS; j++) elongation_rate_initialization_model_region_subset_schemas[i][j] = NULL;
   }
-#ifndef INCLUDE_SCHEMA_PARENT_SET_PROTOCOL_DIRECTION_MODELS
-  if ((n=clp.Specifies_Parameter("axon_direction_model"))>=0) {
-    if (downcase(clp.ParValue(n))==String("segment_history_tension")) general_axon_direction_model = segment_history_tension_dm;
-    else if (downcase(clp.ParValue(n))==String("cell_attraction")) general_axon_direction_model = cell_attraction_dm;
-    else general_axon_direction_model = legacy_dm;
-  }
-  if ((n=clp.Specifies_Parameter("axon_direction_model_label"))>=0) general_axon_direction_model_root = clp.URI_unescape_ParValue(n);
-  if ((n=clp.Specifies_Parameter("dendrite_direction_model"))>=0) {
-    if (downcase(clp.ParValue(n))==String("segment_history_tension")) general_dendrite_direction_model = segment_history_tension_dm;
-    else if (downcase(clp.ParValue(n))==String("cell_attraction")) general_dendrite_direction_model = cell_attraction_dm;
-    else general_dendrite_direction_model = legacy_dm;
-  }
-  if ((n=clp.Specifies_Parameter("dendrite_direction_model_label"))>=0) general_dendrite_direction_model_root = clp.URI_unescape_ParValue(n);
-#endif
+  //    Some initial values for structure initialization values in the universal set
+  for (int j=0; j<NUM_NATURAL_SPS; j++) structure_initialization_region_subset_schemas[0][j].init(natural_schema_parent_set(j));
+  // 2. We start with the universal network models, then work our way through existing populations
+  region * r = NULL; int regid = 0;
+  // [***INCOMPLETE] We may need to modify the way in which universal "contributing" models are specified and used in the selection functions.
+  do {
+    // General model selection (see TL#200603120422.1), and general parameters
+    String genmodel; // genmodel="" is the base model identifier
+    for (natural_schema_parent_set i = universal_sps; i<NUM_NATURAL_SPS; i = natural_schema_parent_set(i+1)) {
+      genmodel = popid+natural_subset_idstr[i];
+      if (!structure_initialization_selection(genmodel,clp,structure_initialization_region_subset_schemas[0][superior_schema_index(r,i)],structure_initialization_region_subset_schemas[regid][i])) region_natural_set_model_error(r,i,"structure initialization");
+      if (!direction_model_selection(genmodel,clp,direction_model_region_subset_schemas[0][superior_schema_index(r,i)],direction_model_region_subset_schemas[regid][i])) region_natural_set_model_error(r,i,"direction");
+      if (!branching_model_selection(genmodel,clp,branching_model_region_subset_schemas[0][superior_schema_index(r,i)],branching_model_region_subset_schemas[regid][i])) region_natural_set_model_error(r,i,"branching");
+      if (!TSBM_selection(genmodel,clp,TSBM_region_subset_schemas[0][superior_schema_index(r,i)],TSBM_region_subset_schemas[regid][i])) region_natural_set_model_error(r,i,"TSBM");
+      if (!TSTM_selection(genmodel,clp,TSTM_region_subset_schemas[0][superior_schema_index(r,i)],TSTM_region_subset_schemas[regid][i])) region_natural_set_model_error(r,i,"TSTM");
+      if (!branch_angle_model_selection(genmodel,clp,branch_angle_model_region_subset_schemas[0][superior_schema_index(r,i)],branch_angle_model_region_subset_schemas[regid][i])) region_natural_set_model_error(r,i,"branch angle");
+      if (!arbor_elongation_model_selection(genmodel,clp,arbor_elongation_model_region_subset_schemas[0][superior_schema_index(r,i)],arbor_elongation_model_region_subset_schemas[regid][i])) region_natural_set_model_error(r,i,"arbor elongation");
+      if (!terminal_segment_elongation_model_selection(genmodel,clp,terminal_segment_elongation_model_region_subset_schemas[0][superior_schema_index(r,i)],terminal_segment_elongation_model_region_subset_schemas[regid][i])) region_natural_set_model_error(r,i,"terminal segment elongation");
+      if (!elongation_rate_initialization_model_selection(genmodel,clp,elongation_rate_initialization_model_region_subset_schemas[0][superior_schema_index(r,i)],elongation_rate_initialization_model_region_subset_schemas[regid][i])) region_natural_set_model_error(r,i,"elongation rate initialization");
+    }
+    // Get the first region if we were working on the universal network, otherwise get the next region.
+    if (popid.empty()) r = net.Regions().head();
+    else r = r->Next();
+    if (r) popid = r->Name()+'.';
+    regid++;
+  } while (r);
+
   if ((n=clp.Specifies_Parameter("figattr_connections_threshold"))>=0) {
     if (figattr_connections_thresholdlist) delete[] figattr_connections_thresholdlist;
     figattr_connections_thresholdlist = str2vec(clp.ParValue(n),&figattr_connections_thresholdlistlength);
@@ -213,24 +250,6 @@ String general_neuron_parameters_interface::report_parameters() {
   else res += "  Compute basal directions\n";
 
   // axon direction model
-
-#ifndef INCLUDE_SCHEMA_PARENT_SET_PROTOCOL_DIRECTION_MODELS
-  res += "General axon direction model: ";
-  switch (general_axon_direction_model) {
-  case segment_history_tension_dm: res += "segment history tension."; break;;
-  case cell_attraction_dm: res += "cell attraction."; break;;
-  default: res += "non-specific legacy functions.";
-  }
-  if (!general_axon_direction_model_root.empty()) res += " (contributing models with root "+general_axon_direction_model_root+".)";
-  // dendrite direction model
-  res += "\nGeneral dendrite direction model: ";
-  switch (general_dendrite_direction_model) {
-  case segment_history_tension_dm: res += "segment history tension."; break;;
-  case cell_attraction_dm: res += "cell attraction."; break;;
-  default: res += "non-specific legacy functions.";
-  }
-  if (!general_dendrite_direction_model_root.empty()) res += " (contributing models with root "+general_dendrite_direction_model_root+".)";
-#endif
 
   // general arbor elongation model
   res += "\nGeneral arbor elongation model: ";
@@ -252,57 +271,84 @@ String general_neuron_parameters_interface::report_parameters() {
   // natural subsets
   // [***INCOMPLETE] Does this report the model class, or any information
   // about contributing models or their parameters?
-  for (natural_schema_parent_set i = universal_sps; i<NUM_NATURAL_SPS; i = natural_schema_parent_set(i+1)) {
-    if (general_arbor_elongation_model_base_subset_schemas[i]) {
-      res += "\nSubset '"; res += natural_subset_idstr[i]; res += "' arbor elongation model: ";
-      res += general_arbor_elongation_model_base_subset_schemas[i]->report_parameters();
+
+  if (!cached_net_ptr) error("Error: Please use the general_neuron_parameters_interface::parse_CLP(Command_Line_Parameters & clp, network & net) function in order to cache a pointer for network regions access.\n");
+  int numschemasets = cached_net_ptr->Regions().length()+1;
+  for (int regid = 0; regid<numschemasets; regid++) {
+    res += "\nRegion '";
+    if (regid<1) res += "universal network"; else res += cached_net_ptr->Regions().el(regid-1)->Name();
+    res += "':";
+    for (natural_schema_parent_set i = universal_sps; i<NUM_NATURAL_SPS; i = natural_schema_parent_set(i+1)) {
+      res += "\n  Subset '"; res += natural_subset_idstr[i]; res += "' structure initialization: ";
+      res += structure_initialization_region_subset_schemas[regid][i].report_parameters();
+    }
+    for (natural_schema_parent_set i = universal_sps; i<NUM_NATURAL_SPS; i = natural_schema_parent_set(i+1)) {
+      if (arbor_elongation_model_region_subset_schemas[regid][i]) {
+	res += "\n  Subset '"; res += natural_subset_idstr[i]; res += "' arbor elongation model: ";
+	res += arbor_elongation_model_region_subset_schemas[regid][i]->report_parameters();
+      }
+    }
+    for (natural_schema_parent_set i = universal_sps; i<NUM_NATURAL_SPS; i = natural_schema_parent_set(i+1)) {
+      if (terminal_segment_elongation_model_region_subset_schemas[regid][i]) {
+	res += "\n  Subset '"; res += natural_subset_idstr[i]; res += "' terminal segment elongation model: ";
+	res += terminal_segment_elongation_model_region_subset_schemas[regid][i]->report_parameters();
+      }
+    }
+    for (natural_schema_parent_set i = universal_sps; i<NUM_NATURAL_SPS; i = natural_schema_parent_set(i+1)) {
+      if (elongation_rate_initialization_model_region_subset_schemas[regid][i]) {
+	if (i==universal_sps) res += "\nUniversal elongation rate initialization model: ";
+	else { res += "\nSubset '"; res += natural_subset_idstr[i]; res += "' elongation rate initialization model: "; }
+	res += elongation_rate_initialization_model_region_subset_schemas[regid][i]->report_parameters();
+	if (i==universal_sps) if (!universal_elongation_rate_initialization_model_root.empty()) res += " (contributing models with root "+universal_elongation_rate_initialization_model_root+".)";
+      }
+    }
+    for (natural_schema_parent_set i = universal_sps; i<NUM_NATURAL_SPS; i = natural_schema_parent_set(i+1)) {
+      if (direction_model_region_subset_schemas[regid][i]) {
+	if (i==universal_sps) res += "\nUniversal direction model: ";
+	else { res += "\n  Subset '"; res += natural_subset_idstr[i]; res += "' direction model: "; }
+	res += direction_model_region_subset_schemas[regid][i]->report_parameters();
+	if (i==universal_sps) if (!universal_direction_model_root.empty()) res += " (contributing models with root "+universal_direction_model_root+".)";
+      }
+    }
+    for (natural_schema_parent_set i = universal_sps; i<NUM_NATURAL_SPS; i = natural_schema_parent_set(i+1)) {
+      if (branching_model_region_subset_schemas[regid][i]) {
+	if (i==universal_sps) res += "\nUniversal branching model: ";
+	else { res += "\n  Subset '"; res += natural_subset_idstr[i]; res += "' branching model: "; }
+	res += branching_model_region_subset_schemas[regid][i]->report_parameters();
+	if (i==universal_sps) if (!universal_branching_model_root.empty()) res += " (contributing models with root "+universal_branching_model_root+".)";
+      }
+    }
+    for (natural_schema_parent_set i = universal_sps; i<NUM_NATURAL_SPS; i = natural_schema_parent_set(i+1)) {
+      if (TSBM_region_subset_schemas[regid][i]) {
+	if (i==universal_sps) res += "\nUniversal TSBM: ";
+	else { res += "\n  Subset '"; res += natural_subset_idstr[i]; res += "' TSBM: "; }
+	res += TSBM_region_subset_schemas[regid][i]->report_parameters();
+	if (i==universal_sps) if (!universal_TSBM_root.empty()) res += " (contributing models with root "+universal_TSBM_root+".)";
+      }
+    }
+    for (natural_schema_parent_set i = universal_sps; i<NUM_NATURAL_SPS; i = natural_schema_parent_set(i+1)) {
+      if (TSTM_region_subset_schemas[regid][i]) {
+	if (i==universal_sps) res += "\nUniversal TSTM: ";
+	else { res += "\n  Subset '"; res += natural_subset_idstr[i]; res += "' TSTM: "; }
+	res += TSTM_region_subset_schemas[regid][i]->report_parameters();
+	if (i==universal_sps) if (!universal_TSTM_root.empty()) res += " (contributing models with root "+universal_TSTM_root+".)";
+      }
+    }
+    for (natural_schema_parent_set i = universal_sps; i<NUM_NATURAL_SPS; i = natural_schema_parent_set(i+1)) {
+      if (branch_angle_model_region_subset_schemas[regid][i]) {
+	if (i==universal_sps) res += "\nUniversal branch angle model: ";
+	else { res += "\n  Subset '"; res += natural_subset_idstr[i]; res += "' branch angle model: "; }
+	res += branch_angle_model_region_subset_schemas[regid][i]->report_parameters();
+	if (i==universal_sps) if (!universal_branch_angle_model_root.empty()) res += " (contributing models with root "+universal_branch_angle_model_root+".)";
+      }
     }
   }
-  for (natural_schema_parent_set i = universal_sps; i<NUM_NATURAL_SPS; i = natural_schema_parent_set(i+1)) {
-    if (general_terminal_segment_elongation_model_base_subset_schemas[i]) {
-      res += "\nSubset '"; res += natural_subset_idstr[i]; res += "' terminal segment elongation model: ";
-      res += general_terminal_segment_elongation_model_base_subset_schemas[i]->report_parameters();
-    }
-  }
-  for (natural_schema_parent_set i = universal_sps; i<NUM_NATURAL_SPS; i = natural_schema_parent_set(i+1)) {
-    if (elongation_rate_initialization_model_subset_schemas[i]) {
-      if (i==universal_sps) res += "\nUniversal elongation rate initialization model: ";
-      else { res += "\nSubset '"; res += natural_subset_idstr[i]; res += "' elongation rate initialization model: "; }
-      res += elongation_rate_initialization_model_subset_schemas[i]->report_parameters();
-      if (i==universal_sps) if (!universal_elongation_rate_initialization_model_root.empty()) res += " (contributing models with root "+universal_elongation_rate_initialization_model_root+".)";
-    }
-  }
-  if (!elongation_rate_initialization_model_subset_schemas[universal_sps]) res += "\nUniversal elongation_rate_initialization model: length_distribution";
-#ifdef INCLUDE_SCHEMA_PARENT_SET_PROTOCOL_DIRECTION_MODELS
-  for (natural_schema_parent_set i = universal_sps; i<NUM_NATURAL_SPS; i = natural_schema_parent_set(i+1)) {
-    if (direction_model_subset_schemas[i]) {
-      if (i==universal_sps) res += "\nUniversal direction model: ";
-      else { res += "\nSubset '"; res += natural_subset_idstr[i]; res += "' direction model: "; }
-      res += direction_model_subset_schemas[i]->report_parameters();
-      if (i==universal_sps) if (!universal_direction_model_root.empty()) res += " (contributing models with root "+universal_direction_model_root+".)";
-    }
-  }
-  if (!direction_model_subset_schemas[universal_sps]) res += "\nUniversal direction model: legacy";
-#endif
-  for (natural_schema_parent_set i = universal_sps; i<NUM_NATURAL_SPS; i = natural_schema_parent_set(i+1)) {
-    if (branching_model_subset_schemas[i]) {
-      if (i==universal_sps) res += "\nUniversal branching model: ";
-      else { res += "\nSubset '"; res += natural_subset_idstr[i]; res += "' branching model: "; }
-      res += branching_model_subset_schemas[i]->report_parameters();
-      if (i==universal_sps) if (!universal_branching_model_root.empty()) res += " (contributing models with root "+universal_branching_model_root+".)";
-    }
-  }
-  if (!branching_model_subset_schemas[universal_sps]) res += "\nUniversal branching model: van_Pelt";
-  for (natural_schema_parent_set i = universal_sps; i<NUM_NATURAL_SPS; i = natural_schema_parent_set(i+1)) {
-    if (branch_angle_model_subset_schemas[i]) {
-      if (i==universal_sps) res += "\nUniversal branch angle model: ";
-      else { res += "\nSubset '"; res += natural_subset_idstr[i]; res += "' branch angle model: "; }
-      res += branch_angle_model_subset_schemas[i]->report_parameters();
-      if (i==universal_sps) if (!universal_branch_angle_model_root.empty()) res += " (contributing models with root "+universal_branch_angle_model_root+".)";
-    }
-  }
-  if (!branch_angle_model_subset_schemas[universal_sps]) res += "\nUniversal branch angle model: balanced_forces";
+  if (!elongation_rate_initialization_model_region_subset_schemas[0][universal_sps]) res += "\nUniversal elongation_rate_initialization model: length_distribution";
+  if (!direction_model_region_subset_schemas[0][universal_sps]) res += "\nUniversal direction model: radial";
+  if (!branching_model_region_subset_schemas[0][universal_sps]) res += "\nUniversal branching model: van_Pelt";
+  if (!branch_angle_model_region_subset_schemas[0][universal_sps]) res += "\nUniversal branch angle model: balanced_forces";
   res += '\n';
+
   res += "Lowest threshold strength at which abstract connections are shown (when drawn): " + String(figattr_connections_threshold,"%.3f\n");
   if (figattr_connections_thresholdlist) {
     res += "Using list of thresholds in abstract connection figures: ";
@@ -399,6 +445,32 @@ void neuron::abstract_connections() {
   abstracted_connections = true;
 }
 
+void neuron::move(spatial & pos) {
+  // Recenter a neuron on pos.
+  spatial addvec(pos);
+  addvec -= P;
+  P = pos; // move the soma center
+  PLL_LOOP_FORWARD(fibre_structure,inputstructure.head(),1) e->move_add(addvec);
+  PLL_LOOP_FORWARD(fibre_structure,outputstructure.head(),1) e->move_add(addvec);
+  PLL_LOOP_FORWARD(connection,outputconnections.head(),1) {
+    PLL_LOOP_FORWARD_NESTED(synapse,e->Synapses()->head(),1,s) {
+      s->move_add(addvec);
+    }
+  }
+}
+
+void neuron::fanin_rot() {
+  net_fanin_histogram.collect=(statsattr_fan_in_analysis==dendrite_fs);
+  PLL_LOOP_FORWARD(fibre_structure,inputstructure.head(),1) e->fanin_rot();
+  net_fanin_histogram.collect=(statsattr_fan_in_analysis==axon_fs);
+  PLL_LOOP_FORWARD(fibre_structure,outputstructure.head(),1) e->fanin_rot();
+  PLL_LOOP_FORWARD(connection,outputconnections.head(),1) {
+    PLL_LOOP_FORWARD_NESTED(synapse,e->Synapses()->head(),1,s) {
+      s->fanin_rot();
+    }
+  }
+}
+
 Fig_Object * neuron::net_Fig() {
   /* Documentation:
      The parameter "figattr_box_fibre_independently" allows fibre that is
@@ -439,7 +511,7 @@ Fig_Object * neuron::net_Fig() {
     } else {
       PLL_LOOP_FORWARD(connection,outputconnections.head(),1) if (e->PostSynaptic()->fig_postsyn_is_visible()) connections_fig->Add_Fig_Object(e->net_Fig());
     }
-    if (fig_report_depth()) cout << "Reported Connections Depth = " << _figvar_connection_depth << '\n';
+    if (fig_report_depth()) progress("Reported Connections Depth = "+String((long) _figvar_connection_depth)+'\n');
     _figvar_connection_depth--; if (_figvar_connection_depth<10) _figvar_connection_depth = 997;
   }
   //cout << '1'; cout.flush();
@@ -494,28 +566,66 @@ Txt_Object * neuron::net_Txt() {
   (*Txt_neuronlist) += String(Txt_neuronindex);
   (*Txt_neuronlist) += ',';
   (*Txt_neuronlist) += String((long) this);
+  (*Txt_neuronlist) += ',';
+  (*Txt_neuronlist) += neuron_short_name[TypeID()];
+  (*Txt_neuronlist) += ',';
+  int regnum = -1;
+  if (eq) regnum = eq->Net()->Regions().find(*this);
+  if (regnum>=0) (*Txt_neuronlist) += eq->Net()->Regions().el(regnum)->Name();
+  else (*Txt_neuronlist) += "universal";
   double x=0.0, y=0.0, z=0.0;
   P.get_all(x,y,z);
   (*Txt_neuronlist) += String(x,",%f");
   (*Txt_neuronlist) += String(y,",%f");
   (*Txt_neuronlist) += String(z,",%f\n");
+  progress(" synapses (");
   if (outputconnections.head()) {
     PLL_LOOP_FORWARD(connection,outputconnections.head(),1) {
       PLL_LOOP_FORWARD_NESTED(synapse,e->Synapses()->head(),1,s) s->net_Txt();
+      progress("*");
     }
   }
   if (outattr_track_nodegenesis) {
+    progress(") structure(");
     parsing_fs_type = dendrite_fs;
     PLL_LOOP_FORWARD(fibre_structure,inputstructure.head(),1) e->net_Txt();
+    progress("dendrites,");
     parsing_fs_type = axon_fs;
     PLL_LOOP_FORWARD(fibre_structure,outputstructure.head(),1) e->net_Txt();
-  }
+    progress("axons)\n");
+  } else progress(")\n");
   Txt_neuronindex++;
   return NULL;
 }
 
+VRML_Object * neuron::net_VRML() {
+  if (fig_in_zoom(P)) {
+    (*VRML_neuronlist) += "<Transform translation='";
+    double x=0.0, y=0.0, z=0.0;
+    P.get_all(x,y,z);
+    (*VRML_neuronlist) += String(x,"%.2f");
+    (*VRML_neuronlist) += String(y," %.2f");
+    (*VRML_neuronlist) += String(z," %.2f");
+    (*VRML_neuronlist) += "'>\n<ProtoInstance name='Soma'>\n";
+    (*VRML_neuronlist) += "</ProtoInstance>\n</Transform>\n";
+  } else if (!figattr_box_fibre_independently) return NULL;
+  // [***INCOMPLETE] Continue implementing below.
+  //if (outputconnections.head()) {
+  //  PLL_LOOP_FORWARD(connection,outputconnections.head(),1) {
+  //    PLL_LOOP_FORWARD_NESTED(synapse,e->Synapses()->head(),1,s) s->net_VRML();
+  //  }
+  //}
+  parsing_fs_type = dendrite_fs;
+  PLL_LOOP_FORWARD(fibre_structure,inputstructure.head(),1) e->net_VRML();
+  parsing_fs_type = axon_fs;
+  PLL_LOOP_FORWARD(fibre_structure,outputstructure.head(),1) e->net_VRML();
+  VRML_neuronindex++;
+  return NULL;
+}
+
+#ifdef VECTOR3D
 void neuron::net_Slice(Slice * slice) { // [***INCOMPLETE] Change the return type.
-  // Efficiency: Determine which spatial segments contain or intersect with a slice. Determine which fiber segments
+  // Efficiency: Determine which spatial segments are contained in or intersect with a slice. Determine which fiber segments
   // belong to those spatial segments. For those fiber segments, call net_Slice().
   // [***INCOMPLETE] Within slices, draw neurons, call net_Slice() for fibers.
   // [***NOTE} I am implementing this in 2 steps: (1) I implement calling all fibers and having them test for intersection with slices,
@@ -532,10 +642,36 @@ void neuron::net_Slice(Slice * slice) { // [***INCOMPLETE] Change the return typ
     R=(long) (figscale*radius); if (R==0) R = 1;
     neuron_fig = new Fig_Soma(0,1,color,7,998,-1,0.0,0.0,X,Y,R,X,Y,X+150,Y+75); // ,9,20
   }
-#endif
   // B. Collect presynaptic and postsynaptic fiber objects.
+  Fig_Group * postsynaptic_structures_fig = NULL;
+  if (inputstructure.head()) {
+    postsynaptic_structures_fig = new Fig_Group();
+    PLL_LOOP_FORWARD(fibre_structure,inputstructure.head(),1) postsynaptic_structures_fig->Add_Fig_Object(e->net_Slice());
+    _figvar_connection_depth--; if (_figvar_connection_depth<10) _figvar_connection_depth = 997;
+  }
+  Fig_Group * presynaptic_structures_fig = NULL;
+  if (inputstructure.head()) {
+    presynaptic_structures_fig = new Fig_Group();
+    PLL_LOOP_FORWARD(fibre_structure,outputstructure.head(),1) presynaptic_structures_fig->Add_Fig_Object(e->net_Slice());
+    _figvar_connection_depth--; if (_figvar_connection_depth<10) _figvar_connection_depth = 997;
+  }
+#endif
   // C. Collect synapse objects.
   // Combine all the objects and return them.
+}
+#endif
+
+void principal::parse_CLP(Command_Line_Parameters & clp) {
+  // Note: Facilities for setting the parameters of individual neurons, as well as of all pyramidal neurons can be implemented here.
+  // [***INCOMPLETE] Ideally, this should be settable per region label and per structure, i.e. basal dendrites, apical dendrites and axons.
+  int n;
+  neuron_type nt = this->TypeID();
+  if ((n=clp.Specifies_Parameter(String(neuron_short_name[nt])+".min_basal"))>=0) min_basal[nt] = atoi(clp.ParValue(n));
+  if ((n=clp.Specifies_Parameter(String(neuron_short_name[nt])+".max_basal"))>=0) max_basal[nt] = atoi(clp.ParValue(n));
+  if ((n=clp.Specifies_Parameter(String(neuron_short_name[nt])+".basal.minangle"))>=0) min_angle[nt] = atof(clp.ParValue(n));
+  if ((n=clp.Specifies_Parameter(String(neuron_short_name[nt])+".basal.maxangle"))>=0) max_angle[nt] = atof(clp.ParValue(n));
+  if ((n=clp.Specifies_Parameter(String(neuron_short_name[nt])+".basal.force_model"))>=0) for (int i = 0; i < (int) NUM_bfm; i++) if (downcase(clp.ParValue(n))==bfmstr[i]) { bfm = (basal_force_model) i; break; }
+  // Specific to this neuron:
 }
 
 void multipolar_nonpyramidal::surface_division_basal_force_model(int numpoles, double mintotlength, double maxtotlength, double minangle, double maxangle, const spatial & rc, bool isinputstructure, int _typeid) {
@@ -560,8 +696,8 @@ void multipolar_nonpyramidal::surface_division_basal_force_model(int numpoles, d
 	  double dotp = S1array[j]*S1array[i]; // and they all have length 1.0
 	  if (acos(dotp)<minsepangle) { acceptinit = false; break; };
 	}
-	if ((!acceptinit) && (cnt>100)) {
-	  cout << "Warning - unable to place arbors at desired minimum angular separation.\n";
+	if ((!acceptinit) && (cnt>500)) {
+	  warning("Warning: Unable to place arbors at desired minimum angular separation.\n  Affected neuron type: "+String(neuron_type_name[TypeID()])+", neuron ID:"+String((long) numerical_ID())+", angle constraints: ["+String(minangle,"%.3f,")+String(maxangle,"%.3f")+"], number of arbors: "+String((long) numpoles)+".\n");
 	  break;
 	}
       } while (!acceptinit);
@@ -582,7 +718,7 @@ void multipolar_nonpyramidal::surface_division_basal_force_model(int numpoles, d
       acoords.set_X(radius);
 #endif
 #ifdef VECTOR2D
-      cout << "Warning - surface division BFM is not yet implemented for 2D\n";
+      warning("Warning: Surface division BFM is not yet implemented for 2D\n");
       double anglespread = maxangle - minangle;
       double randomangle = anglespread*((2.0*X_misc.get_rand_real1()) - 1.0); // +/- random angle
       if (randomangle<0.0) randomangle -= minangle; // negative random between minangle and maxangle
@@ -640,8 +776,10 @@ void multipolar_nonpyramidal::initialize_multiple_poles_common(double mintotleng
       // maxangleadd = minangleadd;
       // minangleadd -= (multipolar_initangledevratio*minangleadd);
       // maxangleadd += (multipolar_initangledevratio*maxangleadd);
+#ifdef DIVIDE_INITLENGTHS_OVER_ARBORS
       double dnumpoles = (double) numpoles;
       mintotlength /= dnumpoles; maxtotlength /= dnumpoles;
+#endif
 #ifdef VECTOR3D
       double sinphi(sin(rc.Z())), cosphi(cos(rc.Z()));
       double sintheta(sin(rc.Y())), costheta(cos(rc.Y()));
@@ -702,6 +840,19 @@ void multipolar_nonpyramidal::initialize_multipolar_output_structure(double mint
   initialize_multiple_poles_common(mintotlength,maxtotlength,numpoles,minangle,maxangle,rc,0.0,false);
 }
 
+/*! \brief Initialization of dendrite root nodes and root fiber segments.
+
+    This function calls the general root node placement function initialize_multiple_poles_common(),
+    which uses the minangle and maxangle parameters when allocating 2 or more fiber structure roots,
+    but uses a single maxdev parameter when allocating one fiber structure root near a regioncenter
+    vector rc. In this case, the maxdev parameter is 0.0 in the call, which means that any single
+    dendrite (e.g. an apical dendrite) will be placed along a vector rc that is random or specified.
+    In the case of an apical dendrite, this particular function is only called if the flags
+    apical_specified_overrides_centroid and use_specified_basal_direction are both set. Then the
+    vector rc is negated, so that the apical dendrite is placed exaclty along the opposite direction
+    of the specified basal direction. This option removes all variability from the initial direction
+    of apical root fiber segments.    
+ */
 void multipolar_nonpyramidal::initialize_multipolar_input_structure(double mintotlength, double maxtotlength, int numpoles, double minangle, double maxangle, int _typeid) {
   // _typeid may be used during postsynaptic_structure initialization.
   spatial rc(radius,0.0,0.0);
@@ -713,6 +864,11 @@ void multipolar_nonpyramidal::initialize_multipolar_input_structure(double minto
 #ifdef VECTOR3D
     rc.set_Z(specified_basal_direction_phi);
 #endif
+    if (_typeid==ALL_APICAL_PYRAMIDAL_DENDRITES_AEM) { // you only end up here if apical_specified_overrides_centroid==true
+      rc.convert_from_spherical();
+      rc.Negate();
+      rc.convert_to_spherical();
+    }
   }
   initialize_multiple_poles_common(mintotlength,maxtotlength,numpoles,minangle,maxangle,rc,0.0,true,_typeid);
 }
@@ -743,29 +899,75 @@ void multipolar_nonpyramidal::initialize_multipolar_input_structure(double minto
 }
 
 void multipolar_nonpyramidal::initialize_output_structure(double mintotlength, double maxtotlength) {
-  int numpoles = X_misc.get_rand_range(multipolar_axon_mintrees,multipolar_axon_maxtrees);
-  initialize_multipolar_output_structure(mintotlength,maxtotlength,numpoles,0.0,2.0*M_PI);
+  int numpoles = X_misc.get_rand_range(1,max_axons[TypeID()]);
+  if (inputstructure.tail()) {
+    spatial cg;
+    inputstructure.head()->center_of_gravity(cg);
+    cg -= P;
+    cg.Negate();
+    cg += P;
+    initialize_multipolar_output_structure(mintotlength,maxtotlength,numpoles,0.0,0.1*M_PI,cg,multipolartreesmaxdeviation);
+  } else initialize_multipolar_output_structure(mintotlength,maxtotlength,numpoles,0.0,2.0*M_PI);
 }
 
 void multipolar_nonpyramidal::initialize_input_structure(double mintotlength, double maxtotlength) {
-  int numpoles = X_misc.get_rand_range(multipolar_mintrees,multipolar_maxtrees);
-  initialize_multipolar_input_structure(mintotlength,maxtotlength,numpoles,0.0,2.0*M_PI);
+  int numpoles = X_misc.get_rand_range(min_basal[TypeID()],max_basal[TypeID()]);
+  initialize_multipolar_input_structure(mintotlength,maxtotlength,numpoles,min_angle[TypeID()],max_angle[TypeID()]);
 }
 
-void pyramidal::parse_CLP(Command_Line_Parameters & clp) {
+void multipolar_nonpyramidal::parse_CLP(Command_Line_Parameters & clp) {
   // Note: Facilities for setting the parameters of individual neurons, as well as of all pyramidal neurons can be implemented here.
+  // [***INCOMPLETE] Ideally, this should be settable per region label and per structure, i.e. basal dendrites, apical dendrites and axons.
+  principal::parse_CLP(clp);
   int n;
-  // All pyramidal neurons:
-  pyramidal_min_basal = PYRAMIDAL_MIN_BASAL;
-  pyramidal_max_basal = PYRAMIDAL_MAX_BASAL;
-  if ((n=clp.Specifies_Parameter("pyramidal.min_basal"))>=0) pyramidal_min_basal = atoi(clp.ParValue(n));
-  if ((n=clp.Specifies_Parameter("pyramidal.max_basal"))>=0) pyramidal_max_basal = atoi(clp.ParValue(n));
-  pyramidal_basal_minangle = PYRAMIDAL_BASAL_MINANGLE;
-  pyramidal_basal_maxangle = PYRAMIDAL_BASAL_MAXANGLE;
-  if ((n=clp.Specifies_Parameter("pyramidal.basal.minangle"))>=0) pyramidal_basal_minangle = atof(clp.ParValue(n));
-  if ((n=clp.Specifies_Parameter("pyramidal.basal.maxangle"))>=0) pyramidal_basal_maxangle = atof(clp.ParValue(n));
-  if ((n=clp.Specifies_Parameter("pyramidal.basal.force_model"))>=0) for (int i = 0; i < (int) NUM_bfm; i++) if (downcase(clp.ParValue(n))==bfmstr[i]) { bfm = (basal_force_model) i; break; }
-  // Specific to this pyramidal neuron:
+  neuron_type nt = TypeID();
+  if ((n=clp.Specifies_Parameter(String(neuron_short_name[nt])+".max_axons"))>=0) max_axons[nt] = atoi(clp.ParValue(n));
+  // Specific to this neuron:
+}
+
+void bipolar::initialize_output_structure(double mintotlength, double maxtotlength) {
+  int numpoles = 1;
+  double maxangle = M_PI/2.0;
+  double maxdeviation = bipolartreesmaxdeviation;
+  if (!random_orientation) {
+    maxangle = random_orientation_amplitude;
+    maxdeviation = random_orientation_amplitude;
+  }
+  if (inputstructure.tail()) {
+    spatial cg;
+    if (pia_attraction_repulsion_hypothesis) {
+      cg = inputstructure.tail()->P0;
+      cg -= P; // relative to neuron center
+      cg.Negate();
+      cg += P;
+    } else {
+      inputstructure.head()->center_of_gravity(cg);
+    }
+    initialize_multipolar_output_structure(mintotlength,maxtotlength,numpoles,0.0,maxangle,cg,maxdeviation);
+  } else initialize_multipolar_output_structure(mintotlength,maxtotlength,numpoles,0.0,maxangle);
+}
+
+void bipolar::initialize_input_structure(double mintotlength, double maxtotlength) {
+  // A bipolar cell typically has one axon and one dendrite extending at opposite
+  // ends.
+  int numbasal = X_misc.get_rand_range(min_basal[TypeID()],max_basal[TypeID()]);
+#ifdef DIVIDE_INITLENGTHS_OVER_ARBORS
+  mintotlength /= (double) (numbasal+1);
+  maxtotlength /= (double) (numbasal+1);
+#endif
+  double maxangle = 0.1*M_PI;
+  double maxdeviation = bipolartreesmaxdeviation;
+  if (!random_orientation) {
+    maxangle = random_orientation_amplitude;
+    maxdeviation = random_orientation_amplitude;
+  }
+  if (outputstructure.tail()) { // axon was placed first
+    spatial cg;
+    outputstructure.head()->center_of_gravity(cg);
+    initialize_multipolar_input_structure(mintotlength,maxtotlength,numbasal,min_angle[TypeID()],max_angle[TypeID()],cg,bipolartreesmaxdeviation);
+  } else { // placing dendritic trees first
+    initialize_multipolar_input_structure(mintotlength,maxtotlength,numbasal,min_angle[TypeID()],max_angle[TypeID()]);
+  }
 }
 
 void pyramidal::initialize_output_structure(double mintotlength, double maxtotlength) {
@@ -801,11 +1003,18 @@ void pyramidal::initialize_input_structure(double mintotlength, double maxtotlen
   // code of initialize_multiple_poles_common(), this means that the Apical
   // Dendrite is the last dendritic arbor in the list of input structures
   // (this is accessed as the tail() of the list).
-  int numbasal = X_misc.get_rand_range(pyramidal_min_basal,pyramidal_max_basal);
+  int numbasal = X_misc.get_rand_range(min_basal[TypeID()],max_basal[TypeID()]);
+#ifdef DIVIDE_INITLENGTHS_OVER_ARBORS
   double mintotapicallength = mintotlength / ((double) (numbasal+1));
   double mintotbasallength = mintotlength - mintotapicallength;
   double maxtotapicallength = maxtotlength / ((double) (numbasal+1));
   double maxtotbasallength = maxtotlength - maxtotapicallength;
+#else
+  double mintotapicallength = mintotlength;
+  double mintotbasallength = mintotlength;
+  double maxtotapicallength = maxtotlength;
+  double maxtotbasallength = maxtotlength;
+#endif
   double maxangle = 0.1*M_PI;
   double maxdeviation = pyramidaltreesmaxdeviation;
   if (!random_orientation) {
@@ -816,9 +1025,7 @@ void pyramidal::initialize_input_structure(double mintotlength, double maxtotlen
     spatial cg;
     outputstructure.head()->center_of_gravity(cg);
     // 1. initializing the basal dendritic region
-    // note: mintotlength and maxtotlength are divided by the number of
-    // basal dendrites to determine the initial length
-    initialize_multipolar_input_structure(mintotbasallength,maxtotbasallength,numbasal,pyramidal_basal_minangle,pyramidal_basal_maxangle,cg,pyramidaltreesmaxdeviation);
+    initialize_multipolar_input_structure(mintotbasallength,maxtotbasallength,numbasal,min_angle[TypeID()],max_angle[TypeID()],cg,pyramidaltreesmaxdeviation);
     // 2. initializing the apical dendrite
     if (!pia_attraction_repulsion_hypothesis) inputstructure.head()->center_of_gravity(cg); // prioretize center of gravity of basal dendritic trees
     cg -= P;
@@ -827,16 +1034,17 @@ void pyramidal::initialize_input_structure(double mintotlength, double maxtotlen
     initialize_multipolar_input_structure(mintotapicallength,maxtotapicallength,1,0.0,maxangle,cg,maxdeviation,ALL_APICAL_PYRAMIDAL_DENDRITES_AEM);
   } else { // placing dendritic trees first
     // 1. initializing the basal dendritic region
-    // note: mintotlength and maxtotlength are divided by the number of
-    // basal dendrites to determine the initial length
-    initialize_multipolar_input_structure(mintotbasallength,maxtotbasallength,numbasal,pyramidal_basal_minangle,pyramidal_basal_maxangle);
+    initialize_multipolar_input_structure(mintotbasallength,maxtotbasallength,numbasal,min_angle[TypeID()],max_angle[TypeID()]);
     // 2. initializing the apical dendrite
-    spatial cg;
-    inputstructure.head()->center_of_gravity(cg);
-    cg -= P;
-    cg.Negate();
-    cg += P;
-    initialize_multipolar_input_structure(mintotapicallength,maxtotapicallength,1,0.0,maxangle,cg,maxdeviation,ALL_APICAL_PYRAMIDAL_DENDRITES_AEM);
+    if ((use_specified_basal_direction) && (apical_specified_overrides_centroid)) initialize_multipolar_input_structure(mintotapicallength,maxtotapicallength,1,0.0,maxangle,ALL_APICAL_PYRAMIDAL_DENDRITES_AEM);
+    else {
+      spatial cg;
+      inputstructure.head()->center_of_gravity(cg);
+      cg -= P;
+      cg.Negate();
+      cg += P;
+      initialize_multipolar_input_structure(mintotapicallength,maxtotapicallength,1,0.0,maxangle,cg,maxdeviation,ALL_APICAL_PYRAMIDAL_DENDRITES_AEM);
+    }
   }
 }
 
@@ -854,8 +1062,8 @@ void interneuron::initialize_output_structure(double mintotlength, double maxtot
 }
 
 void interneuron::initialize_input_structure(double mintotlength, double maxtotlength) {
-  int numpoles = X_misc.get_rand_range(2,4);
-  initialize_multipolar_input_structure(mintotlength,maxtotlength,numpoles,0.0,2.0*M_PI);
+  int numpoles = X_misc.get_rand_range(min_basal[TypeID()],max_basal[TypeID()]);
+  initialize_multipolar_input_structure(mintotlength,maxtotlength,numpoles,min_angle[TypeID()],max_angle[TypeID()]);
 }
 
 Fig_Object * electrode::net_Fig() {

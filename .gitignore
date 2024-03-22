@@ -1,0 +1,7 @@
+*.o
+*.a
+netmorph
+netmorph2D
+wizard
+nibr
+nibr2D

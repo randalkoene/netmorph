@@ -1,9 +1,43 @@
-A Framework for the Generation of Large Scale Neuronal Networks that is
-based on the Simulated Development of Neuron Morphology and Synaptic
-Connectivity by means of Neurite Growth and Synapse Formation Models
+A Framework for the Generation of Large Scale Neuronal Networks that is based on the Simulated Development of Neuron Morphology and Synaptic Connectivity by means of Neurite Growth and Synapse Formation Models
 
-NNETMORPH
+Randal A. Koene, Andrew R. Carnell
 
-Randal A. Koene
-========================================================================
+Installation Instructions
+=========================
+NETMORPH depends on the GNU system libraries and is written in standard C++, although compilation during development is done only with the g++/gcc GNU C++/C compilers.
+
+1. Extract the package netmorph-YYYYMMDD.tar.gz.
+   (YYYYMMDD specifies the creation date of the package.)
+
+   A directory netmorph-YYYYMMDD will be created that contains
+   the source files of NETMORPH.
+
+2. Run the installation script:
+   ./install.sh
+
+   Successful compilation results in the programs
+   netmorph and netmorph2D.
+
+At this point it is possible to use the netmorph programs to run simulations of network development. In order to perform evaluation of simulation results and to produce graphs of a resulting network and its statistical data. Analysis methods are described in more detail in the complete manual.
+
+
+Quick Start
+===========
+After successful compilation, it is possible to grow single-neuron morphologies or networks of realistic neurons. The program has a large number of parameters that can be set to control the individual neuron's development, as well as 'administrative issues' during simulation. These parameters are all described in the manual that can be obtained in the same location as your netmorph distribution.
+In addition, two example scripts are provided that generate the example morphologies described in the paper Koene et al. 2009 (Figures 8B and 8D). These scripts contain appropriate settings for all parts of the simulation. The scripts can be executed by the following command in the netmorph home directory:
+
+./netmorph include=fig8b
+
+and
+
+./netmorph include=fig8d
+
+respectively. This results in a series of files with prefix fig8b, followed by the timestamp, and then a description of the various outputs. You can investigate the effect of changing the various parameters by looking at changes in the output statistics. The manual describes more advanced ways of inspecting the output.
+
+
+Optimization
+============
+Various compilers, operating systems and processor architectures allow for optimization of the program at compile time through the use of compiler flags. For reasons of maximal support, these flags have been omitted from the current makefiles.
+
+Once performance becomes an issue, it is advisable to recompile netmorph after setting the parameter MACHOPT. Example settings (for -march, -mtune and -mfpmath) are commented in the current Makefile.
 

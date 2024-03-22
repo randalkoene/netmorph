@@ -44,6 +44,8 @@ const char stat_labels_str[STAT_LABELS_NUM][30] = {
   "Alengthbetweenbifurcations",
   "Dtermlensincebifurcation",
   "Atermlensincebifurcation",
+  "Dtermlensincesoma",
+  "Atermlensincesoma",
   "Dturnsbetweenbifurcations",
   "Aturnsbetweenbifurcations",
   "Dbranchangles",
@@ -67,6 +69,8 @@ const char stat_labels_str[STAT_LABELS_NUM][30] = {
 };
 
 const bool stat_is_static[STAT_LABELS_NUM] = {
+  false,
+  false,
   false,
   false,
   false,
@@ -140,6 +144,11 @@ String network_statistics_set::report_parameters() {
 
 network_statistics_base::network_statistics_base(): collect_statistics(true) {
   for (int i = 0; i < STAT_LABELS_NUM; i++) netstats[i].label = stat_labels_str[i];
+  // [***INCOMPLETE] THIS IS TEMPORARY! Since seven micron angles are not yet
+  // measured, we turn off the collection of those statistics by default:
+  netstats[dendrites_seven_micron_branch_angles].collect = false;
+  netstats[axons_seven_micron_branch_angles].collect = false;
+  // -------------------
   Allocate_New_Data();
 }
 
@@ -187,14 +196,13 @@ void network_statistics_base::Cache_Tail_Statistics() {
 
 void network_statistics_base::Remove_Tail_Raw_Data(bool evenstatic) {
   for (int i = 0; i<STAT_LABELS_NUM; i++)
-    if (evenstatic || (!stat_is_static[i])) netstats[i].tail()->Raw_Data().clear();
+    if (evenstatic || (!stat_is_static[i])) if (netstats[i].tail()) netstats[i].tail()->Raw_Data().clear();
 }
 
 void network_statistics_base::Octave_Output(String filename, bool autoplot) {
   String filebase(filename.before('.',-1));
   if (filebase.empty()) filebase = filename;
-  cout << "Creating Octave file for statistics: "<< filename << '\n';
-  cout.flush();
+  progress("Creating Octave file for statistics: "+filename+'\n');
   String s("#! /usr/bin/octave\n# Randal A. Koene\n# nibr statistics output\n\n# LOADPATH=[LOADPATH,':',system('printf $HOME',1),'/octave/common-m//'];\n\n# Statistical data of simulated network development\n\nT = [\n");
   PLL_LOOP_FORWARD(network_statistics_sample,netstats[0].head(),1) s += String(e->age()/(24.0*60.0*60.0),"%.3f\n");
   s += "];\nDarborssampled = [\n";
@@ -286,11 +294,10 @@ void Network_Generated_Statistics::add_dendrites_axons_intermediate_lengths(doub
 void Network_Generated_Statistics::Octave_Output(String filename, bool autoplot) {
   String filebase(filename.before('.',-1));
   if (filebase.empty()) filebase = filename;
-  cout << "Creating Octave file for statistics: "<< filename << '\n';
-  cout.flush();
+  progress("Creating Octave file for statistics: "+filename+'\n');
   String s("#! /usr/bin/octave\n# Randal A. Koene\n# nibr statistics output\n\n# LOADPATH=[LOADPATH,':',system('printf $HOME',1),'/octave/common-m//'];\n\n# Statistical data of simulated network development\n\nT=[");
   for (int i=0; i<=arrayindex; i++) s += String(t(i)/(24.0*60.0*60.0),"%.3f\n");
-  cout << "6"; cout.flush();
+  //cout << "6"; cout.flush();
   s[s.length()-1] = ']'; s += ";\nDarborssampled = [";
   for (int i=0; i<=arrayindex; i++) s += String(Dendrites_Arbors(i),"%.7f\n");
   s[s.length()-1] = ']'; s += ";\nAarborssampled = [";
@@ -303,31 +310,31 @@ void Network_Generated_Statistics::Octave_Output(String filename, bool autoplot)
   for (int i=0; i<=arrayindex; i++) s += String(get_value(arrayofdendritelength,i),"%.7f ") + String(get_value(arrayofdendritelengthstd,i),"%.7f ") + String(get_value(arrayofdendritelengthmin,i),"%.7f ") + String(get_value(arrayofdendritelengthmax,i),"%.7f\n");
   s[s.length()-1] = ']'; s += ";\nAlength = [";
   for (int i=0; i<=arrayindex; i++) s += String(get_value(arrayofaxonlength,i),"%.7f ") + String(get_value(arrayofaxonlengthstd,i),"%.7f ") + String(get_value(arrayofaxonlengthmin,i),"%.7f ") + String(get_value(arrayofaxonlengthmax,i),"%.7f\n");
-  cout << "7"; cout.flush();
+  //cout << "7"; cout.flush();
   s[s.length()-1] = ']'; s += ";\nDterminallength = [";
   for (int i=0; i<=arrayindex; i++) s += String(get_value(arrayofdendriteterminallength,i),"%.7f ") + String(get_value(arrayofdendriteterminallengthstd,i),"%.7f ") + String(get_value(arrayofdendriteterminallengthmin,i),"%.7f ") + String(get_value(arrayofdendriteterminallengthmax,i),"%.7f\n");
   s[s.length()-1] = ']'; s += ";\nAterminallength = [";
-  cout << "A"; cout.flush();
+  //cout << "A"; cout.flush();
   for (int i=0; i<=arrayindex; i++) s += String(get_value(arrayofaxonterminallength,i),"%.7f ") + String(get_value(arrayofaxonterminallengthstd,i),"%.7f ") + String(get_value(arrayofaxonterminallengthmin,i),"%.7f ") + String(get_value(arrayofaxonterminallengthmax,i),"%.7f\n");
   s[s.length()-1] = ']'; s += ";\nDtermsegsperarbor = [";
-  cout << "B"; cout.flush();
+  //cout << "B"; cout.flush();
   for (int i=0; i<=arrayindex; i++) s += String(get_value(arrayofdendritesmean_nt,i),"%.7f ") + String(get_value(arrayofdendritesstd_nt,i),"%.7f ") + String(get_value(arrayofdendritesmin_nt,i),"%.7f ") + String(get_value(arrayofdendritesmax_nt,i),"%.7f\n");
   s[s.length()-1] = ']'; s += ";\nAtermsegsperarbor = [";
   for (int i=0; i<=arrayindex; i++) s += String(get_value(arrayofaxonsmean_nt,i),"%.7f ") + String(get_value(arrayofaxonsstd_nt,i),"%.7f ") + String(get_value(arrayofaxonsmin_nt,i),"%.7f ") + String(get_value(arrayofaxonsmax_nt,i),"%.7f\n");
-  cout << "C"; cout.flush();
+  //cout << "C"; cout.flush();
   s[s.length()-1] = ']'; s += ";\nDintermediatelength = [";
   for (int i=0; i<=arrayindex; i++) s += String(get_value(arrayofdendriteintermediatelength,i),"%.7f ") + String(get_value(arrayofdendriteintermediatelengthstd,i),"%.7f ") + String(get_value(arrayofdendriteintermediatelengthmin,i),"%.7f ") + String(get_value(arrayofdendriteintermediatelengthmax,i),"%.7f\n");
   s[s.length()-1] = ']'; s += ";\nAintermediatelength = [";
-  cout << "D"; cout.flush();
+  //cout << "D"; cout.flush();
   for (int i=0; i<=arrayindex; i++) s += String(get_value(arrayofaxonintermediatelength,i),"%.7f ") + String(get_value(arrayofaxonintermediatelengthstd,i),"%.7f ") + String(get_value(arrayofaxonintermediatelengthmin,i),"%.7f ") + String(get_value(arrayofaxonintermediatelengthmax,i),"%.7f\n");
   s[s.length()-1] = ']'; s += ";\n\
 \n";
   s += "filebase = \""+filebase+"\";\n";
-  cout << "8"; cout.flush();
+  //cout << "8"; cout.flush();
   if (autoplot) s += "autoplot = 1;\n";
   else s += "autoplot = 0;\n";
   if (autoplot) Octave_Autoplot(s,filebase);
-  cout << "9"; cout.flush();
+  //cout << "9"; cout.flush();
   write_file_from_String(filename,s);
 }
 

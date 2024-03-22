@@ -54,6 +54,8 @@ protected:
   int usedbyNsynapses; // counts how many synapses use this structure definition
 public:
   synapse_structure(fibre_segment & a, fibre_segment & d): axonsegment(&a), dendritesegment(&d), usedbyNsynapses(0) {}
+  void move_add(spatial & addvec);
+  void fanin_rot();
   Fig_Object * net_Fig();
   void require() { usedbyNsynapses++; }
   void release() { usedbyNsynapses--; if (usedbyNsynapses<=0) delete this; }

@@ -31,6 +31,7 @@
 #include "neuron.hh"
 #include "network.hh"
 #include "spatial.hh"
+#include "global.hh"
 
 // constants
 
@@ -64,7 +65,7 @@ void spherical_boundary::parse_CLP(Command_Line_Parameters & clp) {
     else {
       neuron * nptr = static_cast<PLLRoot<neuron> *>(eq->Net())->el(atoi(clp.ParValue(n)));
       if (nptr) center = nptr->Pos();
-      else cout << "Parameter ERROR, " << thislabel << ".spherical_center: Neuron index " << clp.ParValue(n) << " does not exist in network.\n";
+      else warning("Parameter ERROR, "+thislabel+".spherical_center: Neuron index "+clp.ParValue(n)+" does not exist in network.\n");
     }
   }
   if ((n=clp.Specifies_Parameter(thislabel+".spherical_centerX"))>=0) center.set_X(atof(clp.ParValue(n)));
@@ -200,7 +201,7 @@ void point_attractor::parse_CLP(Command_Line_Parameters & clp) {
     else {
       neuron * nptr = static_cast<PLLRoot<neuron> *>(eq->Net())->el(atoi(clp.ParValue(n)));
       if (nptr) attractor = nptr->Pos();
-      else cout << "Parameter ERROR, " << thislabel << ".attractor_point: Neuron index " << clp.ParValue(n) << " does not exist in network.\n";
+      else warning("Parameter ERROR, "+thislabel+".attractor_point: Neuron index "+clp.ParValue(n)+" does not exist in network.\n");
     }
   }
   if ((n=clp.Specifies_Parameter(thislabel+".attractor_pointX"))>=0) attractor.set_X(atof(clp.ParValue(n)));

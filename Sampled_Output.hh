@@ -60,6 +60,25 @@ class neuron;
 
 class network; // forward declaration resolved in network.hh
 
+#define FANIN_ANGLE_SLICE (M_PI/50.0)
+struct fanin_histogram {
+  // one bar per 3.6 degrees, i.e. 50 in a half circle
+  unsigned long n[50];
+  double len[50];
+  bool collect;
+  fanin_histogram(): collect(false) {
+    for (int i = 0; i<50; i++) {
+      n[i] = 0;
+      len[i] = 0.0;
+    }
+  }
+  void means() {
+    for (int i = 0; i<50; i++) if (n[i]>1) len[i] /= (double) n[i];
+  }
+  String octave_output();
+  Fig_Group * fig_output();
+};
+
 class Sampled_Output: public CLP_Modifiable {
 protected:
   network * net;
@@ -96,6 +115,7 @@ class Sampled_Growth_Output: public Sampled_Output
 {
 protected:
   // *** (inherited instead) Network_Generated_Statistics collect_statistics;
+  String Txtname;
   String statsname;
   bool autoplot;
 #ifdef SAMPLES_INCLUDE_NETWORK_STATISTICS_BASE
@@ -105,7 +125,7 @@ protected:
   bool synapsesearchprofile; // 0 = no, 1 = at end of simulation, 2 = every sample
   bool synapsegenesisandloss; // 0 = no, 1 = at end of simulation, 2 = every sample
 public:
-  Sampled_Growth_Output(network * netptr, double mt, double si, String sn, bool ap = false, bool std = false): Sampled_Output(netptr,mt,si,std), statsname(sn), autoplot(ap)
+  Sampled_Growth_Output(network * netptr, double mt, double si, String tn, String sn, bool ap = false, bool std = false): Sampled_Output(netptr,mt,si,std), Txtname(tn), statsname(sn), autoplot(ap)
 #ifdef SAMPLES_INCLUDE_NETWORK_STATISTICS_BASE
 													       , store_raw_data(false)
 #endif
@@ -143,7 +163,7 @@ protected:
   double zoomdepth;
   String combinetype;
 public:
-  Sampled_Growth_Fig_Output(network * netptr, double mt, double si, String sn, bool ap, String fn, double fw, bool c = false, bool ar = false, bool std = false): Sampled_Growth_Output(netptr,mt,si,sn,ap,std), figname(fn), figwidth(fw), combinemagnification(1.0), combine(c), autorotatesequence(ar), netfigidx(0), topleftx(INT_MAX), toplefty(INT_MAX), bottomrightx(INT_MIN), bottomrighty(INT_MIN), zoomdisttoedge(-1.0), zoomwidth(-1.0), zoomheight(-1.0), zoomdepth(-1.0), combinetype("gif") {
+  Sampled_Growth_Fig_Output(network * netptr, double mt, double si, String tn, String sn, bool ap, String fn, double fw, bool c = false, bool ar = false, bool std = false): Sampled_Growth_Output(netptr,mt,si,tn,sn,ap,std), figname(fn), figwidth(fw), combinemagnification(1.0), combine(c), autorotatesequence(ar), netfigidx(0), topleftx(INT_MAX), toplefty(INT_MAX), bottomrightx(INT_MIN), bottomrighty(INT_MIN), zoomdisttoedge(-1.0), zoomwidth(-1.0), zoomheight(-1.0), zoomdepth(-1.0), combinetype("gif") {
     sequencedelay = 2500/numsamples; // default total simulation time 25 seconds
 #ifdef VECTOR3D
     if (autorotatesequence) spat_pres->set_rotate_speed(numsamples);
@@ -165,7 +185,7 @@ public:
   virtual ~Activity_Results_Output() { if (!postop_done) postop(); }
   virtual void spike(neuron * n, double t);
   virtual void psp(neuron * pre, neuron * post, double t);
-  virtual void postop() { cout << "Activity simulation completed.\n"; postop_done = true; }
+  virtual void postop() { progress("Activity simulation completed.\n"); postop_done = true; }
 };
 
 class ARO_to_File: public Activity_Results_Output {
@@ -200,6 +220,8 @@ bool fig_in_zoom(double x, double y, double z);
 bool fig_in_zoom(const spatial & p);
 
 // global variables
+
+extern fanin_histogram net_fanin_histogram;
 
 extern double figattr_focus_box_x1;
 extern double figattr_focus_box_y1;

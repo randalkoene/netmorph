@@ -38,6 +38,10 @@ extern unsigned long int Fig_output_modified;
 extern long Fig_output_min_excess;
 extern long Fig_output_max_excess;
 
+extern double tex_textwidth;
+extern double figscale;
+extern bool figattr_Fig_rescale;
+
 // definitions
 void XFIG_RANGE_CHECK_INIT();
 String XFIG_RANGE_CHECK_WARNING(String fname, double outwidth);
@@ -63,6 +67,7 @@ public:
   virtual long TopLeftY() { return LONG_MAX; }
   virtual long BottomRightX() { return LONG_MIN; }
   virtual long BottomRightY() { return LONG_MIN; }
+  virtual void rescale(double r) = 0;
 };
 
 class Fig_Header: public Fig_Object {
@@ -71,6 +76,7 @@ protected:
 public:
   Fig_Header(): text("#FIG 3.2\nPortrait\nCenter\nInches\nLetter\n100.00\nSingle\n-2\n1200 2\n") {} // Note: used to be Landscape
   virtual String str() { return text; }
+  virtual void rescale(double r) {}
 };
 
 class Fig_Color: public Fig_Object {
@@ -80,6 +86,7 @@ protected:
 public:
   Fig_Color(long cn, unsigned int cd): colnum(cn), coldef(cd) {}
   virtual String str() { return String("0 "+String(colnum)+" #"+RGBstr(coldef)+'\n'); }
+  virtual void rescale(double r) {}
 };
 
 class Fig_Group: public Fig_Object {
@@ -97,6 +104,7 @@ public:
   virtual long TopLeftY() { return toplefty; }
   virtual long BottomRightX() { return bottomrightx; }
   virtual long BottomRightY() { return bottomrighty; }
+  virtual void rescale(double r);
 };
 
 class Fig_Line: public Fig_Object {
@@ -123,6 +131,7 @@ public:
   virtual long BottomRightY() { if (y1>y2) return y1; return y2; }
   //void set_leftarrow(double thickness, double width, double height) {}
   //void set_rightarrow() {}
+  virtual void rescale(double r);
 };
 
 class Fig_Rectangle: public Fig_Line {
@@ -151,6 +160,7 @@ public:
   virtual long BottomRightY() { return y2; }
   //void set_leftarrow(double thickness, double width, double height) {}
   //void set_rightarrow() {}
+  virtual void rescale(double r);
 };
 
 class Fig_Circle: public Fig_Object {
@@ -174,6 +184,7 @@ public:
   virtual long TopLeftY() { return y-radius; }
   virtual long BottomRightX() { return x+radius; }
   virtual long BottomRightY() { return y+radius; }
+  virtual void rescale(double r);
 };
 
 class Fig_Text: public Fig_Object {
@@ -195,6 +206,7 @@ public:
   virtual long TopLeftY() { return y-((textheight*2)/3); }
   virtual long BottomRightX();
   virtual long BottomRightY() { return y+(textheight/3); }
+  virtual void rescale(double r);
 };
 
 #endif

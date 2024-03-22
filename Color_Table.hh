@@ -55,12 +55,17 @@ public:
 class Color_Table: public CLP_Modifiable {
 protected:
   colorpair ct[CT_ARRAY_SIZE];
+  unsigned int * extracolor;
+  long extracolorsmax; // Note that once non-zero, this does not count from 1
   void init();
 public:
-  Color_Table() { init(); }
+  Color_Table(): extracolor(NULL), extracolorsmax(0) { init(); }
+  ~Color_Table() { if (extracolor) delete[] extracolor; }
   long colnum(color_table_name n) { return ct[n].colnum; }
-  unsigned int coldef(color_table_name n) { return ct[n].coldef; }
-  void set_color(color_table_name n, long cn, unsigned int cd) { ct[n].colnum = cn; ct[n].coldef = cd; }
+  unsigned int coldef(color_table_name n) { return ct[n].coldef; } // from list of named colors
+  unsigned int get_color(long cn); // from list of additional colors
+  void set_color(color_table_name n, long cn, unsigned int cd) { ct[n].colnum = cn; ct[n].coldef = cd; } // list of named colors
+  void set_color(long cn, unsigned int cd); // list of additional colors
   virtual void parse_CLP(Command_Line_Parameters & clp);
   virtual String report_parameters();
   void set_defaults() { init(); }
@@ -70,5 +75,6 @@ public:
 
 extern Color_Table defaultcolortable;
 extern Color_Table * colortable;
+extern long definedcolors;
 
 #endif

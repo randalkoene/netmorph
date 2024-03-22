@@ -28,6 +28,7 @@
 #include <iostream>
 using namespace std;
 #include "Command.hh"
+#include "global.hh"
 
 void Command::parse_command(String cmdstr) {
   remove_whitespace(cmdstr);
@@ -88,12 +89,12 @@ void Command::split_object_command(String & cmdname, String & objname) {
 }
 
 bool Command::cmd_Undefined() {
-  cerr << "nibr ERROR: Undefined command ignored (" << cmd_init_str << ")\n";
+  warning("Warning: Undefined command ignored ("+cmd_init_str+")\n");
   return true;
 }
 
 bool Command::cmd_Exit() {
-  cerr << "Command Script Completed\n";
+  progress("Command Script Completed\n");
   return false;
 }
 

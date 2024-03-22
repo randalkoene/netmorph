@@ -96,6 +96,18 @@
      .nbeta is .ncoronal
      .ngamma is .nsagittal
 
+   The slice definitions also store calculated "inner normals" to each slice surface. These are useful
+   vectors to store, since they are used in many volumetric calculations, such as wether a point lies
+   within a slice volume. Normals are retained for all six surfaces, in case the slice is not a
+   parallelogram. The surface identifiers are derived from vertex identifiers concatenated clockwise
+   from an inner perspective as shown in ~/doc/tex/generation-framework/slice-vertices.fig:
+     SASSPSSPDSAD
+     IASIADIPDIPS
+     SASIASIPSSPS
+     SASSADIADIAS
+     SADSPDIPDIAD
+     SPSIPSIPDSPD
+
    When slice output is generated from by the call in the nibr.cc file, the net->Slice_Output() call
    in turn calls Slice() functions in network, neuron, fibre_structure and other components. To be
    more efficient with fiber and synapses, it does so only for those fibers that lie within Spatial
@@ -112,12 +124,20 @@
 #ifndef __SLICE_HH
 #define __SLICE_HH
 
+#ifdef VECTOR3D
+
 #include "templates.hh"
 #include "Command_Line_Parameters.hh"
 #include "spatial.hh"
 #include "BigString.hh"
 
+#ifndef __FIG_OBJECT_HH
+class Fig_Group;
+#endif
+
 enum slice_vertices { SAD, SAS, SPD, SPS, IAD, IAS, IPD, IPS, NUM_slice_vertices };
+
+enum slice_innernormals { SASSPSSPDSAD, IASIADIPDIPS, SASIASIPSSPS, SASSADIADIAS, SADSPDIPDIAD, SPSIPSIPDSPD, NUM_slice_innernormals };
 
 extern const char slicevertexID[NUM_slice_vertices][4];
 
@@ -129,8 +149,10 @@ protected:
   PLLRoot<Slice> batch; // if there are no connected Slices, then this is a single slice
   String label;
   spatial vertex[NUM_slice_vertices]; // *** Does this need to be dynamic in order to destruct correctly?
+  spatial innernormal[NUM_slice_innernormals]; // *** Does this need to be dynamic in order to destruct correctly?
 protected:
   void set_relative_to(double width, double height, double depth);
+  void inner_normals();
 public:
   Slice(Slice * _parentbatch, long _id, Command_Line_Parameters * clp);
   //Slice(const char * _label, unsigned int _batchsize): batchsize(_batchsize), label(_label) {}
@@ -140,6 +162,7 @@ public:
   Slice * iterator_first();
   Slice * iterator_next();
   bool contains(const spatial & centerpoint, double radius);
+  Fig_Group * Outlines_Fig();
 };
 
 class general_slice_parameters_interface: public CLP_Modifiable, public Slice {
@@ -148,14 +171,19 @@ class general_slice_parameters_interface: public CLP_Modifiable, public Slice {
   // A global reference object is initialized in nibr.cc.
 protected:
   bool slice; // true if slice output is requested
+  bool showsliceoutlines; // true if slice outlines and slice output are requested
 public:
-  general_slice_parameters_interface(): Slice(NULL,0,NULL), slice(false) {}
+  general_slice_parameters_interface(): Slice(NULL,0,NULL), slice(false), showsliceoutlines(false) {}
   virtual ~general_slice_parameters_interface() {}
   virtual void parse_CLP(Command_Line_Parameters & clp);
   virtual String report_parameters();
   bool get_slice() { return slice; }
+  bool show_slice_outlines() { return showsliceoutlines; }
 };
 
 extern general_slice_parameters_interface general_slice_parameters;
+
+// VECTOR3D
+#endif
 
 #endif

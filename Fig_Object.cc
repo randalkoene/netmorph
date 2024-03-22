@@ -32,6 +32,10 @@ unsigned long int Fig_output_modified = 0;
 long Fig_output_min_excess = 0;
 long Fig_output_max_excess = 0;
 
+double tex_textwidth = 6.5;
+double figscale = 1.0;
+bool figattr_Fig_rescale = true;
+
 void XFIG_RANGE_CHECK_INIT() {
   Fig_output_modified = 0;
   Fig_output_min_excess = 0;
@@ -65,19 +69,44 @@ long XFIG_RANGE_CHECK(long v) {
 }
 #endif
 
+bool istoplevelfiggroup = true;
+
 String Fig_Group::str() {
   String s;
+  bool tlfgcache = istoplevelfiggroup;
+  if (istoplevelfiggroup) {
+    istoplevelfiggroup = false; // prevent enclosed Fig_Group objects from acting as the top level Fig_Group
+    if (figattr_Fig_rescale) {
+      double w = (double) (bottomrightx - topleftx);
+      double w_target = tex_textwidth*1200.0;
+      double _rescale = w_target/w;
+      if ((_rescale>1.33) || (_rescale<0.67)) {
+	rescale(_rescale);
+	figscale *= _rescale;
+	s += "# rescaled figscale = "+String(figscale,"%.3f\n");
+      }
+    }
+  }
   if (!comment.empty()) {
     if (comment[comment.length()-1]!='\n') comment += '\n';
     comment[comment.length()-1] = '.';
     comment.gsub("\n","\n# ");
     comment[comment.length()-1] = '\n';
-    s = "# " + comment;
+    s += "# " + comment;
   }
   s += "6 "+String(topleftx)+' '+String(toplefty)+' '+String(bottomrightx)+' '+String(bottomrighty)+'\n';
   PLL_LOOP_FORWARD(Fig_Object,figobjects.head(),1) s+=e->str();
   s+="-6\n";
+  istoplevelfiggroup = tlfgcache;
   return s;
+}
+
+void Fig_Group::rescale(double r) {
+  topleftx = (long) (((double) topleftx)*r);
+  toplefty = (long) (((double) toplefty)*r);
+  bottomrightx = (long) (((double) bottomrightx)*r);
+  bottomrighty = (long) (((double) bottomrighty)*r);
+  PLL_LOOP_FORWARD(Fig_Object,figobjects.head(),1) e->rescale(r);
 }
 
 void Fig_Group::Add_Fig_Object(Fig_Object * figobject) {
@@ -95,6 +124,13 @@ String Fig_Line::str() {
   //if (rightarrow) ; "0 0 thickness.00 width.00 height.00\n"; // in steps of 15.00
   s += String(x1)+' '+String(y1)+' '+String(x2)+' '+String(y2)+'\n';
   return s;
+}
+
+void Fig_Line::rescale(double r) {
+  x1 = (long) (((double) x1)*r);
+  y1 = (long) (((double) y1)*r);
+  x2 = (long) (((double) x2)*r);
+  y2 = (long) (((double) y2)*r);
 }
 
 String Fig_Rectangle::str() {
@@ -130,6 +166,23 @@ String Fig_Polygon::str() {
   return s;
 }
 
+void Fig_Polygon::rescale(double r) {
+  for (int i=0; i<numpoints; i++) {
+    X[i] = (long) (((double) X[i])*r);
+    Y[i] = (long) (((double) Y[i])*r);
+  }
+}
+
+void Fig_Circle::rescale(double r) {
+  x = (long) (((double) x)*r);
+  y = (long) (((double) y)*r);
+  radius = (long) (((double) radius)*r);
+  centerptx = (long) (((double) centerptx)*r);
+  centerpty = (long) (((double) centerpty)*r);
+  edgetipx = (long) (((double) edgetipx)*r);
+  edgetipy = (long) (((double) edgetipy)*r);
+}
+
 long Fig_Text::TopLeftX() {
   switch (justification) {
   case 1: return x - (textlength/2) - 30;
@@ -144,6 +197,13 @@ long Fig_Text::BottomRightX() {
   case 2: return x;
   default: return x + textlength + 60;;
   }
+}
+
+void Fig_Text::rescale(double r) {
+  x = (long) (((double) x)*r);
+  y = (long) (((double) y)*r);
+  textheight = (long) (((double) textheight)*r);
+  textlength = (long) (((double) textlength)*r);
 }
 
 String RGBstr(unsigned int coldef) {

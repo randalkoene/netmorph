@@ -25,11 +25,14 @@
 // synapse.cc
 // Randal A. Koene, 20041118
 
+// [Update AC 20110322:]  Added include fibre_structure.hh and APICAL/BASAL flag write to .synapses file
+
 #include "synapse.hh"
-#include "connection.hh"
 #include "synapse_structure.hh"
+#include "connection.hh"
 #include "Color_Table.hh"
 #include "global.hh"
+#include "fibre_structure.hh"
 
 synaptogenesis_data * SynaptoGenesis_Data = NULL;
 
@@ -90,6 +93,14 @@ neuron * synapse::Postsynaptic_Neuron() {
   return c->PostSynaptic();
 }
 
+void synapse::move_add(spatial & addvec) {
+  if (s) s->move_add(addvec);
+}
+
+void synapse::fanin_rot() {
+  if (s) s->fanin_rot();
+}
+
 Fig_Object * synapse::net_Fig() {
   synapse_type stype = this->type_ID();
   if (stype<syntype_candidate) {
@@ -107,26 +118,49 @@ Fig_Object * synapse::net_Fig() {
 }
 
 Txt_Object * synapse::net_Txt() {
+  /* Output format:
+     1. [integer] synapse index (incremental)
+     2. [string] synapse type name
+     3. [real] presynaptic location X
+     4. [real] presynaptic location Y
+     5. [real] presynaptic location Z
+     6. [real] postsynaptic location X
+     7. [real] postsynaptic location Y
+     8. [real] postsynaptic location Z
+     9. [integer] ID of presynaptic axon fiber segment piece
+     10. [integer] ID of postsynaptic dendrite fiber segment piece
+     11. [integer] ID of presynaptic neuron
+     12. [integer] ID of postsynaptic neuron
+     13. (conditionally) [real] time of synaptogenesis
+   */
   (*Txt_synapselist) += String(Txt_synapseindex);
   (*Txt_synapselist) += ',';
   (*Txt_synapselist) += synapse_type_name[type_id];
   ///(*Txt_synapselist) += ','+String((long) this);
   ///(*Txt_synapselist) += ','+String((long) s);
   double x=0.0, y=0.0, z=0.0;
-  ///(s->P0).get_all(x,y,z);
-  ///(*Txt_synapselist) += String(x,",%f");
-  ///(*Txt_synapselist) += String(y,",%f");
-  ///(*Txt_synapselist) += String(z,",%f");
+  (s->P0).get_all(x,y,z);
+  (*Txt_synapselist) += String(x,",%f");
+  (*Txt_synapselist) += String(y,",%f");
+  (*Txt_synapselist) += String(z,",%f");
   (s->P1).get_all(x,y,z);
   (*Txt_synapselist) += String(x,",%f");
   (*Txt_synapselist) += String(y,",%f");
   (*Txt_synapselist) += String(z,",%f,");
-  ///(*Txt_synapselist) += String((long) (s->AxonSegment())) + ',';
-  ///(*Txt_synapselist) += String((long) (s->DendriteSegment())) + ',';
+  (*Txt_synapselist) += String((long) (s->AxonSegment())) + ',';
+  (*Txt_synapselist) += String((long) (s->DendriteSegment())) + ',';
   (*Txt_synapselist) += String((long) Presynaptic_Neuron());
   (*Txt_synapselist) += ',';
   (*Txt_synapselist) += String((long) Postsynaptic_Neuron());
-  if (SynaptoGenesis_Data) (*Txt_synapselist) += String(SynaptoGenesis_Data->find_t_genesis(this),",%f\n");
+  if (SynaptoGenesis_Data) (*Txt_synapselist) += String(SynaptoGenesis_Data->find_t_genesis(this),",%f");
+  if(s->DendriteSegment()->APICAL == 6)
+  {
+	  (*Txt_synapselist) += String(",APICAL\n");
+  }
+  else
+  {
+	  (*Txt_synapselist) += String(",BASAL\n");
+  }
   Txt_synapseindex++;
   return NULL;
 }

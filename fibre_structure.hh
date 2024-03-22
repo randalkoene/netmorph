@@ -28,6 +28,8 @@
 // Classes that define fibre structure and functions that apply both to
 // presynaptic (axonal) and postsynaptic (dendritic) fibre structure..
 
+// [Update AC 201110322:]  Added APICAL flag to fibre_segment
+
 #ifndef __FIBRE_STRUCTURE_HH
 #include <unistd.h>
 #include <math.h>
@@ -40,10 +42,13 @@
 #include "fibre_elongation_model.hh"
 //#include "dendritic_growth_model.hh"
 #include "branching_models.hh"
+#include "turning_models.hh"
 #include "environment_physics.hh"
 #include "event.hh"
+#include "Color_Table.hh"
 #include "diagnostic.hh"
 #include "Txt_Object.hh"
+#include "VRML_Object.hh"
 #define __FIBRE_STRUCTURE_HH
 
 // Class pointer forward declarations (to avoid recursive inclusion)
@@ -150,10 +155,11 @@ protected:
 #ifdef VECTOR3D
   extra_fibre_data d;
 #endif
-  fibre_segment * branch1, * branch2;
+  fibre_segment * parent, * branch1, * branch2;
   // *** I can make this able to have more than one branch, or I can
   // create different classes for that and change fibre_structure from
   // inheriting fibre_segment to linking to a type of fibre_segment.
+  int APICAL;
 #ifdef INCLUDE_SIMPLE_FIBER_DIAMETER
   double diameter; // [***NOTE] I can (a) replace this with a pointer to a bunch of specialized data, or (b) used derived classes such as the "solid" classes defined below.
 #endif
@@ -163,17 +169,17 @@ protected:
   }
 public:
 #ifdef VECTOR3D
-  fibre_segment(neuron & _n, extra_fibre_data & efd): n(&_n), d(efd), branch1(NULL), branch2(NULL)
+  fibre_segment(neuron & _n, fibre_segment * p, extra_fibre_data & efd): n(&_n), d(efd), parent(p), branch1(NULL), branch2(NULL), APICAL(parent->APICAL)
 #ifdef INCLUDE_SIMPLE_FIBER_DIAMETER
 						      , diameter(0.0)
 #endif
   { fibre_segment_initialization(); }
-  fibre_segment(neuron & _n, extra_fibre_data & efd, Segment & s): Segment(s), n(&_n), d(efd), branch1(NULL), branch2(NULL)
+  fibre_segment(neuron & _n, fibre_segment * p, extra_fibre_data & efd, Segment & s, int AP): Segment(s), n(&_n), d(efd), parent(p), branch1(NULL), branch2(NULL), APICAL(AP)
 #ifdef INCLUDE_SIMPLE_FIBER_DIAMETER
 						      , diameter(0.0)
 #endif
   { fibre_segment_initialization(); }
-  fibre_segment(neuron & _n, extra_fibre_data & efd, spatial & segstart, spatial & segend): Segment(segstart,segend), n(&_n), d(efd), branch1(NULL), branch2(NULL)
+  fibre_segment(neuron & _n, fibre_segment * p, extra_fibre_data & efd, spatial & segstart, spatial & segend): Segment(segstart,segend), n(&_n), d(efd), parent(p), branch1(NULL), branch2(NULL), APICAL(parent->APICAL)
 #ifdef INCLUDE_SIMPLE_FIBER_DIAMETER
 						      , diameter(0.0)
 #endif
@@ -186,17 +192,17 @@ public:
   fibre_segment * continuation_node_to_branch(extra_fibre_data & efd);
 #endif
 #ifdef VECTOR2D
-  fibre_segment(neuron & _n): n(&_n), branch1(NULL), branch2(NULL)
+  fibre_segment(neuron & _n, fibre_segment * p): n(&_n), parent(p), branch1(NULL), branch2(NULL), APICAL(parent->APICAL)
 #ifdef INCLUDE_SIMPLE_FIBER_DIAMETER
 						      , diameter(0.0)
 #endif
   {}
-  fibre_segment(neuron & _n, Segment & s): Segment(s), n(&_n), branch1(NULL), branch2(NULL)
+  fibre_segment(neuron & _n, fibre_segment * p, Segment & s, int AP): Segment(s), n(&_n), parent(p), branch1(NULL), branch2(NULL), APICAL(AP)
 #ifdef INCLUDE_SIMPLE_FIBER_DIAMETER
 						      , diameter(0.0)
 #endif
   {}
-  fibre_segment(neuron & _n, spatial & segstart, spatial & segend): Segment(segstart,segend), n(&_n), branch1(NULL), branch2(NULL)
+  fibre_segment(neuron & _n, fibre_segment * p, spatial & segstart, spatial & segend): Segment(segstart,segend), n(&_n), parent(p), branch1(NULL), branch2(NULL), APICAL(parent->APICAL)
 #ifdef INCLUDE_SIMPLE_FIBER_DIAMETER
 						      , diameter(0.0)
 #endif
@@ -222,19 +228,24 @@ public:
 #endif
   virtual int count_segments();
   virtual int count_terminal_segments();
+  virtual void count_segment_types(unsigned long & continuation, unsigned long & bifurcation, unsigned long terminal);
   virtual double sum_of_intermediate_segment_lengths(network_statistics_data * internsd = NULL);
   double cartesian_soma_center_distance2();
   void fiber_location(double dist, spatial & loc);
   double cartesian_to_fiber_ratio(fibre_collected_data & fcd);
   double soma_to_term_cartesian_to_fiber_ratio(double len);
+  void move_add(spatial & addvec);
+  void fanin_rot();
   virtual Fig_Object * net_Fig();
   virtual Txt_Object * bifurcationnode_net_Txt(long parentnodeindex);
   virtual Txt_Object * continuationnode_net_Txt(long parentnodeindex);
   virtual Txt_Object * net_Txt(long parentnodeindex);
+  virtual VRML_Object * net_VRML();
   fibre_segment * connprocid; // flag used during connection evaluation
   common_cache cache;
 };
 
+#ifdef INCLUDE_SOLID_FIBRE_SEGMENT
 class solid_fibre_segment: public fibre_segment {
   // Includes a specific fibre radius (thickness) at each end.
 protected:
@@ -252,6 +263,7 @@ public:
 #endif
   virtual double Average_Radius() { return 0.5*(R1+R2); }
 };
+#endif
 
 class terminal_segment: public PLLHandle<terminal_segment>, public state_storable {
   // this class is simply a more rapid way to locate terminal segments
@@ -260,47 +272,47 @@ class terminal_segment: public PLLHandle<terminal_segment>, public state_storabl
 protected:
   fibre_structure * arbor;
   fibre_segment * terminalsegment;
+  int centrifugalorder; // Gamma parameter in Eq.6 of [KOE:NETMORPH]
   spatial angularcoords; // first element is length, others are angles
   branch_angle_model_base * bamodel;
   direction_model_base * dirmodel;
   terminal_segment_elongation_model_base * elmodel;
   elongation_rate_initialization_model_base * erimodel;
+  TSBM_base * tsbmodel;
+  TSTM_base * tstmodel;
 #ifdef ENABLE_FIXED_STEP_SIMULATION
   double fixedstepelongation; // cached value of last elongation in a fixed step simulation
 #endif
-#ifdef ENABLE_APICAL_TUFTING_TRIGGER_DISTANCE
-  bool istuft;
-#endif
 public:
-  terminal_segment(fibre_structure & a, fibre_segment & ts): arbor(&a), terminalsegment(&ts), dirmodel(NULL), elmodel(NULL), erimodel(NULL)
+  terminal_segment(fibre_structure & a, fibre_segment & ts, int corder = 0): arbor(&a), terminalsegment(&ts), centrifugalorder(corder), dirmodel(NULL), elmodel(NULL), erimodel(NULL), tsbmodel(NULL)
 #ifdef ENABLE_FIXED_STEP_SIMULATION
 					, fixedstepelongation(0.0)
-#endif
-#ifdef ENABLE_APICAL_TUFTING_TRIGGER_DISTANCE
-					, istuft(false)
 #endif
   {}
-  terminal_segment(fibre_structure & a, fibre_segment & ts, spatial & acoords): arbor(&a), terminalsegment(&ts), angularcoords(acoords), dirmodel(NULL), elmodel(NULL), erimodel(NULL)
+  terminal_segment(fibre_structure & a, fibre_segment & ts, spatial & acoords, int corder = 0): arbor(&a), terminalsegment(&ts), centrifugalorder(corder), angularcoords(acoords), dirmodel(NULL), elmodel(NULL), erimodel(NULL), tsbmodel(NULL)
 #ifdef ENABLE_FIXED_STEP_SIMULATION
 					, fixedstepelongation(0.0)
-#endif
-#ifdef ENABLE_APICAL_TUFTING_TRIGGER_DISTANCE
-					, istuft(false)
 #endif
   {
     pb.direction_boundary_effect(terminalsegment->P0,angularcoords); // [***NOTE] Environmental Pressures are applied here.
     update_segment_vector();
   }
+  // [***INCOMPLETE] There should be a destructor that deletes unshared model objects using their delete_shared() function!
   fibre_structure * Arbor() { return arbor; }
   fibre_segment * TerminalSegment() { return terminalsegment; }
+  int CentrifugalOrder() { return centrifugalorder; }
   branch_angle_model_base * BranchAngleModel() { return bamodel; }
   direction_model_base * DirectionModel() { return dirmodel; }
   terminal_segment_elongation_model_base * ElongationModel() { return elmodel; }
   elongation_rate_initialization_model_base * ElongationRateInitializationModel() { return erimodel; }
+  TSBM_base * TSBModel() { return tsbmodel; }
+  TSTM_base * TSTModel() { return tstmodel; }
   void set_branch_angle_model(branch_angle_model_base * bam) { bamodel = bam; }
   void set_direction_model(direction_model_base * dm) { dirmodel = dm; }
   void set_elongation_model(terminal_segment_elongation_model_base * em) { elmodel = em; }
-  void set_ERI_model(elongation_rate_initialization_model_base * eri) {erimodel = eri; }
+  void set_ERI_model(elongation_rate_initialization_model_base * eri) { erimodel = eri; }
+  void set_TSBM_model(TSBM_base * tsbm) { tsbmodel = tsbm; }
+  void set_TSTM_model(TSTM_base * tstm) { tstmodel = tstm; }
   virtual void set_angularcoords(spatial & acoords) {
     angularcoords = acoords;
     pb.direction_boundary_effect(terminalsegment->P0,angularcoords); // [***NOTE] Environmental Pressures are applied here.
@@ -327,25 +339,9 @@ public:
   double Phi() { return angularcoords.Z(); }
 #endif
   void update_segment_vector() { terminalsegment->set_by_angular_coordinates(angularcoords); } // updates the fibre_segment end point
-#ifdef ENABLE_APICAL_TUFTING_TRIGGER_DISTANCE
-  bool IsTuft() { return istuft; }
-  void Check_Tuft_Distance_Threshold(double d);
-#endif
 #ifdef SAMPLES_INCLUDE_NETWORK_STATISTICS_BASE
   void Collect_Data(fibre_collected_data & fcd);
 #endif
-#ifdef LEGACY_BRANCHING_PROTOCOL
-#ifdef VECTOR3D
-  bool branch(PLLRoot<terminal_segment> * prevts, spatial & acoords1, spatial & acoords2, extra_fibre_data & efd1, extra_fibre_data & efd2);
-  bool turn(spatial & acoords, extra_fibre_data & efd);
-  bool turn_without_update_of_segment_vector(spatial & acoords, extra_fibre_data & efd);
-#endif
-#ifdef VECTOR2D
-  bool branch(PLLRoot<terminal_segment> * prevts, spatial & acoords1, spatial & acoords2);
-  bool turn(spatial & acoords);
-  bool turn_without_update_of_segment_vector(spatial & acoords);
-#endif
-#else // NOT(LEGACY_BRANCHING_PROTOCOL)
 #ifdef VECTOR3D
   bool branch(PLLRoot<terminal_segment> * prevts);
   bool turn(neuron * n);
@@ -356,7 +352,6 @@ public:
   bool turn(neuron * n);
   bool turn_without_update_of_segment_vector(spatial & acoords);
 #endif
-#endif // LEGACY_BRANCHING_PROTOCOL
 };
 
 typedef terminal_segment * terminal_segment_ptr;
@@ -374,24 +369,32 @@ protected:
 #endif
   double sum_l_i_cache;
   double sum_l_i_cache_t;
+  long colnum; // numerical color reference ID in color table
 public:
   // Note: Creating fibre_structure as presynaptic_structure or as
   // postsynaptic_structure assures that elmodel is valid.
 #ifdef VECTOR3D
-  fibre_structure(neuron & _n): fibre_segment(_n,root_efd), terminalsegmentsarray(NULL), terminalarraylength(0), elmodel(NULL), bmmodel(NULL), sum_l_i_cache(0.0), sum_l_i_cache_t(eq->T()), cache(0.0) { terminalsegments.link_before(new terminal_segment(*this,*this)); }
-  fibre_structure(neuron & _n, Segment & s): fibre_segment(_n,root_efd,s), terminalsegmentsarray(NULL), terminalarraylength(0), elmodel(NULL), bmmodel(NULL), sum_l_i_cache(0.0), sum_l_i_cache_t(eq->T()), cache(0.0) { terminalsegments.link_before(new terminal_segment(*this,*this)); }
-  fibre_structure(neuron & _n, spatial & segstart, spatial & segend): fibre_segment(_n,root_efd,segstart,segend), terminalsegmentsarray(NULL), terminalarraylength(0), elmodel(NULL), bmmodel(), sum_l_i_cache(0.0), sum_l_i_cache_t(eq->T()), cache(0.0) { terminalsegments.link_before(new terminal_segment(*this,*this)); }
-  fibre_structure(neuron & _n, Segment & s, spatial & acoords): fibre_segment(_n,root_efd,s), terminalsegmentsarray(NULL), terminalarraylength(0), elmodel(NULL), sum_l_i_cache(0.0), sum_l_i_cache_t(eq->T()), cache(0.0) { terminalsegments.link_before(new terminal_segment(*this,*this,acoords)); }
+  fibre_structure(neuron & _n): fibre_segment(_n,NULL,root_efd), terminalsegmentsarray(NULL), terminalarraylength(0), elmodel(NULL), bmmodel(NULL), sum_l_i_cache(0.0), sum_l_i_cache_t(eq->T()), colnum(0), cache(0.0) { terminalsegments.link_before(new terminal_segment(*this,*this)); }
+
+  fibre_structure(neuron & _n, Segment & s, int AP): fibre_segment(_n,NULL,root_efd,s,AP), terminalsegmentsarray(NULL), terminalarraylength(0), elmodel(NULL), bmmodel(NULL), sum_l_i_cache(0.0), sum_l_i_cache_t(eq->T()), colnum(0), cache(0.0) { terminalsegments.link_before(new terminal_segment(*this,*this)); }
+
+  fibre_structure(neuron & _n, spatial & segstart, spatial & segend): fibre_segment(_n,NULL,root_efd,segstart,segend), terminalsegmentsarray(NULL), terminalarraylength(0), elmodel(NULL), bmmodel(NULL), sum_l_i_cache(0.0), sum_l_i_cache_t(eq->T()), colnum(0), cache(0.0) { terminalsegments.link_before(new terminal_segment(*this,*this)); }
+
+  fibre_structure(neuron & _n, Segment & s, spatial & acoords, int AP): fibre_segment(_n,NULL,root_efd,s,AP), terminalsegmentsarray(NULL), terminalarraylength(0), elmodel(NULL), bmmodel(NULL), sum_l_i_cache(0.0), sum_l_i_cache_t(eq->T()), colnum(0), cache(0.0) { terminalsegments.link_before(new terminal_segment(*this,*this,acoords)); }
 #endif
 #ifdef VECTOR2D
-  fibre_structure(neuron & _n): fibre_segment(_n), terminalsegmentsarray(NULL), terminalarraylength(0), elmodel(NULL), bmmodel(NULL), sum_l_i_cache(0.0), sum_l_i_cache_t(eq->T()), cache(0.0) { terminalsegments.link_before(new terminal_segment(*this,*this)); }
-  fibre_structure(neuron & _n, Segment & s): fibre_segment(_n,s), terminalsegmentsarray(NULL), terminalarraylength(0), elmodel(NULL), bmmodel(NULL), sum_l_i_cache(0.0), sum_l_i_cache_t(eq->T()), cache(0.0) { terminalsegments.link_before(new terminal_segment(*this,*this)); }
-  fibre_structure(neuron & _n, spatial & segstart, spatial & segend): fibre_segment(_n,segstart,segend), terminalsegmentsarray(NULL), terminalarraylength(0), elmodel(NULL), bmmodel(NULL), sum_l_i_cache(0.0), sum_l_i_cache_t(eq->T()), cache(0.0) { terminalsegments.link_before(new terminal_segment(*this,*this)); }
-  fibre_structure(neuron & _n, Segment & s, spatial & acoords): fibre_segment(_n,s), terminalsegmentsarray(NULL), terminalarraylength(0), elmodel(NULL), bmmodel(NULL), sum_l_i_cache(0.0), sum_l_i_cache_t(eq->T()), cache(0.0) { terminalsegments.link_before(new terminal_segment(*this,*this,acoords)); }
+  fibre_structure(neuron & _n): fibre_segment(_n,NULL), terminalsegmentsarray(NULL), terminalarraylength(0), elmodel(NULL), bmmodel(NULL), sum_l_i_cache(0.0), sum_l_i_cache_t(eq->T()), colnum(0), cache(0.0) { terminalsegments.link_before(new terminal_segment(*this,*this)); }
+
+  fibre_structure(neuron & _n, Segment & s, int AP): fibre_segment(_n,NULL,s,AP), terminalsegmentsarray(NULL), terminalarraylength(0), elmodel(NULL), bmmodel(NULL), sum_l_i_cache(0.0), sum_l_i_cache_t(eq->T()), colnum(0), cache(0.0) { terminalsegments.link_before(new terminal_segment(*this,*this)); }
+
+  fibre_structure(neuron & _n, spatial & segstart, spatial & segend): fibre_segment(_n,NULL,segstart,segend), terminalsegmentsarray(NULL), terminalarraylength(0), elmodel(NULL), bmmodel(NULL), sum_l_i_cache(0.0), sum_l_i_cache_t(eq->T()), colnum(0), cache(0.0) { terminalsegments.link_before(new terminal_segment(*this,*this)); }
+
+  fibre_structure(neuron & _n, Segment & s, spatial & acoords, int AP): fibre_segment(_n,NULL,s,AP), terminalsegmentsarray(NULL), terminalarraylength(0), elmodel(NULL), bmmodel(NULL), sum_l_i_cache(0.0), sum_l_i_cache_t(eq->T()), colnum(0), cache(0.0) { terminalsegments.link_before(new terminal_segment(*this,*this,acoords)); }
 #endif
   //fibre_structure(double a, double l): fibre_segment(a,l), terminalsegmentsarray(NULL), terminalarraylength(0), cache(0.0) { terminalsegments.link_before(new terminal_segment(*this,*this)); }
   virtual ~fibre_structure() { delete[] terminalsegmentsarray; if (elmodel) delete elmodel; if (bmmodel) delete bmmodel; }
   virtual int count_terminal_segments() { return terminalsegments.length(); }
+  virtual int count_terminal_segments_in_PLL(); // E.g. all terminal segments of all axons, or all terminal segments of all dendrites
   PLLRoot<terminal_segment> * TerminalSegments() { return &terminalsegments; }
   virtual terminal_segment_ptr * array_of_terminal_segments();
   int TerminalArrayLength() { return terminalarraylength; }
@@ -403,6 +406,8 @@ public:
   virtual void batch_elongate();
 #endif
   double sum_of_perturbed_expected_elongations();
+  void move_add(spatial & addvec);
+  void fanin_rot();
   virtual Fig_Object * net_Fig();
   virtual Txt_Object * net_Txt();
   double cache; // cache used during statistics calculation
@@ -410,6 +415,24 @@ public:
   probability_distribution_function * TSEM_Pdf() { return tsem_pdf; }
 #endif
 };
+
+extern terminal_segment * most_recent_branch1_ts;
+extern terminal_segment * most_recent_branch2_ts;
+
+struct structure_initialization {
+  double L0_min;
+  double L0_max;
+  long colnum;
+  structure_initialization(): L0_min(-1.0), L0_max(-1.0), colnum(0) {} // these values must identify "unspecified" (used in structure_initialization_selection())
+  void init(natural_schema_parent_set n, double _L0_min = 9.0, double _L0_max = 11.0);
+  String report_parameters();
+  void initialize(fibre_structure * fs_root);
+};
+
+typedef structure_initialization * region_structure_initialization_ptr;
+extern region_structure_initialization_ptr * structure_initialization_region_subset_schemas;
+
+structure_initialization * structure_initialization_selection(String & label, Command_Line_Parameters & clp, structure_initialization & superior_set, structure_initialization & strucinit);
 
 /* HOW DO YOU IMPLEMENT THIS?
    I need to be able to attach to a common pointer on pre/post synaptic
