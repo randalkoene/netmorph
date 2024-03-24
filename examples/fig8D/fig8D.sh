@@ -37,6 +37,6 @@ fi
 
 cd ../..
 
-./nibr "include=examples/fig8D/fig8D" "outattr_directory=examples/fig8D"
+./nibr "include=examples/fig8D/fig8D" "outattr_directory=examples/fig8D/"
 
 cd $curdir

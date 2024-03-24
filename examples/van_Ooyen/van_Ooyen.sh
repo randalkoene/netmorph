@@ -44,7 +44,7 @@ fi
 
 cd ../..
 
-./nibr "neurons=$numneurons" "sidelength=1200.0" "shape=rectangle" "connectivity=uniformrandom" "seconds=0.0" "figattr_presynaptic=false" "figattr_postsynaptic=false" "figattr_partitions=false" "figattr_connection_eval=false" "figattr_progress=none" "outattr_directory=examples/van_Ooyen"
+./nibr "neurons=$numneurons" "sidelength=1200.0" "shape=rectangle" "connectivity=uniformrandom" "seconds=0.0" "figattr_presynaptic=false" "figattr_postsynaptic=false" "figattr_partitions=false" "figattr_connection_eval=false" "figattr_progress=none" "outattr_directory=examples/van_Ooyen/"
 
 cd $curdir
 

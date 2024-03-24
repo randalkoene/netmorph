@@ -43,6 +43,6 @@ fi
 
 cd ../..
 
-./nibr "neurons=$numneurons" "sidelength=584.0" "shape=rectangle" "electrodes=false" "seconds=0.0" "figattr_connections=false" "figattr_presynaptic=false" "figattr_postsynaptic=false" "figattr_partitions=false" "figattr_connection_eval=false" "figattr_progress=none" "outattr_directory=examples/rectangle"
+./nibr "neurons=$numneurons" "sidelength=584.0" "shape=rectangle" "electrodes=false" "seconds=0.0" "figattr_connections=false" "figattr_presynaptic=false" "figattr_postsynaptic=false" "figattr_partitions=false" "figattr_connection_eval=false" "figattr_progress=none" "outattr_directory=examples/rectangle/"
 
 cd $curdir

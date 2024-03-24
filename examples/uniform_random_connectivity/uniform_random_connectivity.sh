@@ -43,7 +43,7 @@ fi
 
 cd ../..
 
-./nibr "neurons=$numneurons" "sidelength=730.0" "shape=rectangle" "connectivity=uniformrandom" "seconds=0.0" "figattr_presynaptic=false" "figattr_postsynaptic=false" "figattr_partitions=false" "figattr_connection_eval=false" "figattr_progress=none" "outattr_directory=examples/uniform_random_connectivity"
+./nibr "neurons=$numneurons" "sidelength=730.0" "shape=rectangle" "connectivity=uniformrandom" "seconds=0.0" "figattr_presynaptic=false" "figattr_postsynaptic=false" "figattr_partitions=false" "figattr_connection_eval=false" "figattr_progress=none" "outattr_directory=examples/uniform_random_connectivity/"
 
 cd $curdir
 

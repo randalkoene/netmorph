@@ -38,6 +38,6 @@ fi
 
 cd ../..
 
-./nibr dt=1000 shape=box electrodes=false fibreswithturns=true branchinsegment=true branchatinitlength=false growthfunction=polynomialO3 outattr_show_progress=true outattr_show_figure=true outattr_show_stats=true figattr_neurons=true figattr_connections=false figattr_presynaptic=true figattr_postsynaptic=true figattr_tsupd_visibly=true figattr_synapses=false figattr_partitions=true figattr_connection_eval=false sample_dt=43200 figureTeXwidth=3.5 figuresequence=true figattr_progress=none combinesequence=true autorotatesequence=true ROT_x=0 ROT_y=0 ROT_z=0 ROT_interval_x=0 ROT_interval_y=1.5 ROT_interval_z=0 figattr_use_color=true combinemagnification=0.5 outattr_directory=examples/nibr3D-20050516
+./nibr dt=1000 shape=box electrodes=false fibreswithturns=true branchinsegment=true branchatinitlength=false growthfunction=polynomialO3 outattr_show_progress=true outattr_show_figure=true outattr_show_stats=true figattr_neurons=true figattr_connections=false figattr_presynaptic=true figattr_postsynaptic=true figattr_tsupd_visibly=true figattr_synapses=false figattr_partitions=true figattr_connection_eval=false sample_dt=43200 figureTeXwidth=3.5 figuresequence=true figattr_progress=none combinesequence=true autorotatesequence=true ROT_x=0 ROT_y=0 ROT_z=0 ROT_interval_x=0 ROT_interval_y=1.5 ROT_interval_z=0 figattr_use_color=true combinemagnification=0.5 outattr_directory=examples/nibr3D-20050516/
 
 cd $curdir
