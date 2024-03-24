@@ -1,4 +1,4 @@
-#! /bin/sh
+#! /bin/bash
 # © Copyright 2008 Randal A. Koene <randalk@netmorph.org>
 # 
 # With design assistance from J. van Pelt & A. van Ooyen, and support
@@ -23,14 +23,32 @@
 # along with NETMORPH.  If not, see <http://www.gnu.org/licenses/>.
 
 #
-# circle_and_electrodes.sh
+# van_Pelt.sh
 #
 # Randal A. Koene, 20041230
 
+curdir=`pwd`
+if [ ! -f ../../nibr ]; then
+	echo "This script should be run from its example directory"
+	echo "examples/van_Pelt/ and the nibr (netmorph) program needs"
+	echo "to be two steps up from that."
+	exit 1
+fi
+
+
 if [ "$1" = "" ]; then
-    numneurons=21000
+    numneurons=100
 else
     numneurons=$1
 fi
 
-./nibr "neurons=$numneurons" "sidelength=15000.0" "shape=circle" "seconds=0.0" "figattr_connections=false" "figattr_presynaptic=false" "figattr_postsynaptic=false" "figattr_partitions=false" "figattr_connection_eval=false" "figattr_progress=none"
+cd ../..
+
+./nibr "neurons=$numneurons" "sidelength=1168.0" "shape=rectangle" "connectivity=uniformrandom" "seconds=0.0" "figattr_presynaptic=false" "figattr_postsynaptic=false" "figattr_partitions=false" "figattr_connection_eval=false" "figattr_progress=none" "outattr_directory=examples/van_Pelt"
+
+cd $curdir
+
+# net.uniform_random_connectivity(37.0,20,28,PRINCIPAL_NEURON,PRINCIPAL_NEURON); 
+# net.uniform_random_connectivity(232.0,17,23,PRINCIPAL_NEURON,INTERNEURON,false);
+# net.uniform_random_connectivity(82.0,60,88,INTERNEURON,PRINCIPAL_NEURON,false);
+# net.uniform_random_connectivity(82.0,5,7,INTERNEURON,INTERNEURON,false);

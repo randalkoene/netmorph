@@ -1,4 +1,4 @@
-#! /bin/sh
+#! /bin/bash
 # © Copyright 2008 Randal A. Koene <randalk@netmorph.org>
 # 
 # With design assistance from J. van Pelt & A. van Ooyen, and support
@@ -23,9 +23,17 @@
 # along with NETMORPH.  If not, see <http://www.gnu.org/licenses/>.
 
 #
-# rectangle.sh
+# hexagon.sh
 #
 # Randal A. Koene, 20041230
+
+curdir=`pwd`
+if [ ! -f ../../nibr ]; then
+	echo "This script should be run from its example directory"
+	echo "examples/hexagon/ and the nibr (netmorph) program needs"
+	echo "to be two steps up from that."
+	exit 1
+fi
 
 if [ "$1" = "" ]; then
     numneurons=21000
@@ -33,4 +41,9 @@ else
     numneurons=$1
 fi
 
-./nibr "neurons=$numneurons" "sidelength=584.0" "shape=rectangle" "electrodes=false" "seconds=0.0" "figattr_connections=false" "figattr_presynaptic=false" "figattr_postsynaptic=false" "figattr_partitions=false" "figattr_connection_eval=false" "figattr_progress=none"
+cd ../..
+
+./nibr "neurons=$numneurons" "sidelength=292.0" "shape=hexagon" "electrodes=false" "seconds=0.0" "figattr_connections=false" "figattr_presynaptic=false" "figattr_postsynaptic=false" "figattr_partitions=false" "figattr_connection_eval=false" "figattr_progress=none" "outattr_directory=examples/hexagon"
+
+cd $curdir
+

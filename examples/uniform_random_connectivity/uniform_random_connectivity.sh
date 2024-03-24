@@ -1,4 +1,4 @@
-#! /bin/sh
+#! /bin/bash
 # © Copyright 2008 Randal A. Koene <randalk@netmorph.org>
 # 
 # With design assistance from J. van Pelt & A. van Ooyen, and support
@@ -27,12 +27,24 @@
 #
 # Randal A. Koene, 20041230
 
+curdir=`pwd`
+if [ ! -f ../../nibr ]; then
+	echo "This script should be run from its example directory"
+	echo "examples/uniform_random_connectivity/ and the nibr (netmorph) program needs"
+	echo "to be two steps up from that."
+	exit 1
+fi
+
 if [ "$1" = "" ]; then
     numneurons=100
 else
     numneurons=$1
 fi
 
-./nibr "neurons=$numneurons" "sidelength=730.0" "shape=rectangle" "connectivity=uniformrandom" "seconds=0.0" "figattr_presynaptic=false" "figattr_postsynaptic=false" "figattr_partitions=false" "figattr_connection_eval=false" "figattr_progress=none"
+cd ../..
+
+./nibr "neurons=$numneurons" "sidelength=730.0" "shape=rectangle" "connectivity=uniformrandom" "seconds=0.0" "figattr_presynaptic=false" "figattr_postsynaptic=false" "figattr_partitions=false" "figattr_connection_eval=false" "figattr_progress=none" "outattr_directory=examples/uniform_random_connectivity"
+
+cd $curdir
 
 # net.uniform_random_connectivity(100.0,4,12); // 300.0,8,32

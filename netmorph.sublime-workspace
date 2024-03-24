@@ -1,0 +1,518 @@
+{
+	"auto_complete":
+	{
+		"selected_items":
+		[
+			[
+				"Sim",
+				"SimulationCfg"
+			],
+			[
+				"show_",
+				"show_delayed_pulse_kernel"
+			],
+			[
+				"show",
+				"show_pulse_convolved"
+			],
+			[
+				"get",
+				"get_time_zone_info"
+			],
+			[
+				"t",
+				"tdprop"
+			],
+			[
+				"ver",
+				"vertical_multiplier_arg"
+			],
+			[
+				"pro",
+				"progress_analysis"
+			],
+			[
+				"board",
+				"board_title_extra"
+			],
+			[
+				"to_",
+				"to_precision_string"
+			],
+			[
+				"pre",
+				"to_precision_string"
+			],
+			[
+				"cs",
+				"csv_data_vec"
+			],
+			[
+				"start",
+				"start_components"
+			],
+			[
+				"node_d",
+				"node_dependencies_tree"
+			],
+			[
+				"prere",
+				"prerequisite"
+			],
+			[
+				"earliest",
+				"earliest_loc"
+			],
+			[
+				"build_",
+				"build_uri_options"
+			],
+			[
+				"cat",
+				"cartesian_halfdist_v"
+			],
+			[
+				"targetda",
+				"targetdate_sorted_Nodes"
+			],
+			[
+				"BG",
+				"BGAPI_BASE_URI"
+			],
+			[
+				"set_mor",
+				"set_morphology_axon"
+			],
+			[
+				"set_",
+				"set_morphology_soma"
+			],
+			[
+				"s",
+				"stderr"
+			],
+			[
+				"inte",
+				"intended_hours"
+			],
+			[
+				"ac",
+				"actualhours"
+			],
+			[
+				"list",
+				"list_names_vec"
+			],
+			[
+				"no_",
+				"no_minute_map"
+			],
+			[
+				"inter",
+				"interpret_open_as_tcurrent"
+			],
+			[
+				"lowcal",
+				"lowcal_filling_nutritious"
+			],
+			[
+				"m",
+				"multiday_data"
+			],
+			[
+				"check",
+				"checkbox_metrics"
+			]
+		]
+	},
+	"buffers":
+	[
+		{
+			"file": ".nibrrc",
+			"settings":
+			{
+				"buffer_size": 2061,
+				"encoding": "UTF-8",
+				"line_ending": "Unix"
+			},
+			"undo_stack":
+			[
+			]
+		}
+	],
+	"build_system": "",
+	"build_system_choices":
+	[
+		[
+			[
+				[
+					"Packages/C++/C++ Single File.sublime-build",
+					""
+				],
+				[
+					"Packages/C++/C++ Single File.sublime-build",
+					"Run"
+				],
+				[
+					"Packages/Makefile/Make.sublime-build",
+					""
+				],
+				[
+					"Packages/Makefile/Make.sublime-build",
+					"Clean"
+				]
+			],
+			[
+				"Packages/Makefile/Make.sublime-build",
+				""
+			]
+		]
+	],
+	"build_varint": "",
+	"command_palette":
+	{
+		"height": 0.0,
+		"last_filter": "",
+		"selected_items":
+		[
+			[
+				"",
+				"SublimeGDB: Start Debugging"
+			]
+		],
+		"width": 0.0
+	},
+	"console":
+	{
+		"height": 165.0,
+		"history":
+		[
+		]
+	},
+	"distraction_free":
+	{
+		"menu_visible": true,
+		"show_minimap": false,
+		"show_open_files": false,
+		"show_tabs": false,
+		"side_bar_visible": false,
+		"status_bar_visible": false
+	},
+	"expanded_folders":
+	[
+		"/home/randalk/src/nnmodels/netmorph"
+	],
+	"file_history":
+	[
+		"/home/randalk/src/nnmodels/netmorph/Makefile",
+		"/home/randalk/src/nnmodels/netmorph/nibr.cc",
+		"/home/randalk/src/nnmodels/netmorph/branching_models.cc",
+		"/home/randalk/src/nnmodels/netmorph/fibre_structure.cc",
+		"/home/randalk/src/nnmodels/netmorph/netmorph.sublime-project",
+		"/home/randalk/src/nnmodels/netmorph/.gitignore",
+		"/home/randalk/src/nnmodels/netmorph-20240318/README.md",
+		"/home/randalk/src/nnmodels/netmorph-20240318/VERSION",
+		"/home/randalk/src/formalizer/tools/system/daywiz/daywiz.py",
+		"/home/randalk/src/formalizer/tools/system/top/index.json",
+		"/home/randalk/src/formalizer/tools/system/daywiz/wiztable.py",
+		"/home/randalk/src/formalizer/core/include/fznutrition.py",
+		"/home/randalk/src/formalizer/tools/system/doc/system-documentation.html",
+		"/home/randalk/src/formalizer/core/include/Graphaccess.py",
+		"/home/randalk/src/formalizer/core/fzupdate/fzupdate-cgi.py",
+		"/home/randalk/src/formalizer/tools/system/doc/README.md",
+		"/home/randalk/src/formalizer/tools/system/doc/doc.html",
+		"/home/randalk/src/formalizer/Makefile",
+		"/home/randalk/src/formalizer/core/fzguide.system/README.md",
+		"/home/randalk/src/formalizer/core/fzguide.system/system-guide.20200926-flat.html",
+		"/home/randalk/src/formalizer/core/fzguide.system/system-guide-wiztable.20240321.html",
+		"/home/randalk/src/BrainGenix-NES/Source/Core/Simulator/BallAndStick/BSNeuron.h",
+		"/home/randalk/src/BrainGenix-NES/Source/Core/Simulator/Geometries/Geometry.h",
+		"/home/randalk/src/BrainGenix-NES/Source/Core/Simulator/Structs/Simulation.cpp",
+		"/home/randalk/src/BrainGenix-NES/Source/Core/Simulator/Structs/BS.h",
+		"/home/randalk/src/BrainGenix-NES/Source/Core/Simulator/Geometries/GeometryCollection.h",
+		"/home/randalk/src/BrainGenix-NES/Source/Core/Simulator/Structs/Simulation.h",
+		"/home/randalk/src/BrainGenix-NES/Source/Core/Simulator/RPC/ModelRPCInterface.cpp",
+		"/home/randalk/src/BrainGenix-NES/Source/Core/Simulator/SimpleCompartmental/SCNeuron.cpp",
+		"/home/randalk/src/BrainGenix-NES/Source/Core/Simulator/SimpleCompartmental/SCNeuron.h",
+		"/home/randalk/src/BrainGenix-NES/Source/Core/Simulator/BallAndStick/BSNeuron.cpp",
+		"/home/randalk/src/BrainGenix-NES/Source/Core/CMakeLists.txt",
+		"/home/randalk/src/BrainGenix-NES/Source/Core/Simulator/Structs/Neuron.h",
+		"/home/randalk/src/BrainGenix-NES/Source/Core/RPC/RPCHandlerHelper.h",
+		"/home/randalk/src/BrainGenix-NES/Source/Core/Simulator/Structs/SC.h",
+		"/home/randalk/src/BrainGenix-NES/Source/Core/Simulator/Structs/SC.cpp",
+		"/home/randalk/src/BrainGenix-NES/Source/Core/Simulator/RPC/ModelRPCInterface.h",
+		"/home/randalk/src/BrainGenix-NES/Source/Core/Simulator/Structs/Neuron.cpp",
+		"/home/randalk/src/BrainGenix-NES/Source/Core/Simulator/Structs/SignalFunctions.cpp",
+		"/home/randalk/src/BrainGenix-NES/Source/Core/Simulator/SimpleCompartmental/README.md",
+		"/home/randalk/src/BrainGenix-NES/Source/Core/Simulator/Engine.cpp",
+		"/home/randalk/src/vbp/src/models/xor_bs/xor_bs_groundtruth.py",
+		"/home/randalk/src/vbp/PythonClient/BrainGenix/BG_API.py",
+		"/home/randalk/src/vbp/src/components/NES_interfaces/KGTRecords.py",
+		"/home/randalk/src/vbp/src/components/prototyping/KGTRecords.py",
+		"/home/randalk/src/vbp/src/models/e0_bs/bs_vbp00_groundtruth_xi_sampleprep.py",
+		"/home/randalk/src/vbp/PythonClient/BrainGenix/Tools/StackStitcher/StackStitcher.py",
+		"/home/randalk/src/vbp/src/models/e0_bs/bs_vbp01_doubleblind_x_acquisition.py",
+		"/home/randalk/src/vbp/PythonClient/BrainGenix/NES/Simulation/Simulation.py",
+		"/home/randalk/src/vbp/PythonClient/BrainGenix/NES/Models/Connections/Receptor/Receptor.py",
+		"/home/randalk/src/vbp/PythonClient/BrainGenix/NES/Models/Connections/Receptor/Configuration.py",
+		"/home/randalk/src/vbp/src/components/prototyping/BS_Neuron.py",
+		"/home/randalk/src/vbp/PythonClient/BrainGenix/__init__.py",
+		"/home/randalk/src/vbp/src/components/common/_Geometry.py",
+		"/home/randalk/src/vbp/PythonClient/BrainGenix/NES/__init__.py",
+		"/home/randalk/src/vbp/PythonClient/BrainGenix/NES/BG_API.py",
+		"/home/randalk/src/vbp/src/components/NES_interfaces/BG_API.py",
+		"/home/randalk/src/vbp/PythonClient/BrainGenix/NES/Client/BG_API.py",
+		"/home/randalk/src/vbp/src/components/prototyping/Calcium_Imaging.py",
+		"/home/randalk/src/vbp/src/components/prototyping/SignalFunctions.py",
+		"/home/randalk/src/vbp/README.md",
+		"/home/randalk/src/vbp/PythonClient/BrainGenix/NES/Client/Client.py",
+		"/home/randalk/src/vbp/RunThisToCloneSubmodules.sh",
+		"/home/randalk/src/vbp/UpdateSubmodulesFromRemote.sh",
+		"/home/randalk/src/vbp/PushWithSubmodules.sh",
+		"/home/randalk/src/vbp/src/components/common/Spatial.py",
+		"/home/randalk/src/vbp/src/models/e0_bs/prototyping/bs_vbp01_doubleblind_x_acquisition.py",
+		"/home/randalk/src/vbp/src/components/prototyping/System.py",
+		"/home/randalk/src/vbp/src/components/prototyping/Electrodes.py",
+		"/home/randalk/src/vbp/src/components/common/Common_Parameters.py",
+		"/home/randalk/src/vbp/src/models/e0_bs/prototyping/bs_vbp00_groundtruth_xi_sampleprep.py",
+		"/home/randalk/src/vbp/src/models/e0_bs/prototyping/vbpcommon.py",
+		"/home/randalk/src/vbp/src/components/prototyping/BS_Morphology.py",
+		"/home/randalk/src/vbp/src/components/prototyping/BS_Aligned_NC.py",
+		"/home/randalk/src/vbp/src/components/common/_BSAlignedNC.py",
+		"/home/randalk/src/vbp/src/components/NES_interfaces/BS_Neuron.py",
+		"/home/randalk/src/vbp/src/components/common/Neuron.py",
+		"/home/randalk/src/vbp/src/components/NES_interfaces/System.py",
+		"/home/randalk/src/BrainGenix-API/Docs/Adding a new VBP to NES route.jpg",
+		"/home/randalk/src/BrainGenix-API/Docs/API.md",
+		"/home/randalk/src/BrainGenix-API/Docs/NESAPI.md",
+		"/home/randalk/src/BrainGenix-API/Source/Core/Resource/NES/ReceptorCreate.cpp",
+		"/home/randalk/src/vbp/src/models/e0_bs/bs_vbp00_groundtruth_xi_sampleprep_flatNES.py",
+		"/home/randalk/src/vbp/src/components/NES_interfaces/BS_Aligned_NC.py",
+		"/home/randalk/src/vbp/src/components/NES_interfaces/Region.py",
+		"/home/randalk/src/vbp/src/components/NES_interfaces/BS_Morphology.py",
+		"/home/randalk/src/vbp/src/components/NES_interfaces/Geometry.py",
+		"/home/randalk/src/vbp/src/components/common/NeuralCircuit.py",
+		"/home/randalk/src/vbp/src/components/prototyping/Region.py",
+		"/home/randalk/src/vbp/src/models/e0_bs/bs_vbp03_emulation_iii_validation.py",
+		"/home/randalk/src/vbp/src/models/e0_bs/bs_vbp02_translation_iv_system_identification.py",
+		"/home/randalk/src/BrainGenix-NES/.gitignore",
+		"/home/randalk/src/formalizer/core/fztimezone/fztimezone-cgi.py",
+		"/home/randalk/src/formalizer/core/fztimezone/fztimezone.py",
+		"/home/randalk/src/formalizer/core/fzserverpq/tcp_serialized_data_handlers.cpp",
+		"/home/randalk/src/formalizer/core/fzserverpq/fzserverpq.cpp",
+		"/home/randalk/src/formalizer/core/fzgraph/fzgraph.cpp",
+		"/home/randalk/src/formalizer/config/fzserverpq/config.json",
+		"/home/randalk/src/formalizer/core/fzbackup/fzbackup-from-web-cgi.py",
+		"/home/randalk/src/formalizer/tools/interface/fzgraphhtml/fzgraphhtml-cgi.py",
+		"/home/randalk/src/formalizer/tools/system/top/admin.json",
+		"/home/randalk/src/formalizer/tools/interface/fzgraphhtml/templates/html/Node_template.html",
+		"/home/randalk/src/formalizer/tools/interface/fzgraphhtml/fzgraphhtml.cpp",
+		"/home/randalk/src/formalizer/tools/interface/fzlink/fzlink.py",
+		"/home/randalk/src/formalizer/tools/interface/fzloghtml/fzloghtml-cgi.py",
+		"/home/randalk/src/formalizer/core/include/executables.py",
+		"/home/randalk/src/formalizer/tools/interface/fzloghtml/render.cpp",
+		"/home/randalk/src/formalizer/core/lib/html.cpp",
+		"/home/randalk/src/formalizer/tools/interface/fzgraphhtml/fzgraphhtml.hpp",
+		"/home/randalk/src/formalizer/tools/interface/nodeboard/nbrender.cpp",
+		"/home/randalk/src/formalizer/tools/interface/fzgraphhtml/render.cpp",
+		"/home/randalk/src/formalizer/tools/interface/fzgraphhtml/templates/html/node_pars_in_list_tail_template.html",
+		"/home/randalk/src/formalizer/tools/interface/fzgraphhtml/templates/html/node_pars_in_list_head_template.html",
+		"/home/randalk/src/BrainGenix-NES/Benchmarking/Renderer/Test6.py",
+		"/home/randalk/src/BrainGenix-NES/Source/Core/VSDA/VoxelSubsystem/VoxelArrayRenderer.cpp",
+		"/home/randalk/src/BrainGenix-NES/Source/Core/VSDA/EMRenderer.cpp",
+		"/home/randalk/src/BrainGenix-NES/Source/Core/VSDA/VoxelSubsystem/EMSubRegion.cpp",
+		"/home/randalk/src/PythonClient/BrainGenix/NES/Simulation/Simulation.py",
+		"/home/randalk/src/formalizer/core/fzedit/fzedit-cgi.py",
+		"/home/randalk/src/formalizer/core/fzedit/fzedit.cpp",
+		"/home/randalk/src/formalizer/tools/interface/fzgraphhtml/templates/html/Node_edit_template.html",
+		"/home/randalk/src/formalizer/core/fzserverpq/tcp_server_handlers.cpp",
+		"/home/randalk/src/formalizer/core/fzserverpq/shm_server_handlers.cpp",
+		"/home/randalk/src/formalizer/core/include/Graphtypes.hpp",
+		"/home/randalk/src/formalizer/core/lib/Graphtypes.cpp",
+		"/home/randalk/src/formalizer/core/lib/Graphpostgres.cpp",
+		"/home/randalk/src/formalizer/core/lib/Graphmodify.cpp",
+		"/home/randalk/src/formalizer/core/include/Graphpostgres.hpp"
+	],
+	"find":
+	{
+		"height": 27.0
+	},
+	"find_in_files":
+	{
+		"height": 143.0,
+		"where_history":
+		[
+			""
+		]
+	},
+	"find_state":
+	{
+		"case_sensitive": false,
+		"find_history":
+		[
+			"label"
+		],
+		"highlight": true,
+		"in_selection": false,
+		"preserve_case": false,
+		"regex": false,
+		"replace_history":
+		[
+		],
+		"reverse": false,
+		"scrollbar_highlights": true,
+		"show_context": true,
+		"use_buffer2": true,
+		"use_gitignore": true,
+		"whole_word": false,
+		"wrap": true
+	},
+	"groups":
+	[
+		{
+			"sheets":
+			[
+				{
+					"buffer": 0,
+					"file": ".nibrrc",
+					"selected": true,
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 2061,
+						"regions":
+						{
+						},
+						"selection":
+						[
+							[
+								1489,
+								1489
+							]
+						],
+						"settings":
+						{
+							"syntax": "Packages/Text/Plain text.tmLanguage"
+						},
+						"translation.x": 0.0,
+						"translation.y": 540.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 0,
+					"stack_multiselect": false,
+					"type": "text"
+				}
+			]
+		},
+		{
+			"sheets":
+			[
+			]
+		}
+	],
+	"incremental_find":
+	{
+		"height": 27.0
+	},
+	"input":
+	{
+		"height": 53.0
+	},
+	"layout":
+	{
+		"cells":
+		[
+			[
+				0,
+				0,
+				1,
+				1
+			],
+			[
+				1,
+				0,
+				2,
+				1
+			]
+		],
+		"cols":
+		[
+			0.0,
+			0.5,
+			1.0
+		],
+		"rows":
+		[
+			0.0,
+			1.0
+		]
+	},
+	"menu_visible": true,
+	"output.Debugger":
+	{
+		"height": 264.0
+	},
+	"output.Debugger Console":
+	{
+		"height": 470.0
+	},
+	"output.Debugger Terminal":
+	{
+		"height": 264.0
+	},
+	"output.exec":
+	{
+		"height": 72.0
+	},
+	"output.find_results":
+	{
+		"height": 0.0
+	},
+	"pinned_build_system": "",
+	"project": "netmorph.sublime-project",
+	"replace":
+	{
+		"height": 50.0
+	},
+	"save_all_on_build": true,
+	"select_file":
+	{
+		"height": 0.0,
+		"last_filter": "",
+		"selected_items":
+		[
+		],
+		"width": 0.0
+	},
+	"select_project":
+	{
+		"height": 0.0,
+		"last_filter": "",
+		"selected_items":
+		[
+		],
+		"width": 0.0
+	},
+	"select_symbol":
+	{
+		"height": 0.0,
+		"last_filter": "",
+		"selected_items":
+		[
+		],
+		"width": 0.0
+	},
+	"selected_group": 0,
+	"settings":
+	{
+	},
+	"show_minimap": true,
+	"show_open_files": false,
+	"show_tabs": true,
+	"side_bar_visible": true,
+	"side_bar_width": 310.0,
+	"status_bar_visible": true,
+	"template_settings":
+	{
+	}
+}

@@ -1,0 +1,35 @@
+{
+	"folders":
+	[
+		{
+			"path": ".",
+		}
+	],
+	"debugger_configurations":
+	[
+		{
+			"type": "gdb",
+			"request": "launch",
+			"name": "Launch nibr2d in gdb",
+			"target": "./nibr2d",
+			"cwd": "${folder}",
+			"valuesFormatting": "parseText"
+		},
+		{
+			"type": "gdb",
+			"request": "launch",
+			"name": "Launch nibr in gdb",
+			"target": "./nibr",
+			"cwd": "${folder}",
+			"valuesFormatting": "parseText"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Launch in lldb",
+			"program": "${folder}/netmorph",
+			"args": [],
+			"cwd": "${folder}"
+		},
+	],
+}

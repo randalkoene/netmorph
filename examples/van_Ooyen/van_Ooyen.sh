@@ -1,4 +1,4 @@
-#! /bin/sh
+#! /bin/bash
 # © Copyright 2008 Randal A. Koene <randalk@netmorph.org>
 # 
 # With design assistance from J. van Pelt & A. van Ooyen, and support
@@ -22,9 +22,33 @@
 # You should have received a copy of the GNU General Public License
 # along with NETMORPH.  If not, see <http://www.gnu.org/licenses/>.
 
-# nibr3D-20050516.sh
-# Randal A. Koene
 #
-# This script attempts to produce a 3D simulation with animation output that
-# demonstrates network growth with a set of cubic polynomial growth functions.
-./nibr dt=1000 shape=box electrodes=false fibreswithturns=true branchinsegment=true branchatinitlength=false growthfunction=polynomialO3 outattr_show_progress=true outattr_show_figure=true outattr_show_stats=true figattr_neurons=true figattr_connections=false figattr_presynaptic=true figattr_postsynaptic=true figattr_tsupd_visibly=true figattr_synapses=false figattr_partitions=true figattr_connection_eval=false sample_dt=43200 figureTeXwidth=3.5 figuresequence=true figattr_progress=none combinesequence=true autorotatesequence=true ROT_x=0 ROT_y=0 ROT_z=0 ROT_interval_x=0 ROT_interval_y=1.5 ROT_interval_z=0 figattr_use_color=true combinemagnification=0.5
+# van_Ooyen.sh
+#
+# Randal A. Koene, 20041230
+
+curdir=`pwd`
+if [ ! -f ../../nibr ]; then
+	echo "This script should be run from its example directory"
+	echo "examples/van_Ooyen/ and the nibr (netmorph) program needs"
+	echo "to be two steps up from that."
+	exit 1
+fi
+
+
+if [ "$1" = "" ]; then
+    numneurons=100
+else
+    numneurons=$1
+fi
+
+cd ../..
+
+./nibr "neurons=$numneurons" "sidelength=1200.0" "shape=rectangle" "connectivity=uniformrandom" "seconds=0.0" "figattr_presynaptic=false" "figattr_postsynaptic=false" "figattr_partitions=false" "figattr_connection_eval=false" "figattr_progress=none" "outattr_directory=examples/van_Ooyen"
+
+cd $curdir
+
+# net.uniform_random_connectivity(37.0,24,24,PRINCIPAL_NEURON,PRINCIPAL_NEURON); 
+# net.uniform_random_connectivity(232.0,20,20,PRINCIPAL_NEURON,INTERNEURON,false);
+# net.uniform_random_connectivity(82.0,74,74,INTERNEURON,PRINCIPAL_NEURON,false);
+# net.uniform_random_connectivity(82.0,6,6,INTERNEURON,INTERNEURON,false);

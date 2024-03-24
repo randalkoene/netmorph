@@ -1,5 +1,5 @@
-#! /bin/sh
-# © Copyright 2008 Randal A. Koene <randalk@netmorph.org>
+#! /bin/bash
+# © Copyright 2024 Randal A. Koene <randalk@netmorph.org>
 # 
 # With design assistance from J. van Pelt & A. van Ooyen, and support
 # from the Netherlands Organization for Scientific Research (NWO)
@@ -23,14 +23,20 @@
 # along with NETMORPH.  If not, see <http://www.gnu.org/licenses/>.
 
 #
-# rectangle_and_electrodes.sh
+# fig8B.sh
 #
-# Randal A. Koene, 20041230
+# Randal A. Koene, 20240324
 
-if [ "$1" = "" ]; then
-    numneurons=21000
-else
-    numneurons=$1
+curdir=`pwd`
+if [ ! -f ../../nibr ]; then
+	echo "This script should be run from its example directory"
+	echo "examples/fig8B/ and the nibr (netmorph) program needs"
+	echo "to be two steps up from that."
+	exit 1
 fi
 
-./nibr "neurons=$numneurons" "sidelength=1168.0" "shape=rectangle" "seconds=0.0" "figattr_connections=false" "figattr_presynaptic=false" "figattr_postsynaptic=false" "figattr_partitions=false" "figattr_connection_eval=false" "figattr_progress=none"
+cd ../..
+
+./nibr "include=examples/fig8B/fig8B" "outattr_directory=examples/fig8B"
+
+cd $curdir

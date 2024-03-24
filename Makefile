@@ -139,6 +139,9 @@ SAFEREGEX= -D_BIGREGEX_SAFE_MATCHES
 # Normal:
 COMPOPT=-O3
 OPTSTR=optimized
+# Unspecified:
+#COMPOPT=
+#OPTSTR=unspecified
 ## debugging information:
 # For gprof:
 #GPROF=-pg

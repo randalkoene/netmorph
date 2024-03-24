@@ -1,4 +1,4 @@
-#! /bin/sh
+#! /bin/bash
 # © Copyright 2008 Randal A. Koene <randalk@netmorph.org>
 # 
 # With design assistance from J. van Pelt & A. van Ooyen, and support
@@ -23,19 +23,26 @@
 # along with NETMORPH.  If not, see <http://www.gnu.org/licenses/>.
 
 #
-# van_Pelt.sh
+# rectangle_and_electrodes.sh
 #
 # Randal A. Koene, 20041230
 
+curdir=`pwd`
+if [ ! -f ../../nibr ]; then
+	echo "This script should be run from its example directory"
+	echo "examples/rectangle_and_electrodes/ and the nibr (netmorph) program needs"
+	echo "to be two steps up from that."
+	exit 1
+fi
+
 if [ "$1" = "" ]; then
-    numneurons=100
+    numneurons=21000
 else
     numneurons=$1
 fi
 
-./nibr "neurons=$numneurons" "sidelength=1168.0" "shape=rectangle" "connectivity=uniformrandom" "seconds=0.0" "figattr_presynaptic=false" "figattr_postsynaptic=false" "figattr_partitions=false" "figattr_connection_eval=false" "figattr_progress=none"
+cd ../..
 
-# net.uniform_random_connectivity(37.0,20,28,PRINCIPAL_NEURON,PRINCIPAL_NEURON); 
-# net.uniform_random_connectivity(232.0,17,23,PRINCIPAL_NEURON,INTERNEURON,false);
-# net.uniform_random_connectivity(82.0,60,88,INTERNEURON,PRINCIPAL_NEURON,false);
-# net.uniform_random_connectivity(82.0,5,7,INTERNEURON,INTERNEURON,false);
+./nibr "neurons=$numneurons" "sidelength=1168.0" "shape=rectangle" "seconds=0.0" "figattr_connections=false" "figattr_presynaptic=false" "figattr_postsynaptic=false" "figattr_partitions=false" "figattr_connection_eval=false" "figattr_progress=none" "outattr_directory=examples/rectangle_and_electrodes"
+
+cd $curdir
