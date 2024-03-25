@@ -233,6 +233,7 @@ String Sampled_Growth_Fig_Output::report_parameters() {
 }
 
 bool Sampled_Growth_Fig_Output::Sample(double t) {
+  //cout << "F-Sample-Enter " << t << '\n';
   if (!Sampled_Growth_Output::Sample(t)) return false;
   // *** to do this faster, I can capture all the Fig_Groups in one and
   // use its box size for scaling, then produce output from the component

@@ -31,14 +31,14 @@ approxproportionmultipolar_nonpyramidal=0.0;
 approxproportionuntyped_neuron=0.0;
 
 # Default 3D shape:
-shape=regions;
-regions=VI;
-VI.shape=disc;
-VI.neurons=1000;
-VI.minneuronseparation=16.0;
-VI.centerZ=-300;
-VI.shape.radius=500;
-VI.shape.thickness=30;
+#shape=regions;
+#regions=VI;
+#VI.shape=disc;
+#VI.neurons=1000;
+#VI.minneuronseparation=16.0;
+#VI.centerZ=-300;
+#VI.shape.radius=500;
+#VI.shape.thickness=30;
 
 electrodes=false;
 
