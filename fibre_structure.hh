@@ -214,8 +214,10 @@ public:
   //***fibre_segment(double a, double l): branch1(NULL), branch2(NULL), angle(a), seglength(l) {}
   virtual ~fibre_segment() { delete branch1; delete branch2; }
   neuron * N() { return n; }
+  fibre_segment* Parent() { return parent; }
   fibre_segment * Branch1() { return branch1; }
   fibre_segment * Branch2() { return branch2; }
+  int get_APICAL() { return APICAL; }
 #ifdef INCLUDE_SIMPLE_FIBER_DIAMETER
   double Diameter() { return diameter; }
   void set_diameter(double d) { diameter = d; }
@@ -408,6 +410,7 @@ public:
   double sum_of_perturbed_expected_elongations();
   void move_add(spatial & addvec);
   void fanin_rot();
+  void set_colnum(long _colnum) { colnum=_colnum; }
   virtual Fig_Object * net_Fig();
   virtual Txt_Object * net_Txt();
   double cache; // cache used during statistics calculation

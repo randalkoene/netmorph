@@ -107,6 +107,9 @@ protected:
   Spatial_Segment_Subset * sss; // used within develop_connection_structure()
   Neurite_Diameter_Model * ndm;
   regionslist regions;
+
+  bool NES_output = false;
+
   void add_typed_neuron(neuron_type nt, neuron * psmin, neuron * psmax);
   void remove_abstract_connections_without_synapses();
 public:
@@ -174,6 +177,9 @@ public:
   void visible_pre_and_target_post(neuron & n); // (see nibr.cc)
   virtual void parse_CLP(Command_Line_Parameters & clp);
   virtual String report_parameters();
+
+  void set_NES_Output(bool _NESoutput) { NES_output = _NESoutput; }
+  bool NES_Output() const { return NES_output; }
 };
 
 class electrodearray: public network {

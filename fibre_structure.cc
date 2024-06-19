@@ -990,7 +990,7 @@ void structure_initialization::initialize(fibre_structure * fs_root) {
   if ((L0_min<0.0) || (L0_max<0.0) || (L0_max<L0_min)) error("Error: Invalid (or negative) initial segment length range [L0_min,L0_max] for a fiber structure root segment of the neuron with numerical ID "+String((long) fs_root->N()->numerical_ID())+'\n');
   fs_root->TerminalSegments()->head()->set_length(X_misc.get_rand_range_real1(L0_min,L0_max));
   if (colnum<1) warning("Warning: The color with which to display neurite fiber of the neuron with numerical ID "+String((long) fs_root->N()->numerical_ID())+" was not set.\n");
-  fs_root->colnum = colnum;
+  fs_root->set_colnum(colnum);
 }
 
 structure_initialization * structure_initialization_selection(String & label, Command_Line_Parameters & clp, structure_initialization & superior_set, structure_initialization & strucinit) {

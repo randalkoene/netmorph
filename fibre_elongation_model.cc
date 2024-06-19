@@ -794,7 +794,7 @@ terminal_segment_elongation_model_base * BESTL_nonnormalizing_terminal_segment_e
   if (ts) {
     if ((!ts->Prev()) && (!ts->Next())) { // We still use the regular ERI->initialize() call from the terminal_segment::branch() function when branching
       if (!(ts->ElongationRateInitializationModel())) error("ElongationRateInitializationModel() is NULL in BESTL_nonnormalizing_terminal_segment_elongation_model::clone().\n");
-      else ts->ElongationRateInitializationModel()->root_initialize(tsemb->base_parameters.l_i_cache); // Insures that initial segments also draw from the ERI distribution (see TL#200807020156.10)
+      else ts->ElongationRateInitializationModel()->root_initialize(tsemb->l_i_cache_ref()); // Insures that initial segments also draw from the ERI distribution (see TL#200807020156.10)
     }
   }
   return tsemb;
@@ -922,10 +922,10 @@ void BESTLNN_pyramidal_AD_terminal_segment_elongation_model::set_tuft_models(ter
   elongation_rate_initialization_model_base * eribptr = NULL;
   elongation_rate_initialization_model_selection(prefixstr,*main_clp,elongation_rate_initialization_model_region_subset_schemas[0][all_pyramidal_dendrites_sps],eribptr);
   most_recent_branch1_ts->set_ERI_model(eribptr);
-  eribptr->root_initialize(tsembptr1->base_parameters.l_i_cache); // reinitialize according to the new ERI model
+  eribptr->root_initialize(tsembptr1->l_i_cache_ref()); // reinitialize according to the new ERI model
   eribptr = eribptr->clone();
   most_recent_branch2_ts->set_ERI_model(eribptr);
-  eribptr->root_initialize(tsembptr2->base_parameters.l_i_cache); // reinitialize according to the new ERI model
+  eribptr->root_initialize(tsembptr2->l_i_cache_ref()); // reinitialize according to the new ERI model
   // TSB models
   TSBM_base * tsbmbptr = NULL;
   TSBM_selection(prefixstr,*main_clp,TSBM_region_subset_schemas[0][all_pyramidal_dendrites_sps],tsbmbptr,most_recent_branch1_ts);
@@ -985,7 +985,7 @@ void BESTLNN_pyramidal_AD_terminal_segment_elongation_model::set_oblique_models(
   elongation_rate_initialization_model_selection(prefixstr,*main_clp,elongation_rate_initialization_model_region_subset_schemas[0][all_pyramidal_dendrites_sps],eribptr);
   // most_recent_branch1_ts retains the current apical trunk settings
   most_recent_branch2_ts->set_ERI_model(eribptr);
-  eribptr->root_initialize(tsembptr->base_parameters.l_i_cache); // reinitialize according to the new ERI model
+  eribptr->root_initialize(tsembptr->l_i_cache_ref()); // reinitialize according to the new ERI model
   // TSB models
   TSBM_base * tsbmbptr = NULL;
   TSBM_selection(prefixstr,*main_clp,TSBM_region_subset_schemas[0][all_pyramidal_dendrites_sps],tsbmbptr,most_recent_branch2_ts);
@@ -1403,8 +1403,8 @@ elongation_rate_initialization_model_base * continue_defaults_eri_model::clone()
 }
 
 void continue_defaults_eri_model::predict_initial_quota(double & predictedquota1,double & predictedquota2, terminal_segment * ts1, terminal_segment * ts2,double weight) {
-  predictedquota1 += ts1->ElongationModel()->base_parameters.l_i_cache;
-  predictedquota2 += ts2->ElongationModel()->base_parameters.l_i_cache;
+  predictedquota1 += ts1->ElongationModel()->l_i_cache_ref();
+  predictedquota2 += ts2->ElongationModel()->l_i_cache_ref();
 }
 
 String continue_defaults_eri_model::report_parameters_specific() {

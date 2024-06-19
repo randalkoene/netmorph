@@ -66,22 +66,22 @@ double rall_power_law_ndm::fibre_diameter(fibre_segment * fs) {
   // This function recursively reaches down to terminal segments, then retracts,
   // while computing new diameters at bifurcations and setting the diameters of
   // all fiber segments.
-  if (fs->branch1) {
-    if (fs->branch2) { // this is the parent of a bifurcation
-      double d_1 = fibre_diameter(fs->branch1);
-      double d_2 = fibre_diameter(fs->branch2);
+  if (fs->Branch1()) {
+    if (fs->Branch2()) { // this is the parent of a bifurcation
+      double d_1 = fibre_diameter(fs->Branch1());
+      double d_2 = fibre_diameter(fs->Branch2());
       double e_power = PDF_e_power->random_positive();
       double d_epower = exp(e_power*log(d_1)) + exp(e_power*log(d_2));
       double d = exp(log(d_epower)/e_power);
       fs->set_diameter(d);
       return d;
     } else { // this is between bifurcations
-      double d = fibre_diameter(fs->branch1);
+      double d = fibre_diameter(fs->Branch1());
       fs->set_diameter(d);
       return d;
     }
-  } else if (fs->branch2) { // this is between bifurcations
-      double d = fibre_diameter(fs->branch2);
+  } else if (fs->Branch2()) { // this is between bifurcations
+      double d = fibre_diameter(fs->Branch2());
       fs->set_diameter(d);
       return d;
   } else { // this is a terminal segment

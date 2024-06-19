@@ -276,6 +276,9 @@ public:
   virtual double predict(double weight);
   virtual void  elongate(terminal_segment * ts);
   virtual String report_parameters_specific() = 0;
+
+  double& l_i_cache_ref() { return base_parameters.l_i_cache; }
+
   String report_parameters();
 };
 

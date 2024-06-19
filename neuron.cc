@@ -577,7 +577,11 @@ Txt_Object * neuron::net_Txt() {
   P.get_all(x,y,z);
   (*Txt_neuronlist) += String(x,",%f");
   (*Txt_neuronlist) += String(y,",%f");
-  (*Txt_neuronlist) += String(z,",%f\n");
+  (*Txt_neuronlist) += String(z,",%f");
+  if (eq) if (eq->Net()->NES_Output()) {
+    (*Txt_neuronlist) += String(Radius(), ",%f");
+  }
+  (*Txt_neuronlist) += '\n';
   progress(" synapses (");
   if (outputconnections.head()) {
     PLL_LOOP_FORWARD(connection,outputconnections.head(),1) {

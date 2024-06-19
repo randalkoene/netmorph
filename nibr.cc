@@ -1222,6 +1222,10 @@ Usage: netmorph [parameter=value]\n\
     combinemagnification=<decimal#>      magnificant applied when combining\n\
     camera=<true/false>                  use camera specifications\n\
 \n\
+    Simulation Output - Output for NES:\n\
+\n\
+    NES_output=<true/false>              Produce output for NES\n\
+\n\
     General:\n\
 \n\
     substitute=<regular-expression>      RegEx substitution applied to commands\n\

@@ -152,6 +152,8 @@ void network::parse_CLP(Command_Line_Parameters & clp) {
   if ((n=clp.Specifies_Parameter("candidate_synapses"))>=0) candidate_synapses = (downcase(clp.ParValue(n))==String("true"));
   if ((n=clp.Specifies_Parameter("synapses_during_development"))>=0) synapses_during_development = (downcase(clp.ParValue(n))==String("true"));
   ndm = select_neurite_diameter_model(*this,clp);
+
+  if ((n=clp.Specifies_Parameter("NES_output"))>=0) NES_output = (downcase(clp.ParValue(n))==String("true"));
 }
 
 String network::report_parameters() {
@@ -1564,7 +1566,11 @@ Txt_Group * network::net_Txt() {
   if (Txt_neuronlist) delete Txt_neuronlist;
   if (Txt_synapselist) delete Txt_synapselist;
   if (outattr_Txt_separate_files) {
-    Txt_neuronlist = new String(COLUMN_LABELS_NEURONS);
+    if (NES_output) {
+      Txt_neuronlist = new String(COLUMN_LABELS_NEURONS_WITH_RADIUS);
+    } else {
+      Txt_neuronlist = new String(COLUMN_LABELS_NEURONS);
+    }
     Txt_synapselist = new String(COLUMN_LABELS_SYNAPSES);
   } else {
     Txt_neuronlist = new String();
@@ -1596,11 +1602,11 @@ Txt_Group * network::net_Txt() {
     }
     long unsigned int totalnumroots = 0, continuation = 0, bifurcation = 0, terminal = 0;
     PLL_LOOP_FORWARD(neuron,PLLRoot<neuron>::head(),1) {
-      totalnumroots += e->inputstructure.length() + e->outputstructure.length();
+      totalnumroots += e->InputStructure()->length() + e->OutputStructure()->length();
       parsing_fs_type = dendrite_fs;
-      PLL_LOOP_FORWARD_NESTED(fibre_structure,e->inputstructure.head(),1,d) d->count_segment_types(continuation,bifurcation,terminal);
+      PLL_LOOP_FORWARD_NESTED(fibre_structure,e->InputStructure()->head(),1,d) d->count_segment_types(continuation,bifurcation,terminal);
       parsing_fs_type = axon_fs;
-      PLL_LOOP_FORWARD_NESTED(fibre_structure,e->outputstructure.head(),1,a) a->count_segment_types(continuation,bifurcation,terminal);
+      PLL_LOOP_FORWARD_NESTED(fibre_structure,e->OutputStructure()->head(),1,a) a->count_segment_types(continuation,bifurcation,terminal);
     }
     Txt_fiberrootlist->alloc((totalnumroots+3)*80);
     Txt_continuationnodelist->alloc((continuation+3)*128);
@@ -1691,8 +1697,8 @@ bool network::Data_Output_Synapse_Distance(String dataname) {
   PLL_LOOP_FORWARD(neuron,PLLRoot<neuron>::head(),1) {
     PLL_LOOP_FORWARD_NESTED(connection,e->OutputConnections()->head(),1,c) {
       PLL_LOOP_FORWARD_NESTED(synapse,c->Synapses()->head(),1,s) {
-        int axonbinnum = (int) (c->PreSynaptic()->P.distance(s->Structure()->P0) / outattr_distance_frequency_distbinsize);
-        int dendritebinnum = (int) (c->PostSynaptic()->P.distance(s->Structure()->P0) / outattr_distance_frequency_distbinsize);
+        int axonbinnum = (int) (c->PreSynaptic()->Pos().distance(s->Structure()->P0) / outattr_distance_frequency_distbinsize);
+        int dendritebinnum = (int) (c->PostSynaptic()->Pos().distance(s->Structure()->P0) / outattr_distance_frequency_distbinsize);
 	if ((axonbinnum>=numbins) || (dendritebinnum>=numbins)) {
 	  int maxbinnum = axonbinnum;
 	  if (dendritebinnum>maxbinnum) maxbinnum = dendritebinnum;
@@ -1736,7 +1742,7 @@ bool network::Data_Output_Connection_Distance(String dataname) {
   for (int i = 0; i<numbins; i++) bins[i] = 0;
   PLL_LOOP_FORWARD(neuron,PLLRoot<neuron>::head(),1) {
     PLL_LOOP_FORWARD_NESTED(connection,e->OutputConnections()->head(),1,c) {
-      int binnum = (int) (c->PreSynaptic()->P.distance(c->PostSynaptic()->P) / outattr_distance_frequency_distbinsize);
+      int binnum = (int) (c->PreSynaptic()->Pos().distance(c->PostSynaptic()->Pos()) / outattr_distance_frequency_distbinsize);
       if (binnum>=numbins) {
 	int newnumbins = numbins + 2*((binnum-numbins)+1);
 	unsigned long * oldbins = bins;

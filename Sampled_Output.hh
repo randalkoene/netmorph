@@ -179,6 +179,7 @@ public:
 };
 
 class Activity_Results_Output {
+protected:
   bool postop_done;
 public:
   Activity_Results_Output(): postop_done(false) {}

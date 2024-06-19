@@ -266,7 +266,7 @@ void Delayed_Branching_Model::continuation_node_to_branch(fibre_segment * fs, do
   // a direction model.
   // Determine centrifugal order:
   int centord = 1;
-  for (fibre_segment * fsp = fs->parent; (fsp); fsp = fsp->parent) if ((fsp->branch1) && (fsp->branch2)) centord++;
+  for (fibre_segment * fsp = fs->Parent(); (fsp); fsp = fsp->Parent()) if ((fsp->Branch1()) && (fsp->Branch2())) centord++;
   terminal_segment * ts = new terminal_segment(*arbor,*newbranch,acoords,centord);
   register PLLRoot<terminal_segment> * tsroot = arbor->TerminalSegments();
   register direction_model_base * dirmodel = tsroot->head()->DirectionModel();

@@ -153,7 +153,7 @@ Txt_Object * synapse::net_Txt() {
   (*Txt_synapselist) += ',';
   (*Txt_synapselist) += String((long) Postsynaptic_Neuron());
   if (SynaptoGenesis_Data) (*Txt_synapselist) += String(SynaptoGenesis_Data->find_t_genesis(this),",%f");
-  if(s->DendriteSegment()->APICAL == 6)
+  if(s->DendriteSegment()->get_APICAL() == 6)
   {
 	  (*Txt_synapselist) += String(",APICAL\n");
   }
