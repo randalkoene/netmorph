@@ -309,6 +309,9 @@ Abranchesatturns=false;
 Dbranchesatturns=false;
 candidate_synapses=false;
 
+fibrediameter=true;
+neurite_diameter_model=rall;
+
 # SIMULATION RUNTIME AND SAMPLING PARAMETERS
 # Data is collected at intervals of 4320 seconds.
 # This data is used to produce statistical output
