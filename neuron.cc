@@ -575,15 +575,18 @@ presynaptic_structures_fig->Add_Fig_Object(fo);
   return neuron_structure_fig;
 }
 
+/**
+ * *** BUG! Output correctly lists the positions of all neurons, but labels are repeated!
+ */
 Txt_Object * neuron::net_Txt() {
   (*Txt_neuronlist) += String(Txt_neuronindex);
   (*Txt_neuronlist) += ',';
-  (*Txt_neuronlist) += String((long) this);
+  (*Txt_neuronlist) += String((long) this_neuron(););
   (*Txt_neuronlist) += ',';
   (*Txt_neuronlist) += neuron_short_name[TypeID()];
   (*Txt_neuronlist) += ',';
   int regnum = -1;
-  if (eq) regnum = eq->Net()->Regions().find(*this);
+  if (eq) regnum = eq->Net()->Regions().find(*this); // *** Is this use of this safe?
   if (regnum>=0) (*Txt_neuronlist) += eq->Net()->Regions().el(regnum)->Name();
   else (*Txt_neuronlist) += "universal";
   double x=0.0, y=0.0, z=0.0;

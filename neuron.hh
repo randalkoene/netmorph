@@ -118,6 +118,11 @@ struct neuron_chemical_factors {
 
 // <A NAME="one-clear-on-multiple-linked-lists">Only one clear() must be called on a multiply linked list</A>
 // See <A HREF="../../../doc/html/lists/task-log.20040915.html#200410060901">TL#200410060901</A>.
+/**
+ * Beware: We've had some issues using the this pointer in functions
+ * of the virtual base class. It might be necessary to use the
+ * this_neuron() function instead.
+ */
 class neuron: public PLLHandle<neuron>, public state_storable {
   friend class connection;
 protected:
@@ -138,6 +143,7 @@ public:
   neuron(): radius(5.0), Vm(VmREST), abstracted_connections(false), a(&NullActivity), figneuroncolor(colortable->colnum(CT_neuron_untyped)), figconnectionscolor(colortable->colnum(CT_connection_excitatory)), figsynapsescolor(colortable->colnum(CT_synapses)), figdendritescolor(colortable->colnum(CT_dendrites)), figaxonscolor(colortable->colnum(CT_axon_excitatory)), figattr(0) { numberID = num_neurons_created; num_neurons_created++; }
   neuron(spatial & npos): P(npos), radius(5.0), Vm(VmREST), abstracted_connections(false), a(&NullActivity), figneuroncolor(colortable->colnum(CT_neuron_untyped)), figconnectionscolor(colortable->colnum(CT_connection_excitatory)), figdendritescolor(colortable->colnum(CT_dendrites)), figaxonscolor(colortable->colnum(CT_axon_excitatory)), figattr(0) { numberID = num_neurons_created; num_neurons_created++; }
   ~neuron() { if (a!=&NullActivity) delete a; }
+  virtual void* this_neuron() = 0; // See Beware note above.
   // architecture geometry  
   virtual void parse_CLP(Command_Line_Parameters & clp) = 0;
   void set_position(spatial & npos) { P = npos; }
@@ -212,6 +218,7 @@ class principal: public neuron {
 public:
   principal() { set_fig_colors(colortable->colnum(CT_neuron_principal),colortable->colnum(CT_connection_excitatory),colortable->colnum(CT_dendrites),colortable->colnum(CT_axon_excitatory)); } //parse_CLP(*main_clp); }
   principal(spatial npos): neuron(npos) { figneuroncolor=colortable->colnum(CT_neuron_principal); figconnectionscolor=colortable->colnum(CT_connection_excitatory); } //parse_CLP(*main_clp); }
+  virtual void* this_neuron() { return (void*) this; };
   virtual neuron_type TypeID() { return PRINCIPAL_NEURON; }
   virtual void parse_CLP(Command_Line_Parameters & clp);
 };
@@ -230,6 +237,7 @@ protected:
 public:
   multipolar_nonpyramidal() {}
   multipolar_nonpyramidal(spatial & npos): principal(npos) {}
+  virtual void* this_neuron() { return (void*) this; };
   virtual neuron_type TypeID() { return MULTIPOLAR_NONPYRAMIDAL; }
   virtual void initialize_output_structure(double mintotlength, double maxtotlength); // (see nibr.cc)
   virtual void initialize_input_structure(double mintotlength, double maxtotlength); // (see nibr.cc)
@@ -240,6 +248,7 @@ class bipolar: public multipolar_nonpyramidal {
 public:
   bipolar() {}
   bipolar(spatial & npos): multipolar_nonpyramidal(npos) {}
+  virtual void* this_neuron() { return (void*) this; };
   virtual neuron_type TypeID() { return BIPOLAR; }
   virtual void initialize_output_structure(double mintotlength, double maxtotlength); // (see nibr.cc)
   virtual void initialize_input_structure(double mintotlength, double maxtotlength); // (see nibr.cc)
@@ -249,6 +258,7 @@ class pyramidal: public multipolar_nonpyramidal {
 public:
   pyramidal() {}
   pyramidal(spatial & npos): multipolar_nonpyramidal(npos) {}
+  virtual void* this_neuron() { return (void*) this; };
   virtual neuron_type TypeID() { return PYRAMIDAL; }
   virtual void initialize_output_structure(double mintotlength, double maxtotlength); // (see nibr.cc)
   virtual void initialize_input_structure(double mintotlength, double maxtotlength); // (see nibr.cc)
@@ -258,6 +268,7 @@ class interneuron: public multipolar_nonpyramidal {
 public:
   interneuron() { set_fig_colors(colortable->colnum(CT_neuron_interneuron),colortable->colnum(CT_connection_inhibitory),colortable->colnum(CT_dendrites),colortable->colnum(CT_axon_inhibitory)); }
   interneuron(spatial & npos): multipolar_nonpyramidal(npos) { figneuroncolor=colortable->colnum(CT_neuron_interneuron); figconnectionscolor=colortable->colnum(CT_connection_inhibitory); }
+  virtual void* this_neuron() { return (void*) this; };
   virtual neuron_type TypeID() { return INTERNEURON; }
   virtual void initialize_output_structure(double mintotlength, double maxtotlength); // (see nibr.cc)
   virtual void initialize_input_structure(double mintotlength, double maxtotlength); // (see nibr.cc)
@@ -267,6 +278,7 @@ class electrode: public neuron {
 public:
   electrode() { radius = 12.0/2.0; } // diameter from [PELT:LONGTERMDYN]
   electrode(double r) { radius = r; }
+  virtual void* this_neuron() { return (void*) this; };
   virtual void parse_CLP(Command_Line_Parameters & clp) {}
   virtual Fig_Object * net_Fig();
 };
