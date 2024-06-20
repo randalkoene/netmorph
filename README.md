@@ -50,7 +50,7 @@ g++/gcc GNU C++/C compilers.
    `./install.sh`
 
    Successful compilation results in the programs
-   `netmorph` and `netmorph2D`.
+   `./bin/netmorph` and `./bin/netmorph2D`.
 
 At this point it is possible to use the netmorph programs to run
 simulations of network development. In order to perform evaluation

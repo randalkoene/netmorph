@@ -37,6 +37,7 @@ INCLUDES= -I$(INC_PATH)
 LIB_PATH= ./lib
 LIBRARIES= -L$(LIB_PATH)
 OBJ_PATH= ./obj
+BIN_PATH= ./bin
 
 ##########################################################
 ## Machine selection
@@ -83,7 +84,7 @@ MEMORYSAVING=
 #RNGCHOICE=-DFAST_RNG
 RNGCHOICE=-DPRECISE_RNG
 #MODELCHOICES=-DADM_PRIORITIZE_SPEED_OVER_SPACE -DTESTING_SIMPLE_ATTRACTION -DENABLE_APICAL_TUFTING_TRIGGER_DISTANCE $(RNGCHOICE) $(MEMORYSAVING) -DINCLUDE_SIMPLE_FIBER_DIAMETER
-MODELCHOICES=-DADM_PRIORITIZE_SPEED_OVER_SPACE -DTESTING_SIMPLE_ATTRACTION $(RNGCHOICE) $(MEMORYSAVING) -DINCLUDE_SIMPLE_FIBER_DIAMETER -DUSE_RCFILE
+MODELCHOICES=-DADM_PRIORITIZE_SPEED_OVER_SPACE -DTESTING_SIMPLE_ATTRACTION $(RNGCHOICE) $(MEMORYSAVING) -DINCLUDE_SIMPLE_FIBER_DIAMETER -DUSE_RCFILE -DUSE_RCFILE
 OUTPUTCHOICES=-DCHECK_XFIG_RANGES
 #-DTESTING_SPIKING
 #-DLEGACY_ELONGATION
@@ -139,6 +140,9 @@ SAFEREGEX= -D_BIGREGEX_SAFE_MATCHES
 # Normal:
 COMPOPT=-O3
 OPTSTR=optimized
+# Unspecified:
+#COMPOPT=
+#OPTSTR=unspecified
 ## debugging information:
 # For gprof:
 #GPROF=-pg
@@ -367,8 +371,8 @@ nibr: $(OBJ_PATH)/nibr.o $(OBJ_PATH)/Txt_Object.o $(OBJ_PATH)/VRML_Object.o $(OB
 	@echo "  _____individual synapses (synapse)"
 	@echo "  _______presynaptic and postsynaptic nodes and branches"
 	@echo "  _________terminals, receptive zones/spines, soma, axon hillock"
-	$(CCPP) $(CPPFLAGS) $(OBJ_PATH)/nibr.o $(OBJ_PATH)/Txt_Object.o $(OBJ_PATH)/VRML_Object.o $(OBJ_PATH)/Catacomb_Object.o $(OBJ_PATH)/Fig_Object.o $(OBJ_PATH)/Color_Table.o $(OBJ_PATH)/Sampled_Output.o $(OBJ_PATH)/Spatial_Presentation.o $(OBJ_PATH)/Network_Generated_Statistics.o $(OBJ_PATH)/Results.o $(OBJ_PATH)/Command_Line_Parameters.o $(OBJ_PATH)/Command.o $(OBJ_PATH)/Spatial_Segment_Subset.o $(OBJ_PATH)/Network_Statistics.o $(OBJ_PATH)/Connection_Statistics.o $(OBJ_PATH)/prepost_structure.o $(OBJ_PATH)/fibre_structure.o $(OBJ_PATH)/synapse_structure.o $(OBJ_PATH)/generic_synapse.o $(OBJ_PATH)/dendritic_growth_model.o $(OBJ_PATH)/synapse_formation_model.o $(OBJ_PATH)/branching_models.o $(OBJ_PATH)/turning_models.o $(OBJ_PATH)/axon_direction_model.o $(OBJ_PATH)/fibre_elongation_model.o $(OBJ_PATH)/neurite_diameter_model.o $(OBJ_PATH)/environment_physics.o $(OBJ_PATH)/connection.o $(OBJ_PATH)/synapse.o $(OBJ_PATH)/IFactivity.o $(OBJ_PATH)/neuron.o $(OBJ_PATH)/network.o $(OBJ_PATH)/spatial.o $(OBJ_PATH)/event.o $(OBJ_PATH)/slice.o $(OBJ_PATH)/StringList.o $(OBJ_PATH)/file.o $(OBJ_PATH)/state_storable.o $(OBJ_PATH)/global.o $(OBJ_PATH)/diagnostic.o $(OBJ_PATH)/BigString.o $(OBJ_PATH)/BigRegex.o $(OBJ_PATH)/mtprng.o $(OBJ_PATH)/regex-gnu.o -lgeometry -o netmorph $(LIBRARIES)
-	ln -f -s netmorph nibr
+	$(CCPP) $(CPPFLAGS) $(OBJ_PATH)/nibr.o $(OBJ_PATH)/Txt_Object.o $(OBJ_PATH)/VRML_Object.o $(OBJ_PATH)/Catacomb_Object.o $(OBJ_PATH)/Fig_Object.o $(OBJ_PATH)/Color_Table.o $(OBJ_PATH)/Sampled_Output.o $(OBJ_PATH)/Spatial_Presentation.o $(OBJ_PATH)/Network_Generated_Statistics.o $(OBJ_PATH)/Results.o $(OBJ_PATH)/Command_Line_Parameters.o $(OBJ_PATH)/Command.o $(OBJ_PATH)/Spatial_Segment_Subset.o $(OBJ_PATH)/Network_Statistics.o $(OBJ_PATH)/Connection_Statistics.o $(OBJ_PATH)/prepost_structure.o $(OBJ_PATH)/fibre_structure.o $(OBJ_PATH)/synapse_structure.o $(OBJ_PATH)/generic_synapse.o $(OBJ_PATH)/dendritic_growth_model.o $(OBJ_PATH)/synapse_formation_model.o $(OBJ_PATH)/branching_models.o $(OBJ_PATH)/turning_models.o $(OBJ_PATH)/axon_direction_model.o $(OBJ_PATH)/fibre_elongation_model.o $(OBJ_PATH)/neurite_diameter_model.o $(OBJ_PATH)/environment_physics.o $(OBJ_PATH)/connection.o $(OBJ_PATH)/synapse.o $(OBJ_PATH)/IFactivity.o $(OBJ_PATH)/neuron.o $(OBJ_PATH)/network.o $(OBJ_PATH)/spatial.o $(OBJ_PATH)/event.o $(OBJ_PATH)/slice.o $(OBJ_PATH)/StringList.o $(OBJ_PATH)/file.o $(OBJ_PATH)/state_storable.o $(OBJ_PATH)/global.o $(OBJ_PATH)/diagnostic.o $(OBJ_PATH)/BigString.o $(OBJ_PATH)/BigRegex.o $(OBJ_PATH)/mtprng.o $(OBJ_PATH)/regex-gnu.o -lgeometry -o $(BIN_PATH)/netmorph $(LIBRARIES)
+	cd $(BIN_PATH) && ln -f -s netmorph nibr
 
 nibr2D: $(OBJ_PATH)/nibr2D.o $(OBJ_PATH)/Txt_Object.o $(OBJ_PATH)/VRML_Object2D.o $(OBJ_PATH)/Catacomb_Object2D.o $(OBJ_PATH)/Fig_Object.o $(OBJ_PATH)/Color_Table.o $(OBJ_PATH)/Sampled_Output2D.o $(OBJ_PATH)/Spatial_Presentation2D.o $(OBJ_PATH)/Network_Generated_Statistics.o $(OBJ_PATH)/Results.o $(OBJ_PATH)/Command_Line_Parameters.o $(OBJ_PATH)/Command.o $(OBJ_PATH)/Spatial_Segment_Subset2D.o $(OBJ_PATH)/Network_Statistics2D.o $(OBJ_PATH)/Connection_Statistics2D.o $(OBJ_PATH)/prepost_structure2D.o $(OBJ_PATH)/fibre_structure2D.o $(OBJ_PATH)/synapse_structure2D.o $(OBJ_PATH)/generic_synapse.o $(OBJ_PATH)/dendritic_growth_model2D.o $(OBJ_PATH)/synapse_formation_model2D.o $(OBJ_PATH)/branching_models2D.o $(OBJ_PATH)/turning_models2D.o $(OBJ_PATH)/axon_direction_model2D.o $(OBJ_PATH)/fibre_elongation_model2D.o $(OBJ_PATH)/neurite_diameter_model2D.o $(OBJ_PATH)/environment_physics2D.o $(OBJ_PATH)/connection2D.o $(OBJ_PATH)/synapse2D.o $(OBJ_PATH)/IFactivity2D.o $(OBJ_PATH)/neuron2D.o $(OBJ_PATH)/network2D.o $(OBJ_PATH)/spatial2D.o $(OBJ_PATH)/event2D.o $(OBJ_PATH)/slice2D.o $(OBJ_PATH)/StringList.o $(OBJ_PATH)/file.o $(OBJ_PATH)/state_storable.o $(OBJ_PATH)/global.o $(OBJ_PATH)/diagnostic.o $(OBJ_PATH)/BigString.o $(OBJ_PATH)/BigRegex.o $(OBJ_PATH)/mtprng.o $(OBJ_PATH)/regex-gnu.o $(LIB_PATH)/$(LIB)
 	@echo "Design rule: Add only the physiology required by function."
@@ -376,11 +380,11 @@ nibr2D: $(OBJ_PATH)/nibr2D.o $(OBJ_PATH)/Txt_Object.o $(OBJ_PATH)/VRML_Object2D.
 	@echo "  _____individual synapses (synapse)"
 	@echo "  _______presynaptic and postsynaptic nodes and branches"
 	@echo "  _________terminals, receptive zones/spines, soma, axon hillock"
-	$(CCPP) $(CPPFLAGS) $(OBJ_PATH)/nibr2D.o $(OBJ_PATH)/Txt_Object.o $(OBJ_PATH)/VRML_Object2D.o $(OBJ_PATH)/Catacomb_Object2D.o $(OBJ_PATH)/Fig_Object.o $(OBJ_PATH)/Color_Table.o $(OBJ_PATH)/Sampled_Output2D.o $(OBJ_PATH)/Spatial_Presentation2D.o $(OBJ_PATH)/Network_Generated_Statistics.o $(OBJ_PATH)/Results.o $(OBJ_PATH)/Command_Line_Parameters.o $(OBJ_PATH)/Command.o $(OBJ_PATH)/Spatial_Segment_Subset2D.o $(OBJ_PATH)/Network_Statistics2D.o $(OBJ_PATH)/Connection_Statistics2D.o $(OBJ_PATH)/prepost_structure2D.o $(OBJ_PATH)/fibre_structure2D.o $(OBJ_PATH)/synapse_structure2D.o $(OBJ_PATH)/generic_synapse.o $(OBJ_PATH)/dendritic_growth_model2D.o $(OBJ_PATH)/synapse_formation_model2D.o $(OBJ_PATH)/branching_models2D.o $(OBJ_PATH)/turning_models2D.o $(OBJ_PATH)/axon_direction_model2D.o $(OBJ_PATH)/fibre_elongation_model2D.o $(OBJ_PATH)/neurite_diameter_model2D.o $(OBJ_PATH)/environment_physics2D.o $(OBJ_PATH)/connection2D.o $(OBJ_PATH)/synapse2D.o $(OBJ_PATH)/IFactivity2D.o $(OBJ_PATH)/neuron2D.o $(OBJ_PATH)/network2D.o $(OBJ_PATH)/spatial2D.o $(OBJ_PATH)/event2D.o $(OBJ_PATH)/slice2D.o $(OBJ_PATH)/StringList.o $(OBJ_PATH)/file.o $(OBJ_PATH)/state_storable.o $(OBJ_PATH)/global.o $(OBJ_PATH)/diagnostic.o $(OBJ_PATH)/BigString.o $(OBJ_PATH)/BigRegex.o $(OBJ_PATH)/mtprng.o $(OBJ_PATH)/regex-gnu.o -lgeometry -o netmorph2D $(LIBRARIES)
-	ln -f -s netmorph2D nibr2D
+	$(CCPP) $(CPPFLAGS) $(OBJ_PATH)/nibr2D.o $(OBJ_PATH)/Txt_Object.o $(OBJ_PATH)/VRML_Object2D.o $(OBJ_PATH)/Catacomb_Object2D.o $(OBJ_PATH)/Fig_Object.o $(OBJ_PATH)/Color_Table.o $(OBJ_PATH)/Sampled_Output2D.o $(OBJ_PATH)/Spatial_Presentation2D.o $(OBJ_PATH)/Network_Generated_Statistics.o $(OBJ_PATH)/Results.o $(OBJ_PATH)/Command_Line_Parameters.o $(OBJ_PATH)/Command.o $(OBJ_PATH)/Spatial_Segment_Subset2D.o $(OBJ_PATH)/Network_Statistics2D.o $(OBJ_PATH)/Connection_Statistics2D.o $(OBJ_PATH)/prepost_structure2D.o $(OBJ_PATH)/fibre_structure2D.o $(OBJ_PATH)/synapse_structure2D.o $(OBJ_PATH)/generic_synapse.o $(OBJ_PATH)/dendritic_growth_model2D.o $(OBJ_PATH)/synapse_formation_model2D.o $(OBJ_PATH)/branching_models2D.o $(OBJ_PATH)/turning_models2D.o $(OBJ_PATH)/axon_direction_model2D.o $(OBJ_PATH)/fibre_elongation_model2D.o $(OBJ_PATH)/neurite_diameter_model2D.o $(OBJ_PATH)/environment_physics2D.o $(OBJ_PATH)/connection2D.o $(OBJ_PATH)/synapse2D.o $(OBJ_PATH)/IFactivity2D.o $(OBJ_PATH)/neuron2D.o $(OBJ_PATH)/network2D.o $(OBJ_PATH)/spatial2D.o $(OBJ_PATH)/event2D.o $(OBJ_PATH)/slice2D.o $(OBJ_PATH)/StringList.o $(OBJ_PATH)/file.o $(OBJ_PATH)/state_storable.o $(OBJ_PATH)/global.o $(OBJ_PATH)/diagnostic.o $(OBJ_PATH)/BigString.o $(OBJ_PATH)/BigRegex.o $(OBJ_PATH)/mtprng.o $(OBJ_PATH)/regex-gnu.o -lgeometry -o $(BIN_PATH)/netmorph2D $(LIBRARIES)
+	cd $(BIN_PATH) && ln -f -s netmorph2D nibr2D
 
 wizard: $(OBJ_PATH)/wizard.o $(OBJ_PATH)/StringList.o $(OBJ_PATH)/BigString.o $(OBJ_PATH)/BigRegex.o $(OBJ_PATH)/regex-gnu.o
-	$(CCPP) $(CPPFLAGS) $(OBJ_PATH)/wizard.o $(OBJ_PATH)/StringList.o $(OBJ_PATH)/BigString.o $(OBJ_PATH)/BigRegex.o $(OBJ_PATH)/regex-gnu.o -o wizard $(LIBRARIES)
+	$(CCPP) $(CPPFLAGS) $(OBJ_PATH)/wizard.o $(OBJ_PATH)/StringList.o $(OBJ_PATH)/BigString.o $(OBJ_PATH)/BigRegex.o $(OBJ_PATH)/regex-gnu.o -o $(BIN_PATH)/wizard $(LIBRARIES)
 
 clean:
-	rm -r -f $(OBJ_PATH)/*.o $(NAME) $(LIB_PATH)/$(LIB)
+	rm -r -f $(BIN_PATH)/* $(OBJ_PATH)/*.o $(LIB_PATH)/$(LIB)

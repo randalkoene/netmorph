@@ -16,7 +16,7 @@ NETMORPH depends on the GNU system libraries and is written in standard C++, alt
    ./install.sh
 
    Successful compilation results in the programs
-   netmorph and netmorph2D.
+   ./bin/netmorph and ./bin/netmorph2D.
 
 At this point it is possible to use the netmorph programs to run simulations of network development. In order to perform evaluation of simulation results and to produce graphs of a resulting network and its statistical data. Analysis methods are described in more detail in the complete manual.
 
