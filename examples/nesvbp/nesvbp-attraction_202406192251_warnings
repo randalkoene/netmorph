@@ -1,0 +1,49 @@
+Warning: Unable to place arbors at desired minimum angular separation.
+  Affected neuron type: Interneuron, neuron ID:26, angle constraints: [0.314,6.283], number of arbors: 4.
+Warning: Unable to place arbors at desired minimum angular separation.
+  Affected neuron type: Interneuron, neuron ID:26, angle constraints: [0.314,6.283], number of arbors: 4.
+Warning: Unable to place arbors at desired minimum angular separation.
+  Affected neuron type: Interneuron, neuron ID:25, angle constraints: [0.314,6.283], number of arbors: 3.
+Warning: Unable to place arbors at desired minimum angular separation.
+  Affected neuron type: Interneuron, neuron ID:25, angle constraints: [0.314,6.283], number of arbors: 3.
+Warning: Unable to place arbors at desired minimum angular separation.
+  Affected neuron type: Interneuron, neuron ID:24, angle constraints: [0.314,6.283], number of arbors: 3.
+Warning: Unable to place arbors at desired minimum angular separation.
+  Affected neuron type: Interneuron, neuron ID:24, angle constraints: [0.314,6.283], number of arbors: 3.
+Warning: Unable to place arbors at desired minimum angular separation.
+  Affected neuron type: Interneuron, neuron ID:23, angle constraints: [0.314,6.283], number of arbors: 2.
+Warning: Unable to place arbors at desired minimum angular separation.
+  Affected neuron type: Interneuron, neuron ID:22, angle constraints: [0.314,6.283], number of arbors: 2.
+Warning: Unable to place arbors at desired minimum angular separation.
+  Affected neuron type: Interneuron, neuron ID:21, angle constraints: [0.314,6.283], number of arbors: 4.
+Warning: Unable to place arbors at desired minimum angular separation.
+  Affected neuron type: Interneuron, neuron ID:21, angle constraints: [0.314,6.283], number of arbors: 4.
+Warning: Unable to place arbors at desired minimum angular separation.
+  Affected neuron type: Interneuron, neuron ID:21, angle constraints: [0.314,6.283], number of arbors: 4.
+Warning: Unable to place arbors at desired minimum angular separation.
+  Affected neuron type: Interneuron, neuron ID:20, angle constraints: [0.314,6.283], number of arbors: 2.
+Warning: Unable to place arbors at desired minimum angular separation.
+  Affected neuron type: Interneuron, neuron ID:19, angle constraints: [0.314,6.283], number of arbors: 2.
+During the collection of simulation statistics, 1684 samples were empty.
+Warning: Unused command Dgrowth_L0_min=0
+  [origin: ./.nibrrc]
+Warning: Unused command Dgrowth_L0_max=0
+  [origin: ./.nibrrc]
+Warning: Unused command Agrowth_L0_min=0
+  [origin: ./.nibrrc]
+Warning: Unused command Agrowth_L0_max=0
+  [origin: ./.nibrrc]
+Warning: Unused command Amin_node_interval=1.0
+  [origin: ./.nibrrc]
+Warning: Unused command Dmin_node_interval=1.0
+  [origin: ./.nibrrc]
+Warning: Unused command growthfunction=vanpelt
+  [origin: ./.nibrrc]
+Warning: Unused command all_axons.B_inf=13.21658
+  [origin: examples/nesvbp/nesvbp-attraction]
+Warning: Unused command all_axons.S=-0.20538
+  [origin: examples/nesvbp/nesvbp-attraction]
+Warning: Unused command all_axons.E=0.319251
+  [origin: examples/nesvbp/nesvbp-attraction]
+Warning: Unused command all_axons.tau=1681541
+  [origin: examples/nesvbp/nesvbp-attraction]

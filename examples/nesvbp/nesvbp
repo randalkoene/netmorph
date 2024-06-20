@@ -10,7 +10,7 @@
 
 days=10;
 dt=100;
-randomseed=20240614
+randomseed=20240614;
 
 # SOMA INITIALIZATION PARAMETERS
 
@@ -21,7 +21,7 @@ pia_attraction_repulsion_hypothesis=true;
 # Start basal growth from specified vector from soma center
 # to center-of-mass of dendrite roots.
 use_specified_basal_direction=true;
-specified_basal_direction_relx=0.001
+specified_basal_direction_relx=0.001;
 specified_basal_direction_rely=0;
 specified_basal_direction_relz=-1;
 
@@ -166,14 +166,14 @@ all_axons.arbor_elongation_model=van_Pelt;
 all_axons.growth_nu0=0.0005208333;
 all_axons.growth_F=0.16;
 all_axons.F_competes_with=same_arbor;
-all_axons.B_inf=13.21658
-all_axons.S=-0.20538
-all_axons.E=0.319251
+all_axons.B_inf=13.21658;
+all_axons.S=-0.20538;
+all_axons.E=0.319251;
 all_axons.elongation_rate_initialization_model=nonnorm_BESTL_length_distribution;
 all_axons.eri.PDF=normal;
 all_axons.eri.PDF.mean=0.00021367265496506256;
 all_axons.eri.PDF.std=0.0003978;
-all_axons.tau=1681541
+all_axons.tau=1681541;
 
 # DENDRITE ELONGATION MODEL PARAMETERS
 # Elongation of growth cones of basal dendrites is governed by a

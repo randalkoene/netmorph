@@ -120,6 +120,8 @@ struct chemical_factor_data {
   // <chemical factor index, list of fiber segments>
   std::map<int, std::set<fibre_segment*>> attractor_segments;
   std::map<int, std::set<fibre_segment*>> repulsion_segments;
+
+  bool has_specified_factors = false;
 };
 
 class network: public PLLRoot<neuron>, public Event_Queue {

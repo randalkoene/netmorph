@@ -34,6 +34,7 @@
 
 #include <set>
 #include <math.h>
+#include <iostream>
 #include "network.hh"
 #include "axon_direction_model.hh"
 #include "neuron.hh"
@@ -594,6 +595,10 @@ void cell_attraction_direction_model::predict_direction(spatial & predicted, neu
     // For all the chemical factors this neuron is attracted to:
     for (auto & attractor : n->chemdata.attractedto) {
       // Find all the somata that are attractive:
+      if (net_ptr->chemdata.attractor_somata.find(attractor)==net_ptr->chemdata.attractor_somata.end()) {
+        std::cout << "MISSING ATTRACTOR SOMATA FOR " << net_ptr->chemindex_to_label.at(attractor) << '\n'; std::cout.flush();
+        exit(1);
+      }
       std::set<neuron*>& neuronptr_set = net_ptr->chemdata.attractor_somata.at(attractor);
       for (auto & n_ptr : neuronptr_set) {
         if (n != n_ptr) {
@@ -606,15 +611,17 @@ void cell_attraction_direction_model::predict_direction(spatial & predicted, neu
         }
       }
     }
-  }
 
-  PLL_LOOP_FORWARD(neuron,n->Root()->head(),1) if (e!=n) if (n->attractedto==e->attracts) {
-    spatial d(e->Pos());
-    d -= growthcone;
-    double SQdistance = d.len2();
-    d /= SQdistance; // square distance gravitational analogy
-    d /= sqrt(SQdistance); // working with weighted unit vectors
-    predicted += d;
+    if (!net_ptr->chemdata.has_specified_factors) {
+      PLL_LOOP_FORWARD(neuron,n->Root()->head(),1) if (e!=n) if (n->attractedto==e->attracts) {
+        spatial d(e->Pos());
+        d -= growthcone;
+        double SQdistance = d.len2();
+        d /= SQdistance; // square distance gravitational analogy
+        d /= sqrt(SQdistance); // working with weighted unit vectors
+        predicted += d;
+      }
+    }
   }
 #endif
 }

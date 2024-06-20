@@ -192,8 +192,8 @@ public:
   inline bool fig_cell_is_visible() { return (!(figattr & FIGMASK_SHOWCELL)); }
   inline bool fig_report_depth() { return (figattr & FIGMASK_REPORTDEPTH); }
 #ifdef TESTING_SIMPLE_ATTRACTION
-  int attracts;
-  int attractedto;
+  int attracts = 0;
+  int attractedto = 0;
 #endif
 };
 
