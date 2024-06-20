@@ -32,7 +32,9 @@
    The base model provides a reference to the history of an axon's growth.
  */
 
+#include <set>
 #include <math.h>
+#include "network.hh"
 #include "axon_direction_model.hh"
 #include "neuron.hh"
 #include "fibre_structure.hh"
@@ -580,8 +582,32 @@ void cell_attraction_direction_model::handle_turning(terminal_segment & ts) {
   ts.set_direction_model(this);
 }
 
+/**
+ * Predicted direction is influenced by the combined vectors resulting from
+ * direction and distance to the soma of neurons marked as being attractive
+ * to the neuron of this growthcone.
+ */
 void cell_attraction_direction_model::predict_direction(spatial & predicted, neuron * n, spatial & growthcone) {
 #ifdef TESTING_SIMPLE_ATTRACTION
+  if (eq) {
+    network * net_ptr = eq->Net();
+    // For all the chemical factors this neuron is attracted to:
+    for (auto & attractor : n->chemdata.attractedto) {
+      // Find all the somata that are attractive:
+      std::set<neuron*>& neuronptr_set = net_ptr->chemdata.attractor_somata.at(attractor);
+      for (auto & n_ptr : neuronptr_set) {
+        if (n != n_ptr) {
+          spatial d(n_ptr->Pos());
+          d -= growthcone;
+          double SQdistance = d.len2();
+          d /= SQdistance; // square distance gravitational analogy
+          d /= sqrt(SQdistance); // working with weighted unit vectors
+          predicted += d;
+        }
+      }
+    }
+  }
+
   PLL_LOOP_FORWARD(neuron,n->Root()->head(),1) if (e!=n) if (n->attractedto==e->attracts) {
     spatial d(e->Pos());
     d -= growthcone;
@@ -641,9 +667,13 @@ direction_model_base * direction_model_selection(String & label, Command_Line_Pa
   // delete a previously defined schema before linking to a new one.
   // PROTOCOL: [See 200709130802.] Sets for which a direction model is not defined explicitly inherit the direction model of
   //           their specific direct superior by cloning it, thereby also inheriting parameters specified therein.
+  // Note that label is something like "regionA.all_pyramidal_axons.",
+  // and dmbptr points to the reference for the direction model specific
+  // to "regionA.all_pyramidal_axons.".
   direction_model dm = NUM_dm;
   String nextlabel;
   int n;
+
   // Determine if a specific model is selected for the set with the given label
   if ((n=clp.Specifies_Parameter(label+"direction_model"))>=0) {
     String dmstr(downcase(clp.ParValue(n)));
@@ -654,17 +684,24 @@ direction_model_base * direction_model_selection(String & label, Command_Line_Pa
     }
     if (label.empty()) default_direction_model = dm; // modify default if setting universal
     if (dmstr==String("segment_history_tension")) dm = segment_history_tension_dm;
-  } else if (label.empty()) dm = default_direction_model; // the universal set must have a model, since it cannot inherit
+  } else {
+    if (label.empty()) dm = default_direction_model; // the universal set must have a model, since it cannot inherit
+  }
+
   // Determine if a following model selection should include chaining detection
   if ((n=clp.Specifies_Parameter(label+"direction_model_label"))>=0) {
     nextlabel = label+clp.URI_unescape_ParValue(n)+'.';
     if (label.empty()) universal_direction_model_root = nextlabel; // to report at universal level
-  } else if ((n=clp.Specifies_Parameter(label+"dm_label"))>=0) { // alternate syntax
-    nextlabel = label+clp.URI_unescape_ParValue(n)+'.';
-    if (label.empty()) universal_direction_model_root = nextlabel; // to report at universal level
+  } else {
+    if ((n=clp.Specifies_Parameter(label+"dm_label"))>=0) { // alternate syntax
+      nextlabel = label+clp.URI_unescape_ParValue(n)+'.';
+      if (label.empty()) universal_direction_model_root = nextlabel; // to report at universal level
+    }
   }
+
   // Clean up any previously defined schema
   if (dmbptr) dmbptr->delete_shared();
+
   // Set and return specified model schema or universal model schema if at universal set level
   axon_direction_history * adh = NULL;
   switch (dm) {
@@ -690,6 +727,7 @@ direction_model_base * direction_model_selection(String & label, Command_Line_Pa
     dmbptr = superior_set->clone();
     break;;
   }
+
   // In case a secondary schema reference is provided through dmbptr for the universal set level, create a clone for the universal set
   if ((label.empty()) && (direction_model_region_subset_schemas[0][universal_sps]!=dmbptr)) {
     if (direction_model_region_subset_schemas[0][universal_sps]) direction_model_region_subset_schemas[0][universal_sps]->delete_shared();

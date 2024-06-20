@@ -180,19 +180,22 @@ double possible_syntypes[UNTYPED_NEURON+1][UNTYPED_NEURON+1][syntype_candidate] 
 // without spines can bridge a distance of up to 0.1 microns.
 double maxfibredistance[UNTYPED_NEURON+1][UNTYPED_NEURON+1] = {
   { // pre==PRINCIPAL_NEURON
-      1.0, 0.1, 1.0, 1.0, 0.0
+      1.0, 0.1, 1.0, 1.0, 1.0, 0.0
   },
   { // pre==INTERNEURON
-      0.1, 0.1, 0.1, 0.1, 0.0
+      0.1, 0.1, 0.1, 0.1, 0.1, 0.0
   },
   { // pre==MULTIPOLAR_NONPYRAMIDAL
-      1.0, 0.1, 1.0, 1.0, 0.0
+      1.0, 0.1, 1.0, 1.0, 1.0, 0.0
+  },
+  { // pre==BIPOLAR
+      1.0, 0.1, 1.0, 1.0, 1.0, 0.0
   },
   { // pre==PYRAMIDAL
-      1.0, 0.1, 1.0, 1.0, 0.0
+      1.0, 0.1, 1.0, 1.0, 1.0, 0.0
   },
   { // pre==UNTYPED_NEURON
-      0.0, 0.0, 0.0, 0.0, 0.0
+      0.0, 0.0, 0.0, 0.0, 0.0, 0.0
   }
 };
 
@@ -291,285 +294,301 @@ double synapse_formation_model::evaluate_possible_connection(fibre_segment * axo
   DIAGNOSTIC_AFTER_ALLOCATION(new_synapse_structure,1,sizeof(*s));
 #ifdef DELAYED_SPECIFIC_PROXIMITY_THRESHOLDS
   double likelihood = 1.0 - (dist3D_Segment_to_Segment(*axonsegment,*dendritesegment,s)/proximitythreshold);
+
 #else
-double mfd = maxfibredistance[axonsegment->N()->TypeID()][dendritesegment->N()->TypeID()];
-double likelihood = -1.0;
+
+  // Note that this version will only produce likelihood values of: -1, 0, or 1.
+  // These values are not particularly informative beyond the fact that a candidate
+  // is created or not.
+  // The maxfibredistance is specified by the D_synmax.**.** parameters.
+  double mfd = maxfibredistance[axonsegment->N()->TypeID()][dendritesegment->N()->TypeID()];
+  double likelihood = -1.0;
 
 
-//"Crossing line-piece" synapse formation model:
-//A geometrical approach to synapse formation. For a detailed explanation see
-//SECO Year 2 report -- Grant agreement number 216593
+  //"Crossing line-piece" synapse formation model:
+  //A geometrical approach to synapse formation. For a detailed explanation see
+  //SECO Year 2 report -- Grant agreement number 216593
 
-double dsegseg = dist3D_Segment_to_Segment(*axonsegment,*dendritesegment,s);
+  double dsegseg = dist3D_Segment_to_Segment(*axonsegment,*dendritesegment,s);
 
-//Initialise line-piece end points
-double Px = 0.0;
-double Py = 0.0;
-double Pz = 0.0;
-double Qx = 0.0;
-double Qy = 0.0;
-double Qz = 0.0;
+  //Initialise line-piece end points
+  double Px = 0.0;
+  double Py = 0.0;
+  double Pz = 0.0;
+  double Qx = 0.0;
+  double Qy = 0.0;
+  double Qz = 0.0;
 
-double Rx = 0.0;
-double Ry = 0.0;
-double Rz = 0.0;
-double Sx = 0.0;
-double Sy = 0.0;
-double Sz = 0.0;
-
-
-double px = 0.0;
-double py = 0.0;
-double pz = 0.0;
-double qx = 0.0;
-double qy = 0.0;
-double qz = 0.0;
-
-double rx = 0.0;
-double ry = 0.0;
-double rz = 0.0;
-double sx = 0.0;
-double sy = 0.0;
-double sz = 0.0;
+  double Rx = 0.0;
+  double Ry = 0.0;
+  double Rz = 0.0;
+  double Sx = 0.0;
+  double Sy = 0.0;
+  double Sz = 0.0;
 
 
-fibre_segment * axon_test_seg;// = axonsegment;
-fibre_segment * dendrite_test_seg;// = dendritesegment;
+  double px = 0.0;
+  double py = 0.0;
+  double pz = 0.0;
+  double qx = 0.0;
+  double qy = 0.0;
+  double qz = 0.0;
 
-axon_test_seg = axonsegment;
-dendrite_test_seg = dendritesegment;
-
-#ifdef VECTOR3D
-Px = axon_test_seg->P0.X();
-Py = axon_test_seg->P0.Y();
-Pz = axon_test_seg->P0.Z();
-Qx = axon_test_seg->P1.X();
-Qy = axon_test_seg->P1.Y();
-Qz = axon_test_seg->P1.Z();
-
-
-Rx = dendrite_test_seg->P0.X();
-Ry = dendrite_test_seg->P0.Y();
-Rz = dendrite_test_seg->P0.Z();
-Sx = dendrite_test_seg->P1.X();
-Sy = dendrite_test_seg->P1.Y();
-Sz = dendrite_test_seg->P1.Z();
-#endif
+  double rx = 0.0;
+  double ry = 0.0;
+  double rz = 0.0;
+  double sx = 0.0;
+  double sy = 0.0;
+  double sz = 0.0;
 
 
+  fibre_segment * axon_test_seg;// = axonsegment;
+  fibre_segment * dendrite_test_seg;// = dendritesegment;
 
-//I
-//Perform spatial translation on axon and dendrite segments
-//Relocate segments: Express their coordinates by shifting the
-//x_0,y_0 point of the axon segment to the x=0,y=0,z=0 location.
-px = Px - Px;
-py = Py - Py;
-pz = Pz - Pz;
-qx = Qx - Px;
-qy = Qy - Py;
-qz = Qz - Pz;
+  axon_test_seg = axonsegment;
+  dendrite_test_seg = dendritesegment;
 
-rx = Rx - Px;
-ry = Ry - Py;
-rz = Rz - Pz;
-sx = Sx - Px;
-sy = Sy - Py;
-sz = Sz - Pz;
+  #ifdef VECTOR3D
+  Px = axon_test_seg->P0.X();
+  Py = axon_test_seg->P0.Y();
+  Pz = axon_test_seg->P0.Z();
+  Qx = axon_test_seg->P1.X();
+  Qy = axon_test_seg->P1.Y();
+  Qz = axon_test_seg->P1.Z();
+
+
+  Rx = dendrite_test_seg->P0.X();
+  Ry = dendrite_test_seg->P0.Y();
+  Rz = dendrite_test_seg->P0.Z();
+  Sx = dendrite_test_seg->P1.X();
+  Sy = dendrite_test_seg->P1.Y();
+  Sz = dendrite_test_seg->P1.Z();
+  #endif
 
 
 
-//II
-//First rotation: Rotate X2,Y2,Z2 coords of the axon segment into XY plane
-//		  Rotate X1,Y1,Z1 and X2,Y2,Z2 coords of dendrite segment accordingly
-double PQ = pow( (pow(abs(Px-Qx),2) + pow(abs(Py-Qy),2) + pow(abs(Pz-Qz),2) ), 0.5);
-double l = pow( (pow(PQ,2) - pow((Qz - Pz),2)), 0.5);
+  //I
+  //Perform spatial translation on axon and dendrite segments
+  //Relocate segments: Express their coordinates by shifting the
+  //x_0,y_0 point of the axon segment to the x=0,y=0,z=0 location.
+  px = Px - Px;
+  py = Py - Py;
+  pz = Pz - Pz;
+  qx = Qx - Px;
+  qy = Qy - Py;
+  qz = Qz - Pz;
 
-
-double qx1;
-double qy1;
-double qz1;
-
-qx1 = l;
-qy1 = 0;
-qz1 = qz;
-
-double rx1;
-double ry1;
-double rz1;
-
-rx1 = ((rx*qx) + (ry*qy))/l;
-ry1 = ((-rx*qy) + (ry*qx))/l;
-rz1 = rz;
-
-double sx1;
-double sy1;
-double sz1;
-
-sx1 = ((sx*qx) + (sy*qy))/l;
-sy1 = ((-sx*qy) + (sy*qx))/l;
-sz1 = sz;
+  rx = Rx - Px;
+  ry = Ry - Py;
+  rz = Rz - Pz;
+  sx = Sx - Px;
+  sy = Sy - Py;
+  sz = Sz - Pz;
 
 
 
-//III
-//Second rotation around Y-axis of q2 onto X-axis
-
-double qx2;
-double qy2;
-double qz2;
-
-qx2 = PQ;
-qy2 = 0;
-qz2 = 0;
+  //II
+  //First rotation: Rotate X2,Y2,Z2 coords of the axon segment into XY plane
+  //		  Rotate X1,Y1,Z1 and X2,Y2,Z2 coords of dendrite segment accordingly
+  double PQ = pow( (pow(abs(Px-Qx),2) + pow(abs(Py-Qy),2) + pow(abs(Pz-Qz),2) ), 0.5);
+  double l = pow( (pow(PQ,2) - pow((Qz - Pz),2)), 0.5);
 
 
-double rx2;
-double ry2;
-double CR;
-double rz2;
+  double qx1;
+  double qy1;
+  double qz1;
 
-rx2 = ((rx*qx) + (ry*qy) + (rz*qz))/PQ;
-ry2 = ry1;
-CR = rx2;
-rz2 = ((-CR*qz) + (PQ*rz))/l;
+  qx1 = l;
+  qy1 = 0;
+  qz1 = qz;
 
-double sx2;
-double CS;
-double sy2;
-double sz2;
+  double rx1;
+  double ry1;
+  double rz1;
 
-sx2 = ((sx*qx)+(sy*qy)+(sz*qz))/PQ;
-CS = sx2;
-sy2 = ((-sx*qy)+(sy*qx))/l;
-sz2 = ((-CS*qz) + (PQ*sz))/l;
+  rx1 = ((rx*qx) + (ry*qy))/l;
+  ry1 = ((-rx*qy) + (ry*qx))/l;
+  rz1 = rz;
 
+  double sx1;
+  double sy1;
+  double sz1;
 
-
-//IV
-//Third rotation around X-axis
-
-double Or2_prime_sq;
-double Os2_prime_sq;
-
-double fv;
-
-Or2_prime_sq = pow(ry2,2) + pow(rz2,2);
-Os2_prime_sq = pow(sy2,2) + pow(sz2,2);
-fv = 0.5*( Or2_prime_sq - Os2_prime_sq )/( pow((ry2 - sy2),2) + pow((rz2 - sz2),2) ) + 0.5;
-
-
-if(abs(fv)<1e-10)
-{
-  fv = 0;
-}
-
-double Vy;
-double Vz;
-Vy = ry2 + fv*(sy2 - ry2);
-Vz = rz2 + fv*(sz2 - rz2);
-
-double lov;
-lov = pow((pow(Vy,2) + pow(Vz,2)),0.5);
-
-double rx3;
-rx3 = CR;
-
-double ry3;
-ry3 = ((ry2*Vy) +(rz2*Vz))/lov;
-
-
-double rz3;
-rz3 = ((ry2*-Vz) +(rz2*Vy))/lov;
-
-double sx3;
-sx3 = CS;
-
-double sy3;
-sy3 = ((sy2*Vy) +(sz2*Vz))/lov;
-
-double sz3;
-sz3 = ((sy2*-Vz) +(sz2*Vy))/lov;
+  sx1 = ((sx*qx) + (sy*qy))/l;
+  sy1 = ((-sx*qy) + (sy*qx))/l;
+  sz1 = sz;
 
 
 
-//V
-//Determine whether r3s3 intersects XY-plane
-bool CONDITION_A = false;
-bool CONDITION_B1 = false;
-bool CONDITION_B2 = false;
-if(rz3*sz3 < 0)   //CONDITION A
-{
-  CONDITION_A = true;
-}
+  //III
+  //Second rotation around Y-axis of q2 onto X-axis
+
+  double qx2;
+  double qy2;
+  double qz2;
+
+  qx2 = PQ;
+  qy2 = 0;
+  qz2 = 0;
 
 
-double qx3 = PQ;
+  double rx2;
+  double ry2;
+  double CR;
+  double rz2;
+
+  rx2 = ((rx*qx) + (ry*qy) + (rz*qz))/PQ;
+  ry2 = ry1;
+  CR = rx2;
+  rz2 = ((-CR*qz) + (PQ*rz))/l;
+
+  double sx2;
+  double CS;
+  double sy2;
+  double sz2;
+
+  sx2 = ((sx*qx)+(sy*qy)+(sz*qz))/PQ;
+  CS = sx2;
+  sy2 = ((-sx*qy)+(sy*qx))/l;
+  sz2 = ((-CS*qz) + (PQ*sz))/l;
 
 
-if(rx3 > sx3)   //CONDITION B1
-{
-  if(rx3 > 0 && sx3 < qx3)
+
+  //IV
+  //Third rotation around X-axis
+
+  double Or2_prime_sq;
+  double Os2_prime_sq;
+
+  double fv;
+
+  Or2_prime_sq = pow(ry2,2) + pow(rz2,2);
+  Os2_prime_sq = pow(sy2,2) + pow(sz2,2);
+  fv = 0.5*( Or2_prime_sq - Os2_prime_sq )/( pow((ry2 - sy2),2) + pow((rz2 - sz2),2) ) + 0.5;
+
+
+  if(abs(fv)<1e-10)
   {
-    CONDITION_B1 = true;
+    fv = 0;
   }
-}
-else if(sx3 > rx3)
-{
-  if(sx3 > 0 && rx3 < qx3)
+
+  double Vy;
+  double Vz;
+  Vy = ry2 + fv*(sy2 - ry2);
+  Vz = rz2 + fv*(sz2 - rz2);
+
+  double lov;
+  lov = pow((pow(Vy,2) + pow(Vz,2)),0.5);
+
+  double rx3;
+  rx3 = CR;
+
+  double ry3;
+  ry3 = ((ry2*Vy) +(rz2*Vz))/lov;
+
+
+  double rz3;
+  rz3 = ((ry2*-Vz) +(rz2*Vy))/lov;
+
+  double sx3;
+  sx3 = CS;
+
+  double sy3;
+  sy3 = ((sy2*Vy) +(sz2*Vz))/lov;
+
+  double sz3;
+  sz3 = ((sy2*-Vz) +(sz2*Vy))/lov;
+
+
+
+  //V
+  //Determine whether r3s3 intersects XY-plane
+  bool CONDITION_A = false;
+  bool CONDITION_B1 = false;
+  bool CONDITION_B2 = false;
+  if(rz3*sz3 < 0)   //CONDITION A
   {
-    CONDITION_B1 = true;
-  }
-}
-
-if(CONDITION_A == true && CONDITION_B1 ==true)
-{
-  double ux;  //Interception point
-  ux = (CS*rz3 - CR*sz3)/(rz3-sz3);
-  double tx;
-
-  tx=ux;
-
-
-
-  if(ux >=0 && ux<= PQ)  //Condidtion B2
-  {
-    CONDITION_B2 = true;
+    CONDITION_A = true;
   }
 
 
-  double frac_T_PQ = tx/qx;
-  double frac_U_RS = (ux - rx3)/(sx3 - rx3);
+  double qx3 = PQ;
 
-  double Tx = Px + frac_T_PQ*(Qx - Px);
-  double Ty = Py + frac_T_PQ*(Qy - Py);
-  double Tz = Pz + frac_T_PQ*(Qz - Pz);
 
-  double Ux = Rx + frac_U_RS*(Sx - Rx);
-  double Uy = Ry + frac_U_RS*(Sy - Ry);
-  double Uz = Rz + frac_U_RS*(Sz - Rz);
-
-  double TU;
-  TU= pow((pow((Tx - Ux),2) + pow((Ty - Uy),2) + pow((Tz - Uz),2)),0.5);
- 
-  
-  if(mfd>=0.0)
+  if(rx3 > sx3)   //CONDITION B1
   {
-    //Set likelihood value for synapse formation between segments
-    if(CONDITION_A == true && CONDITION_B1 == true && CONDITION_B2 == true && TU <= mfd)
+    if(rx3 > 0 && sx3 < qx3)
     {
-      likelihood = 1.0;
+      CONDITION_B1 = true;
     }
-    else
+  }
+  else if(sx3 > rx3)
+  {
+    if(sx3 > 0 && rx3 < qx3)
     {
+      CONDITION_B1 = true;
+    }
+  }
+
+  if(CONDITION_A == true && CONDITION_B1 ==true)
+  {
+    double ux;  //Interception point
+    ux = (CS*rz3 - CR*sz3)/(rz3-sz3);
+    double tx;
+
+    tx=ux;
+
+
+
+    if(ux >=0 && ux<= PQ)  //Condidtion B2
+    {
+      CONDITION_B2 = true;
+    }
+
+
+    double frac_T_PQ = tx/qx;
+    double frac_U_RS = (ux - rx3)/(sx3 - rx3);
+
+    double Tx = Px + frac_T_PQ*(Qx - Px);
+    double Ty = Py + frac_T_PQ*(Qy - Py);
+    double Tz = Pz + frac_T_PQ*(Qz - Pz);
+
+    double Ux = Rx + frac_U_RS*(Sx - Rx);
+    double Uy = Ry + frac_U_RS*(Sy - Ry);
+    double Uz = Rz + frac_U_RS*(Sz - Rz);
+
+    double TU; // distance between the two fiber segments, which will be compared with the maximum allowable fiber distance (mfd) for a given pair of neurite types.
+    TU= pow((pow((Tx - Ux),2) + pow((Ty - Uy),2) + pow((Tz - Uz),2)),0.5);
+    
+    if(mfd>=0.0)
+    {
+      //Set likelihood value for synapse formation between segments
       likelihood = 0.0;
+      if (CONDITION_A == true && CONDITION_B1 == true && CONDITION_B2 == true) {
+        candidate_synapses_num_distance_checks++;
+        if (TU < candidate_synapses_minimum_distance) {
+          candidate_synapses_minimum_distance = TU;
+        }
+        double histogram_bin = round(TU / 0.1);
+        size_t bin = size_t(histogram_bin);
+        if (bin>9) bin=9;
+        candidate_synapse_distances_histogram[bin]++;
+        histogram_bin = round(mfd / 0.1);
+        bin = size_t(histogram_bin);
+        if (bin>9) bin=9;
+        threshold_distances_histogram[bin]++;
+        if (TU <= mfd) {
+          likelihood = 1.0;
+        }
+      }
     }
   }
-}
-else
-{
-  likelihood = 0.0;
-}
-#endif
+  else
+  {
+    likelihood = 0.0;
+  }
+#endif // DELAYED_SPECIFIC_PROXIMITY_THRESHOLDS
+
   ///if ((eq->T()>=101000.0) && (eq->T()<102000.0)) {
   ///  cout << "\nSYNEVAL: T=" << eq->T() << " axonsegment=" << (unsigned long) axonsegment << " dendritesegment=" << (unsigned long) dendritesegment;
   ///}
@@ -580,6 +599,7 @@ else
     // established.
     connectionptr c = axonsegment->N()->connect_to(dendritesegment->N());
     new candidate_synapse(*c,likelihood,s);
+    candidate_synapses_created++;
     return likelihood;
     }
   ///if ((eq->T()>=101000.0) && (eq->T()<102000.0)) cout << '\n'; cout.flush();

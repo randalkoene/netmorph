@@ -28,6 +28,10 @@
 // Classes that define neuronal networks and related functions.
 
 #ifndef __NETWORK_HH
+
+#include <map>
+#include <set>
+
 #include "templates.hh"
 #include "Network_Statistics.hh"
 #include "Spatial_Segment_Subset.hh"
@@ -95,6 +99,29 @@ public:
   int find(neuron & n);
 };
 
+/**
+ * Data cache to quickly find network components involved in various
+ * forms of attracting and repelling using chemical factors.
+ * This is used extensively by the cell_attraction model in
+ * axon_direction_model.
+ * (RK 20240619)
+ * 
+ * This cache table is set up during model setup.
+ */
+struct chemical_factor_data {
+  // <chemical factor index, list of somata>
+  std::map<int, std::set<neuron*>> attractor_somata;
+  std::map<int, std::set<neuron*>> repulsion_somata;
+
+  // <chemical factor index, list of growth cones>
+  //std::map<int, std::vector<terminal_segment*>> attractor_cones;
+  //std::map<int, std::vector<terminal_segment*>> repulsion_cones;
+
+  // <chemical factor index, list of fiber segments>
+  std::map<int, std::set<fibre_segment*>> attractor_segments;
+  std::map<int, std::set<fibre_segment*>> repulsion_segments;
+};
+
 class network: public PLLRoot<neuron>, public Event_Queue {
 protected:
   String netinfo;
@@ -110,6 +137,12 @@ protected:
 
   bool NES_output = false;
 
+public:
+  std::map<String, int> chemlabel_to_index;
+  std::vector<String> chemindex_to_label;
+  chemical_factor_data chemdata;
+
+protected:
   void add_typed_neuron(neuron_type nt, neuron * psmin, neuron * psmax);
   void remove_abstract_connections_without_synapses();
 public:
@@ -122,6 +155,7 @@ public:
   regionslist & Regions() { return regions; }
   spatial & Center() { return center; }
   double Time() { return t; }
+  int get_or_add_chemlabel(String chemlabel);
   bool Seek_Candidate_Synapses() { return candidate_synapses; }
   Shape_Hexagon_Result shape_hexagon(Command_Line_Parameters & clp);
   Shape_Rectangle_Result shape_rectangle(Command_Line_Parameters & clp);

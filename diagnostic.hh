@@ -31,8 +31,15 @@
 #ifndef __DIAGNOSTIC_HH
 #define __DIAGNOSTIC_HH
 
+#include <cstddef>
+
 #ifdef EVALUATE_POSSIBLE_CONNECTION_PROFILING
 extern long evaluate_possible_connection_calls;
+extern long candidate_synapses_created;
+extern long candidate_synapses_num_distance_checks;
+extern double candidate_synapses_minimum_distance;
+extern size_t candidate_synapse_distances_histogram[10];
+extern size_t threshold_distances_histogram[10];
 #define DIAGNOSTIC_EVALUATE_POSSIBLE_CONNECTION_PROFILING evaluate_possible_connection_calls++
 #else
 #define DIAGNOSTIC_EVALUATE_POSSIBLE_CONNECTION_PROFILING

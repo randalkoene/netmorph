@@ -30,10 +30,16 @@
 #include <stdio.h>
 #include <fstream>
 #include <iostream>
+#include <cstddef>
 using namespace std;
 
 #ifdef EVALUATE_POSSIBLE_CONNECTION_PROFILING
 long evaluate_possible_connection_calls = 0;
+long candidate_synapses_created = 0;
+long candidate_synapses_num_distance_checks = 0;
+double candidate_synapses_minimum_distance = 999999999999.0;
+size_t candidate_synapse_distances_histogram[10] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+size_t threshold_distances_histogram[10] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 #endif
 
 #ifdef MEMTESTS

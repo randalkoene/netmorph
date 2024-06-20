@@ -177,8 +177,11 @@ void general_neuron_parameters_interface::parse_CLP(Command_Line_Parameters & cl
   // Population specific model selection (see TL#200807020156.12):
   cached_net_ptr = &net;
   String popid; // popid="" is the universal network model identifier
+
   // 1. We prepare schema arrays according to the number of regions defined
-  int numschemasets = net.Regions().length()+1; // index 0 is for the universal network
+  //    [0] is for the universal network
+  //    [1]..[Regions().length()] is for each of the defined regions
+  int numschemasets = net.Regions().length()+1;
   structure_initialization_region_subset_schemas = new region_structure_initialization_ptr[numschemasets];
   direction_model_region_subset_schemas = new region_direction_model_base_ptr[numschemasets];
   branching_model_region_subset_schemas = new region_branching_model_base_ptr[numschemasets];
@@ -207,9 +210,19 @@ void general_neuron_parameters_interface::parse_CLP(Command_Line_Parameters & cl
     elongation_rate_initialization_model_region_subset_schemas[i] = new elongation_rate_initialization_model_base_ptr[NUM_NATURAL_SPS];
     for (int j=0; j<NUM_NATURAL_SPS; j++) elongation_rate_initialization_model_region_subset_schemas[i][j] = NULL;
   }
+
   //    Some initial values for structure initialization values in the universal set
   for (int j=0; j<NUM_NATURAL_SPS; j++) structure_initialization_region_subset_schemas[0][j].init(natural_schema_parent_set(j));
+
   // 2. We start with the universal network models, then work our way through existing populations
+  //    E.g. "direction_model"
+  //         "all_axons.direction_model"
+  //         "..."
+  //         "all_apical_pyramidal_dendrites.direction_model"
+  //         "regionA.direction_model"
+  //         "regionA.all_axons.direction_model"
+  //         "..."
+  //         "regionA.all_apical_pyramidal_dendrites.direction_model"
   region * r = NULL; int regid = 0;
   // [***INCOMPLETE] We may need to modify the way in which universal "contributing" models are specified and used in the selection functions.
   do {

@@ -240,6 +240,18 @@ network::network(int numneurons, neuron * psmin, neuron * psmax, Network_Statist
   }
 }
 
+int network::get_or_add_chemlabel(String chemlabel) {
+  auto it = chemlabel_to_index.find(chemlabel);
+  if (it == chemlabel_to_index.end()) {
+    int new_idx = chemindex_to_label.size();
+    chemlabel_to_index[chemlabel] = new_idx;
+    chemindex_to_label.emplace_back(chemlabel);
+    return new_idx;
+  } else {
+    return it->second;
+  }
+}
+
 Shape_Hexagon_Result network::shape_hexagon(Command_Line_Parameters & clp) {
 // gives neurons in the network positions such that they form a hexagon and
 // are evenly distributed.
@@ -620,6 +632,21 @@ String region_parameters::report_parameters() {
 int attracts = 0;
 #endif
 
+std::vector<String> get_chem_factors(String factorsstr) {
+    std::vector<String> chemfactors_vec;
+    while (!factorsstr.empty()) {
+      String factor(factorsstr.before(' '));
+      if (factor.empty()) {
+        factor = factorsstr;
+        factorsstr = "";
+      } else {
+        factorsstr = factorsstr.after(' ');
+      }
+      chemfactors_vec.emplace_back(factor);
+    }
+    return chemfactors_vec;
+}
+
 neuron * region_parameters::add_neurons(PLLRoot<neuron> * all, neuron * n, neuron * psmin, neuron * psmax) {
   // The requisite number of neurons are recruited from the available
   // list in n and are given positions in the region.
@@ -658,7 +685,7 @@ neuron * region_parameters::add_neurons(PLLRoot<neuron> * all, neuron * n, neuro
       case PYRAMIDAL: memberneurons[i] = new pyramidal(); break;;
       default: memberneurons[i] = new principal(); break;; //neuron(); break;;
       }
-      memberneurons[i]->parse_CLP(*main_clp);
+      memberneurons[i]->parse_CLP(*main_clp); // This calls parameters parsing on neuron::parse_CLP() (a virtual function).
       // initialize
       if ((psmin) && (psmax)) if (psmin->Radius()<psmax->Radius()) {
 	memberneurons[i]->set_radius(X_misc.get_rand_range_real1(psmin->Radius(),psmax->Radius()));
@@ -669,6 +696,32 @@ neuron * region_parameters::add_neurons(PLLRoot<neuron> * all, neuron * n, neuro
     }
   }
 #ifdef TESTING_SIMPLE_ATTRACTION
+  if (eq) {
+    network * net_ptr = eq->Net();
+    int clp_n;
+    if ((clp_n=main_clp->Specifies_Parameter(label+".attractors"))>=0) {
+      // separate list of attractor factors
+      std::vector<String> factors = get_chem_factors(main_clp->URI_unescape_ParValue(clp_n));
+      for (auto & factor : factors) {
+        // the neuron index by attractor reference in the network list
+        for (i =0; i<generalandspecificneurons; i++) {
+          net_ptr->chemdata.attractor_somata[net_ptr->get_or_add_chemlabel(factor)].emplace(memberneurons[i]);
+        }
+      }
+    }
+    if ((clp_n=main_clp->Specifies_Parameter(label+".attractedto"))>=0) {
+      // separate list of attractor factors
+      std::vector<String> factors = get_chem_factors(main_clp->URI_unescape_ParValue(clp_n));
+      for (auto & factor : factors) {
+        // store them for each neuron in the region
+        for (i =0; i<generalandspecificneurons; i++) {
+          memberneurons[i]->chemdata.attractedto.emplace(net_ptr->get_or_add_chemlabel(factor));
+        }
+      }
+    }
+  }
+
+  // This test was meant for 2 layers that are attracted to each other.
   for (i = 0; i<generalandspecificneurons; i++) {
     memberneurons[i]->attracts = attracts;
     memberneurons[i]->attractedto = 1 - attracts;
@@ -772,7 +825,7 @@ Shape_Regions_Result network::shape_regions(Command_Line_Parameters & clp,neuron
     // Feed the neurons into the region
     nextavailable = e->add_neurons(this,nextavailable,psmin,psmax);
 #ifdef TESTING_SIMPLE_ATTRACTION
-    attracts++;
+    attracts++; // For this test, the attracts label is simply increased for each region.
 #endif
     if (e->N()>0) {
       avnearestdist += e->average_distance_to_nearest_neighbor();

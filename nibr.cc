@@ -49,6 +49,7 @@
 #include <math.h>
 #include <iostream>
 #include <time.h>
+#include <cstddef>
 using namespace std;
 #include "diagnostic.hh"
 #include "Sampled_Output.hh"
@@ -562,6 +563,15 @@ void developmental_simulation(Command_Line_Parameters & clp) {
   if (net->Seek_Candidate_Synapses()) {
     double brute_force = ((double) totaldendriticsegments)*((double) totalaxonalsegments);
     progress("Evaluated possible candidate synapses = "+String((long) evaluate_possible_connection_calls)+" (compared to "+String(brute_force,"%.3f")+" by brute force, i.e. "+String(((((double) evaluate_possible_connection_calls)/brute_force)*100.0),"%.3f")+" percent)\n");
+    progress("Created candidate synapses = "+String((long) candidate_synapses_created)+"\n");
+    progress("Minimum distance found during candidate synapses tests = "+String(candidate_synapses_minimum_distance,"%.5f")+"\n");
+    progress("Number of candidate synapses disstance checks = "+String((long) candidate_synapses_num_distance_checks)+"\n");
+    String hist_str;
+    for (size_t i = 0; i<10; i++) hist_str += String((long) candidate_synapse_distances_histogram[i])+" ";
+    progress("Histogram of candidate synapse distances (steps of 0.1) = "+hist_str+"\n");
+    hist_str = "";
+    for (size_t i = 0; i<10; i++) hist_str += String((long) threshold_distances_histogram[i])+" ";
+    progress("Histogram of threshold distances (steps of 0.1) = "+hist_str+"\n");
   }
 #endif
 #ifdef SYNAPTOGENESIS_AND_LOSS_INVENTORY

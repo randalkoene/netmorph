@@ -48,6 +48,8 @@ class network;
 class network_statistics_base;
 #endif
 
+#include <set>
+
 #include "templates.hh"
 #include "global.hh"
 #include "Color_Table.hh"
@@ -104,6 +106,16 @@ extern general_neuron_parameters_interface general_neuron_parameters;
 
 extern long num_neurons_created;
 
+/**
+ * This data is used when cell attraction is identical for all
+ * growthcones of a specific neuron. This is used by cell_attraction
+ * in axon_direction_model.
+ */
+struct neuron_chemical_factors {
+  std::set<int> attractedto; // Indices of chemical factors attracted to.
+  std::set<int> repelledby; // Indices of chemical factors repelled by.
+};
+
 // <A NAME="one-clear-on-multiple-linked-lists">Only one clear() must be called on a multiply linked list</A>
 // See <A HREF="../../../doc/html/lists/task-log.20040915.html#200410060901">TL#200410060901</A>.
 class neuron: public PLLHandle<neuron>, public state_storable {
@@ -120,6 +132,8 @@ protected:
   double Vm;
   bool abstracted_connections;
   Activity * a;
+public:
+  neuron_chemical_factors chemdata;
 public:
   neuron(): radius(5.0), Vm(VmREST), abstracted_connections(false), a(&NullActivity), figneuroncolor(colortable->colnum(CT_neuron_untyped)), figconnectionscolor(colortable->colnum(CT_connection_excitatory)), figsynapsescolor(colortable->colnum(CT_synapses)), figdendritescolor(colortable->colnum(CT_dendrites)), figaxonscolor(colortable->colnum(CT_axon_excitatory)), figattr(0) { numberID = num_neurons_created; num_neurons_created++; }
   neuron(spatial & npos): P(npos), radius(5.0), Vm(VmREST), abstracted_connections(false), a(&NullActivity), figneuroncolor(colortable->colnum(CT_neuron_untyped)), figconnectionscolor(colortable->colnum(CT_connection_excitatory)), figdendritescolor(colortable->colnum(CT_dendrites)), figaxonscolor(colortable->colnum(CT_axon_excitatory)), figattr(0) { numberID = num_neurons_created; num_neurons_created++; }
