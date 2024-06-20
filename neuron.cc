@@ -26,12 +26,16 @@
 // Randal A. Koene, 20041118
 
 #include <math.h>
+#include <cstdint>
+#include <string>
 #include "neuron.hh"
 #include "fibre_elongation_model.hh"
 #include "axon_direction_model.hh"
 #include "Sampled_Output.hh"
 #include "BigString.hh"
 #include "network.hh"
+
+#define POINTER_TO_ID(pointer) String(std::to_string((int64_t) pointer).c_str())
 
 //neuron * processing_neuron = NULL; // *** this cannot be global when parallel processing
 
@@ -575,13 +579,10 @@ presynaptic_structures_fig->Add_Fig_Object(fo);
   return neuron_structure_fig;
 }
 
-/**
- * *** BUG! Output correctly lists the positions of all neurons, but labels are repeated!
- */
 Txt_Object * neuron::net_Txt() {
   (*Txt_neuronlist) += String(Txt_neuronindex);
   (*Txt_neuronlist) += ',';
-  (*Txt_neuronlist) += String((long) this_neuron(););
+  (*Txt_neuronlist) += POINTER_TO_ID(this);
   (*Txt_neuronlist) += ',';
   (*Txt_neuronlist) += neuron_short_name[TypeID()];
   (*Txt_neuronlist) += ',';

@@ -34,6 +34,9 @@
 #include "global.hh"
 #include "fibre_structure.hh"
 
+#define POINTER_TO_ID(pointer) String(std::to_string((int64_t) pointer).c_str())
+
+
 synaptogenesis_data * SynaptoGenesis_Data = NULL;
 
 bool figattr_receptor[syntype_candidate] = {
@@ -82,7 +85,7 @@ synapse::~synapse() {
 #ifdef SYNAPTOGENESIS_AND_LOSS_INVENTORY
   synapse_inventory[type_id][SYNLOSS]++;
 #endif
-  //cout << "DS" << String((long) this) << '\n'; cout.flush();
+  //cout << "DS" << POINTER_TO_ID(this) << '\n'; cout.flush();
 }
 
 neuron * synapse::Presynaptic_Neuron() {
@@ -136,8 +139,8 @@ Txt_Object * synapse::net_Txt() {
   (*Txt_synapselist) += String(Txt_synapseindex);
   (*Txt_synapselist) += ',';
   (*Txt_synapselist) += synapse_type_name[type_id];
-  ///(*Txt_synapselist) += ','+String((long) this);
-  ///(*Txt_synapselist) += ','+String((long) s);
+  ///(*Txt_synapselist) += ','+POINTER_TO_ID(this);
+  ///(*Txt_synapselist) += ','+POINTER_TO_ID(s);
   double x=0.0, y=0.0, z=0.0;
   (s->P0).get_all(x,y,z);
   (*Txt_synapselist) += String(x,",%f");
@@ -147,11 +150,11 @@ Txt_Object * synapse::net_Txt() {
   (*Txt_synapselist) += String(x,",%f");
   (*Txt_synapselist) += String(y,",%f");
   (*Txt_synapselist) += String(z,",%f,");
-  (*Txt_synapselist) += String((long) (s->AxonSegment())) + ',';
-  (*Txt_synapselist) += String((long) (s->DendriteSegment())) + ',';
-  (*Txt_synapselist) += String((long) Presynaptic_Neuron());
+  (*Txt_synapselist) += POINTER_TO_ID(s->AxonSegment()) + ',';
+  (*Txt_synapselist) += POINTER_TO_ID(s->DendriteSegment()) + ',';
+  (*Txt_synapselist) += POINTER_TO_ID(Presynaptic_Neuron());
   (*Txt_synapselist) += ',';
-  (*Txt_synapselist) += String((long) Postsynaptic_Neuron());
+  (*Txt_synapselist) += POINTER_TO_ID(Postsynaptic_Neuron());
   if (SynaptoGenesis_Data) (*Txt_synapselist) += String(SynaptoGenesis_Data->find_t_genesis(this),",%f");
   if(s->DendriteSegment()->get_APICAL() == 6)
   {

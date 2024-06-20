@@ -27,6 +27,7 @@
 
 #include <math.h>
 #include <iostream>
+#include <cstdint>
 #include "global.hh"
 #include "file.hh"
 #include "Network_Generated_Statistics.hh"
@@ -700,20 +701,14 @@ neuron * region_parameters::add_neurons(PLLRoot<neuron> * all, neuron * n, neuro
   if (eq) {
     network * net_ptr = eq->Net();
     int clp_n;
-    //std::cout << "Check CLP: " << label+".attractors" << '\n';
     if ((clp_n=main_clp->Specifies_Parameter(label+".attractors"))>=0) {
       // separate list of attractor factors
-      //String something = main_clp->URI_unescape_ParValue(clp_n);
-      //std::cout << "Checking: " << something << '\n';
       std::vector<String> factors = get_chem_factors(main_clp->URI_unescape_ParValue(clp_n));
       for (auto & factor : factors) {
         // the neuron index by attractor reference in the network list
-        //std::cout << "Attractor Somata for factor " << factor << ": ";
         for (i =0; i<generalandspecificneurons; i++) {
           net_ptr->chemdata.attractor_somata[net_ptr->get_or_add_chemlabel(factor)].emplace(memberneurons[i]);
-          //std::cout << String((long) memberneurons[i]) << ' ';
         }
-        //std::cout << '\n';
       }
       net_ptr->chemdata.has_specified_factors = true;
     }

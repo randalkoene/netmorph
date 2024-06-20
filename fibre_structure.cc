@@ -34,6 +34,8 @@
 #include "Network_Generated_Statistics.hh"
 #include "Sampled_Output.hh"
 
+#define POINTER_TO_ID(pointer) String(std::to_string((int64_t) pointer).c_str())
+
 general_fibre_structure_parameters_interface general_fibre_structure_parameters;
 
 region_structure_initialization_ptr * structure_initialization_region_subset_schemas = NULL;
@@ -431,7 +433,7 @@ Txt_Object * fibre_segment::bifurcationnode_net_Txt(long parentnodeindex) {
   long nodeindexcache = Txt_nodeindex; // To remember this after depth-first parse along one branch
   (*Txt_bifurcationnodelist) += String(Txt_nodeindex); // Txt_nodeindex is the index of this bifurcation node
   (*Txt_bifurcationnodelist) += ',';
-  (*Txt_bifurcationnodelist) += String((long) this); // This is a memory location label that can be crossreferenced from synapse text output
+  (*Txt_bifurcationnodelist) += POINTER_TO_ID(this); // This is a memory location label that can be crossreferenced from synapse text output
   (*Txt_bifurcationnodelist) += ',';
   (*Txt_bifurcationnodelist) += fibre_structure_name[parsing_fs_type];
   double x=0.0, y=0.0, z=0.0;
@@ -439,7 +441,7 @@ Txt_Object * fibre_segment::bifurcationnode_net_Txt(long parentnodeindex) {
   (*Txt_bifurcationnodelist) += String(x,",%f");
   (*Txt_bifurcationnodelist) += String(y,",%f");
   (*Txt_bifurcationnodelist) += String(z,",%f,");
-  (*Txt_bifurcationnodelist) += String((long) n);
+  (*Txt_bifurcationnodelist) += POINTER_TO_ID(n);
   (*Txt_bifurcationnodelist) += ',';
   (*Txt_bifurcationnodelist) += String(parentnodeindex);
 #ifdef INCLUDE_SIMPLE_FIBER_DIAMETER
@@ -460,7 +462,7 @@ Txt_Object * fibre_segment::continuationnode_net_Txt(long parentnodeindex) {
   fibre_segment * fs = branch1; if (!fs) fs = branch2; // whichever continues the segment of fiber
   (*Txt_continuationnodelist) += String(Txt_nodeindex); // Txt_nodeindex is the index of this continuation node
   (*Txt_continuationnodelist) += ',';
-  (*Txt_continuationnodelist) += String((long) this); // This is a memory location label that can be crossreferenced from synapse text output
+  (*Txt_continuationnodelist) += POINTER_TO_ID(this); // This is a memory location label that can be crossreferenced from synapse text output
   (*Txt_continuationnodelist) += ',';
   (*Txt_continuationnodelist) += fibre_structure_name[parsing_fs_type];
   double x=0.0, y=0.0, z=0.0;
@@ -468,7 +470,7 @@ Txt_Object * fibre_segment::continuationnode_net_Txt(long parentnodeindex) {
   (*Txt_continuationnodelist) += String(x,",%f");
   (*Txt_continuationnodelist) += String(y,",%f");
   (*Txt_continuationnodelist) += String(z,",%f,");
-  (*Txt_continuationnodelist) += String((long) n);
+  (*Txt_continuationnodelist) += POINTER_TO_ID(n);
   (*Txt_continuationnodelist) += ',';
   (*Txt_continuationnodelist) += String(parentnodeindex);
 #ifdef INCLUDE_SIMPLE_FIBER_DIAMETER
@@ -491,7 +493,7 @@ Txt_Object * fibre_segment::net_Txt(long parentnodeindex) {
   Txt_nodeindex++;
   (*Txt_terminalgrowthconelist) += String(Txt_nodeindex); // Txt_nodeindex is the index of this growth cone
   (*Txt_terminalgrowthconelist) += ',';
-  (*Txt_terminalgrowthconelist) += String((long) this); // This is a memory location label that can be crossreferenced from synapse text output
+  (*Txt_terminalgrowthconelist) += POINTER_TO_ID(this); // This is a memory location label that can be crossreferenced from synapse text output
   (*Txt_terminalgrowthconelist) += ',';
   (*Txt_terminalgrowthconelist) += fibre_structure_name[parsing_fs_type];
   double x=0.0, y=0.0, z=0.0;
@@ -499,7 +501,7 @@ Txt_Object * fibre_segment::net_Txt(long parentnodeindex) {
   (*Txt_terminalgrowthconelist) += String(x,",%f");
   (*Txt_terminalgrowthconelist) += String(y,",%f");
   (*Txt_terminalgrowthconelist) += String(z,",%f,");
-  (*Txt_terminalgrowthconelist) += String((long) n);
+  (*Txt_terminalgrowthconelist) += POINTER_TO_ID(n);
   (*Txt_terminalgrowthconelist) += ',';
   (*Txt_terminalgrowthconelist) += String(parentnodeindex);
 #ifdef INCLUDE_SIMPLE_FIBER_DIAMETER
@@ -663,7 +665,7 @@ Txt_Object * fibre_structure::net_Txt() {
   Txt_nodeindex++;
   (*Txt_fiberrootlist) += String(Txt_nodeindex); // Txt_nodeindex is the index of this root node
   (*Txt_fiberrootlist) += ',';
-  (*Txt_fiberrootlist) += String((long) this); // This is a memory location label that can be crossreferenced from synapse text output
+  (*Txt_fiberrootlist) += POINTER_TO_ID(this); // This is a memory location label that can be crossreferenced from synapse text output
   (*Txt_fiberrootlist) += ',';
   (*Txt_fiberrootlist) += fibre_structure_name[parsing_fs_type];
   double x=0.0, y=0.0, z=0.0;
@@ -671,7 +673,7 @@ Txt_Object * fibre_structure::net_Txt() {
   (*Txt_fiberrootlist) += String(x,",%f");
   (*Txt_fiberrootlist) += String(y,",%f");
   (*Txt_fiberrootlist) += String(z,",%f,");
-  (*Txt_fiberrootlist) += String((long) n);
+  (*Txt_fiberrootlist) += POINTER_TO_ID(n);
   if (NodeGenesis_Data) (*Txt_fiberrootlist) += String(NodeGenesis_Data->find_t_genesis(this),",%f\n");
   fibre_segment::net_Txt(Txt_nodeindex);
   return NULL;

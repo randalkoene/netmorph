@@ -31,6 +31,8 @@
 #include "network.hh"
 #include "Sampled_Output.hh"
 
+#define POINTER_TO_ID(pointer) String(std::to_string((int64_t) pointer).c_str())
+
 //#define CONVERT_READS_FIG_FILES
 
 // global variables
@@ -269,7 +271,7 @@ bool Sampled_Growth_Fig_Output::Max_Resolution_Sample(double t, const void * id)
   // *** to do this faster, I can capture all the Fig_Groups in one and
   // use its box size for scaling, then produce output from the component
   // groups, to save memory do as follows
-  Fig_Group * figgroup = net->Fig_Output(figname+'-'+String(t,"%012.3f-")+String((long) id)+".fig",figwidth,true);
+  Fig_Group * figgroup = net->Fig_Output(figname+'-'+String(t,"%012.3f-")+POINTER_TO_ID(id)+".fig",figwidth,true);
   /*if (figgroup->TopLeftX()<topleftx) topleftx = figgroup->TopLeftX();
   if (figgroup->TopLeftY()<toplefty) toplefty = figgroup->TopLeftY();
   if (figgroup->BottomRightX()>bottomrightx) bottomrightx = figgroup->BottomRightX();
@@ -358,11 +360,11 @@ void Sampled_Growth_Fig_Output::Output(bool show_stats) {
 }
 
 void Activity_Results_Output::spike(neuron * n, double t) {
-  progress(String(t,"%.3f")+':'+String((long) n)+'\n');
+  progress(String(t,"%.3f")+':'+POINTER_TO_ID(n)+'\n');
 }
 
 void Activity_Results_Output::psp(neuron * pre, neuron * post, double t) {
-  progress(String(t,"%.3f")+':'+String((long) pre)+"->"+String((long) post)+'\n');
+  progress(String(t,"%.3f")+':'+POINTER_TO_ID(pre)+"->"+POINTER_TO_ID(post)+'\n');
 }
 
 void ARO_to_File::spike(neuron * n, double t) {

@@ -33,6 +33,8 @@
 #include "Txt_Object.hh"
 #include "diagnostic.hh"
 
+#define POINTER_TO_ID(pointer) String(std::to_string((int64_t) pointer).c_str())
+
 #define DAYSECONDS 86400.0
 #define DAYSECONDSSQR (86400.0*86400.0)
 #define DAYSECONDSCUB (86400.0*86400.0*86400.0)
@@ -907,7 +909,7 @@ void BESTLNN_pyramidal_AD_terminal_segment_elongation_model::set_tuft_models(ter
   // modify any variables of the terminal segment object or its dependents after calling this
   // function!
   //cout << "TUFTING!"; cout.flush();
-  if (Txt_tuftrootbranchnodelist) (*Txt_tuftrootbranchnodelist) += String((long) ts->TerminalSegment()) + '\n';
+  if (Txt_tuftrootbranchnodelist) (*Txt_tuftrootbranchnodelist) += POINTER_TO_ID(ts->TerminalSegment()) + '\n';
   ts->branch(NULL);
   String prefixstr(parameters.prefix);
   if (!prefixstr.empty()) prefixstr += ".tuft.";
@@ -949,7 +951,7 @@ void BESTLNN_pyramidal_AD_terminal_segment_elongation_model::set_oblique_models(
   // modify any variables of the terminal segment object or its dependents after calling this
   // function!
   //cout << "OBLIQUE!"; cout.flush();
-  if (Txt_obliquerootbranchnodelist) (*Txt_obliquerootbranchnodelist) += String((long) ts->TerminalSegment()) + '\n';
+  if (Txt_obliquerootbranchnodelist) (*Txt_obliquerootbranchnodelist) += POINTER_TO_ID(ts->TerminalSegment()) + '\n';
   // 1. For obliques, preserve the growth angle of the main branch and prepare an oblique angle
   spatial mainbranchacoords(ts->AngularCoords());
   mainbranchacoords.set_X(0.0);
