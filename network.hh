@@ -122,6 +122,7 @@ struct chemical_factor_data {
   std::map<int, std::set<fibre_segment*>> repulsion_segments;
 
   bool has_specified_factors = false;
+  bool detailed_chemical_factors = false; // at neurites as well
 };
 
 class network: public PLLRoot<neuron>, public Event_Queue {
@@ -158,6 +159,7 @@ public:
   spatial & Center() { return center; }
   double Time() { return t; }
   int get_or_add_chemlabel(String chemlabel);
+  void possibly_add_attractor(fibre_segment * new_branching_segment);
   bool Seek_Candidate_Synapses() { return candidate_synapses; }
   Shape_Hexagon_Result shape_hexagon(Command_Line_Parameters & clp);
   Shape_Rectangle_Result shape_rectangle(Command_Line_Parameters & clp);

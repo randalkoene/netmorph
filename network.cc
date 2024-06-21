@@ -156,6 +156,8 @@ void network::parse_CLP(Command_Line_Parameters & clp) {
   ndm = select_neurite_diameter_model(*this,clp);
 
   if ((n=clp.Specifies_Parameter("NES_output"))>=0) NES_output = (downcase(clp.ParValue(n))==String("true"));
+
+  if ((n=clp.Specifies_Parameter("detailed_chemical_factors"))>=0) chemdata.detailed_chemical_factors = (downcase(clp.ParValue(n))==String("true"));
 }
 
 String network::report_parameters() {
@@ -251,6 +253,27 @@ int network::get_or_add_chemlabel(String chemlabel) {
     return new_idx;
   } else {
     return it->second;
+  }
+}
+
+/**
+ * If this fiber segment is dendritic, and if the associated cell is an
+ * attractor, then the P1 location of the new_branching_segment becomes
+ * a new attractor point.
+ * 
+ * *** Note: At present, this assigns the same chemical factors as those
+ *     used by the soma.
+ */
+void network::possibly_add_attractor(fibre_segment * new_branching_segment) {
+  if (chemdata.has_specified_factors && chemdata.detailed_chemical_factors) {
+    if (new_branching_segment->get_fstype()==dendrite_fs) {
+      neuron * nptr = new_branching_segment->N();
+      if (nptr->is_attractor()) {
+        for (auto & chemfactor : nptr->chemdata.attractor) {
+          chemdata.attractor_segments[chemfactor].emplace(new_branching_segment);
+        }
+      }
+    }
   }
 }
 
@@ -706,8 +729,10 @@ neuron * region_parameters::add_neurons(PLLRoot<neuron> * all, neuron * n, neuro
       std::vector<String> factors = get_chem_factors(main_clp->URI_unescape_ParValue(clp_n));
       for (auto & factor : factors) {
         // the neuron index by attractor reference in the network list
+        auto chemfactor = net_ptr->get_or_add_chemlabel(factor);
         for (i =0; i<generalandspecificneurons; i++) {
-          net_ptr->chemdata.attractor_somata[net_ptr->get_or_add_chemlabel(factor)].emplace(memberneurons[i]);
+          net_ptr->chemdata.attractor_somata[chemfactor].emplace(memberneurons[i]);
+          memberneurons[i]->chemdata.attractor.emplace(chemfactor);
         }
       }
       net_ptr->chemdata.has_specified_factors = true;
@@ -717,8 +742,9 @@ neuron * region_parameters::add_neurons(PLLRoot<neuron> * all, neuron * n, neuro
       std::vector<String> factors = get_chem_factors(main_clp->URI_unescape_ParValue(clp_n));
       for (auto & factor : factors) {
         // store them for each neuron in the region
+        auto chemfactor = net_ptr->get_or_add_chemlabel(factor);
         for (i =0; i<generalandspecificneurons; i++) {
-          memberneurons[i]->chemdata.attractedto.emplace(net_ptr->get_or_add_chemlabel(factor));
+          memberneurons[i]->chemdata.attractedto.emplace(chemfactor);
         }
       }
       net_ptr->chemdata.has_specified_factors = true;

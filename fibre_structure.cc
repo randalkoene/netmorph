@@ -33,6 +33,7 @@
 //#include "branching_models.hh"
 #include "Network_Generated_Statistics.hh"
 #include "Sampled_Output.hh"
+#include "network.hh"
 
 #define POINTER_TO_ID(pointer) String(std::to_string((int64_t) pointer).c_str())
 
@@ -80,16 +81,25 @@ bool fibre_segment::branch() {
   if (branch1) return false;
   DIAGNOSTIC_BEFORE_ALLOCATION(new_fibre_segment);
 #ifdef VECTOR3D
-  branch1 = new fibre_segment(*n,this,efd1);
-  branch2 = new fibre_segment(*n,this,efd2);
+  branch1 = new fibre_segment(fs_type, *n,this,efd1);
+  branch2 = new fibre_segment(fs_type, *n,this,efd2);
 #endif
 #ifdef VECTOR2D
-  branch1 = new fibre_segment(*n,this);
-  branch2 = new fibre_segment(*n,this);
+  branch1 = new fibre_segment(fs_type, *n,this);
+  branch2 = new fibre_segment(fs_type, *n,this);
 #endif
   DIAGNOSTIC_AFTER_ALLOCATION(new_fibre_segment,2,sizeof(*branch1));
   branch1->P0 = P1;
   branch2->P0 = P1;
+
+  // RK 20240620 - Adding optional tracking for detailed cell attraction.
+  if (eq) {
+    // If this fiber segment is dendritic, the P1 location of this segment
+    // now becomes a new attraction point, if the associated cell is an
+    // attractor.
+    eq->Net()->possibly_add_attractor(this);
+  }
+
   return true;
 }
 
@@ -102,10 +112,10 @@ bool fibre_segment::turn() {
   if (branch1) return false;
   DIAGNOSTIC_BEFORE_ALLOCATION(new_fibre_segment);
 #ifdef VECTOR3D
-  branch1 = new fibre_segment(*n,this,efd);
+  branch1 = new fibre_segment(fs_type, *n,this,efd);
 #endif
 #ifdef VECTOR2D
-  branch1 = new fibre_segment(*n,this);
+  branch1 = new fibre_segment(fs_type, *n,this);
 #endif
   DIAGNOSTIC_AFTER_ALLOCATION(new_fibre_segment,1,sizeof(*branch1));
   branch1->P0 = P1;
@@ -121,10 +131,10 @@ fibre_segment * fibre_segment::continuation_node_to_branch() {
   if (branch1 && branch2) return NULL;
   DIAGNOSTIC_BEFORE_ALLOCATION(new_fibre_segment);
 #ifdef VECTOR3D
-  fibre_segment * newbranch = new fibre_segment(*n,this,efd);
+  fibre_segment * newbranch = new fibre_segment(fs_type, *n,this,efd);
 #endif
 #ifdef VECTOR2D
-  fibre_segment * newbranch = new fibre_segment(*n,this);
+  fibre_segment * newbranch = new fibre_segment(fs_type, *n,this);
 #endif
   DIAGNOSTIC_AFTER_ALLOCATION(new_fibre_segment,1,sizeof(*newbranch));
   newbranch->P0 = P1;

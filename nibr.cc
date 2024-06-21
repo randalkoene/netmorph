@@ -1049,6 +1049,8 @@ Usage: netmorph [parameter=value]\n\
     turnanglemin=<decimal#>              minimum angle at continuation node\n\
     turnanglemax=<decimal#>              maximum angle at continuation node\n\
 \n\
+    detailed_chemical_factors=<true/false> use chemical factors at neurites\n\
+\n\
     Morphological Development - Neurite Fiber Diameter:\n\
 \n\
     fibrediameter=<true/false>           use specific diameters\n\

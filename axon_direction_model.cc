@@ -592,27 +592,49 @@ void cell_attraction_direction_model::predict_direction(spatial & predicted, neu
 #ifdef TESTING_SIMPLE_ATTRACTION
   if (eq) {
     network * net_ptr = eq->Net();
-    // For all the chemical factors this neuron is attracted to:
-    for (auto & attractor : n->chemdata.attractedto) {
-      // Find all the somata that are attractive:
-      if (net_ptr->chemdata.attractor_somata.find(attractor)==net_ptr->chemdata.attractor_somata.end()) {
-        std::cout << "MISSING ATTRACTOR SOMATA FOR " << net_ptr->chemindex_to_label.at(attractor) << '\n'; std::cout.flush();
-        exit(1);
-      }
-      std::set<neuron*>& neuronptr_set = net_ptr->chemdata.attractor_somata.at(attractor);
-      for (auto & n_ptr : neuronptr_set) {
-        if (n != n_ptr) {
-          spatial d(n_ptr->Pos());
-          d -= growthcone;
-          double SQdistance = d.len2();
-          d /= SQdistance; // square distance gravitational analogy
-          d /= sqrt(SQdistance); // working with weighted unit vectors
-          predicted += d;
+    if (net_ptr->chemdata.has_specified_factors) {
+      // For all the chemical factors this neuron is attracted to:
+      for (auto & attractor : n->chemdata.attractedto) {
+        // Find all the somata that are attractive:
+        if (net_ptr->chemdata.attractor_somata.find(attractor)==net_ptr->chemdata.attractor_somata.end()) {
+          std::cout << "MISSING ATTRACTOR SOMATA FOR " << net_ptr->chemindex_to_label.at(attractor) << '\n'; std::cout.flush();
+          exit(1);
+        }
+        std::set<neuron*>& neuronptr_set = net_ptr->chemdata.attractor_somata.at(attractor);
+        for (auto & n_ptr : neuronptr_set) {
+          if (n != n_ptr) {
+            spatial d(n_ptr->Pos());
+            d -= growthcone;
+            double SQdistance = d.len2();
+            d /= SQdistance; // square distance gravitational analogy
+            d /= sqrt(SQdistance); // working with weighted unit vectors
+            predicted += d;
+          }
         }
       }
-    }
 
-    if (!net_ptr->chemdata.has_specified_factors) {
+      if (net_ptr->chemdata.detailed_chemical_factors) {
+        // Influence of points on dendrites, for all the chemical factors this neuron is attracted to:
+        std::map<int, std::set<fibre_segment*>>& attractor_segments_map = net_ptr->chemdata.attractor_segments;
+        for (auto & attractor : n->chemdata.attractedto) {
+          auto it = attractor_segments_map.find(attractor);
+          if (it != attractor_segments_map.end()) {
+            std::set<fibre_segment*>& segmentptr_set = it->second;
+            for (auto& fs_ptr : segmentptr_set) {
+              if (n != fs_ptr->N()) {
+                spatial d(fs_ptr->P1);
+                d -= growthcone;
+                double SQdistance = d.len2();
+                d /= SQdistance; // square distance gravitational analogy
+                d /= sqrt(SQdistance); // working with weighted unit vectors
+                predicted += d;
+              }
+            }
+          }
+        }
+      }
+
+    } else { // Simpler cell attraction model, only works between 2 layers
       PLL_LOOP_FORWARD(neuron,n->Root()->head(),1) if (e!=n) if (n->attractedto==e->attracts) {
         spatial d(e->Pos());
         d -= growthcone;

@@ -44,7 +44,8 @@ natural_schema_parent_set axons_most_specific_natural_set[UNTYPED_NEURON+1] = {
   all_axons_sps
 };
 
-presynaptic_structure::presynaptic_structure(neuron & _n, Segment & initseg, spatial & acoords, int _typeid): fibre_structure(_n,initseg,acoords, _typeid) {
+// Axonal structure
+presynaptic_structure::presynaptic_structure(neuron & _n, Segment & initseg, spatial & acoords, int _typeid): fibre_structure(axon_fs, _n,initseg,acoords, _typeid) {
   // If a general or specific parameter settings so indicate, the terminal
   // segment created in this constructor can be associated with a direction
   // model.
@@ -109,7 +110,8 @@ natural_schema_parent_set dendrites_most_specific_natural_set[UNTYPED_NEURON+1] 
   all_dendrites_sps
 };
 
-postsynaptic_structure::postsynaptic_structure(neuron & _n, Segment & initseg, spatial & acoords, int _typeid): fibre_structure(_n,initseg,acoords, _typeid) {
+// Dendritic structure
+postsynaptic_structure::postsynaptic_structure(neuron & _n, Segment & initseg, spatial & acoords, int _typeid): fibre_structure(dendrite_fs, _n,initseg,acoords, _typeid) {
   // If a general or specific parameter settings so indicate, the terminal
   // segment created in this constructor can be associated with a direction
   // model.

@@ -114,6 +114,9 @@ extern long num_neurons_created;
 struct neuron_chemical_factors {
   std::set<int> attractedto; // Indices of chemical factors attracted to.
   std::set<int> repelledby; // Indices of chemical factors repelled by.
+
+  std::set<int> attractor; // Indices of chemical factors this attracts with.
+  std::set<int> repellor; // Indices of chemical factors this repels with.
 };
 
 // <A NAME="one-clear-on-multiple-linked-lists">Only one clear() must be called on a multiply linked list</A>
@@ -152,6 +155,8 @@ public:
   spatial & Pos() { return P; }
   void set_radius(double r) { radius=r; }
   double Radius() { return radius; }
+  bool is_attractor() const { return !chemdata.attractor.empty(); }
+  bool is_repellor() const { return !chemdata.repellor.empty(); }
   void set_activity(Activity * _a) { a = _a; }
   Activity * activity() { return a; }
   // neuroanatomical functions
