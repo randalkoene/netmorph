@@ -146,6 +146,33 @@ network::network(int numneurons, neuron * psmin, neuron * psmax, double principa
   }
 }
 
+String network::show_target_approach() {
+  String res;
+  for (auto & [np, npa] : neuron_pair_map) {
+    res += "Approach from " + np.from->numerical_IDStr() + " to " + np.to->numerical_IDStr() + ": ";
+    for (auto & sqd : npa.sqdhistory) {
+      res += String(sqd,"%.3f ");
+    }
+    res += " last entry t=" + String(npa.t_sample,"%.1f\n");
+  }
+  return res;
+}
+
+void network::target_approach_samples(neuron * from, neuron * to, double sqdistance) {
+  neuron_pair np(from, to);
+  auto it = neuron_pair_map.find(np);
+  if (it==neuron_pair_map.end()) {
+    neuron_pair_map[np] = neuron_pair_approach(Time(), sqdistance);
+    return;
+  }
+  if (sqdistance < it->second.sqdistance) {
+    it->second.sqdistance = sqdistance;
+    it->second.t_sample = Time();
+    it->second.sqdhistory.emplace_back(sqdistance);
+  }
+}
+
+
 void network::parse_CLP(Command_Line_Parameters & clp) {
   // This parses specifications of general parameters. Very specialized
   // parameters are parsed within relevant functions (see below).
@@ -158,6 +185,185 @@ void network::parse_CLP(Command_Line_Parameters & clp) {
   if ((n=clp.Specifies_Parameter("NES_output"))>=0) NES_output = (downcase(clp.ParValue(n))==String("true"));
 
   if ((n=clp.Specifies_Parameter("detailed_chemical_factors"))>=0) chemdata.detailed_chemical_factors = (downcase(clp.ParValue(n))==String("true"));
+
+  if ((n=clp.Specifies_Parameter("soma_attraction_weight"))>=0) chemdata.soma_attraction_weight = atof(clp.ParValue(n));
+
+  if ((n=clp.Specifies_Parameter("enable_completion_requirements"))>=0) completion.enable_completion_requirements = (downcase(clp.ParValue(n))==String("true"));
+}
+
+// Find neurons specified by region+type+index. E.g. "Mid.pyramidal.2".
+void network::_innerloop_byregiontypecell_neuron_specific_configurator(Command_Line_Parameters & clp, int i, String identifier, String valuestr) {
+  enum idparts_enum: int {
+    id_region,
+    id_type,
+    id_idx,
+    id_request,
+    NUM_idparts_enum
+  };
+  StringList idparts(identifier,'.');
+  if (idparts.length()<int(NUM_idparts_enum)) {
+    warning("Missing region / cell type / index / request at command line parameter: "+clp.ParName(i));
+    return;
+  }
+
+  if ((idparts.length()>int(NUM_idparts_enum)) && (!idparts[NUM_idparts_enum].empty())) {
+    warning("Neuron identifier parsing with multipart requests not yet implemented: "+clp.ParName(i));
+    return;
+  }
+
+  long idx = atol(idparts[id_idx].chars());
+
+  PLL_LOOP_FORWARD(region, Regions().head(), 1) {
+    if (downcase(e->Name())==idparts[id_region]) { // Correct region.
+        
+      long celltype_idx = 0;
+      PLL_LOOP_FORWARD_NESTED(neuronptrlist, e->Nlist().head(), 1, _nptr) {
+        neuron* n = _nptr->N();
+
+        if (n->TypeStr()==idparts[id_type]) { // Correct cell type.
+
+          if (celltype_idx==idx) { // Correct index.
+
+            n->neuron_specific_configurator(idparts[id_request], valuestr);
+            return;
+          }
+          celltype_idx++;
+        }
+      }
+
+      return;  
+    }
+  }
+
+  warning("Match not found for: "+clp.ParName(i));
+
+}
+
+void network::_innerloop_byidx_neuron_specific_configurator(Command_Line_Parameters & clp, int i, String identifier, String valuestr) {
+  String neuron_idxstr(identifier.before('.'));
+  String config_clp(identifier.after('.'));
+  if (config_clp.empty()) {
+    warning("Missing configuration request at command line parameter: "+clp.ParName(i));
+  } else {
+    neuron * n = find_neuron_by_idx(atol(neuron_idxstr.chars()));
+    n->neuron_specific_configurator(config_clp, clp.ParValue(i));
+  }
+}
+
+void network::_innerloop_neuron_specific_configurator(Command_Line_Parameters & clp, int i, String identifier, String valuestr) {
+  if (identifier.empty()) {
+    warning("Missing identifier details after 'idx.' in "+clp.ParName(i)+'\n');
+    return;
+  }
+
+  // Find neurons specified by index in list of all neurons.
+  char first = identifier[0];
+  if ((first>='0') && (first<='9')) {
+    _innerloop_byidx_neuron_specific_configurator(clp, i, identifier, valuestr);
+  } else {
+
+    _innerloop_byregiontypecell_neuron_specific_configurator(clp, i, identifier, valuestr);
+  }
+
+}
+
+/**
+ * This applies a neuron identification protocol within an already-known network
+ * architecture to identify specific neurons and to call a configuration function
+ * on those.
+ * 
+ * Identification examples are:
+ * "idx.0.attractors=" - specify chemical attraction factors emitted by neuron with index 0.
+ * "idx.Mid.pyramidal.2.attractedto=" - specify chemical factors that the third pyramidal
+ * neuron in region Mid is attracted to.
+ */
+void network::neuron_specific_configurator(Command_Line_Parameters & clp) {
+  for (int i=0; i<clp.NumParameters(); i++) {
+    // Find all the arguments that begin with "idx.".
+    if (downcase(clp.ParName(i).before(4))=="idx.") {
+
+      _innerloop_neuron_specific_configurator(clp, i, downcase(clp.ParName(i).after(3)), clp.ParValue(i));
+      
+    }
+  }
+}
+
+void completion_requirements::update_connection(neuron* presyn, neuron* postsyn) {
+  neuron_pair np(presyn, postsyn);
+  auto it = target_connections.find(np);
+  if (it != target_connections.end()) {
+    it->second = true;
+    progress("Completion requirements: "+String(completion_percentage(), "%.1f\n"));
+  }
+}
+
+String completion_requirements::report_completion_criteria() {
+  String res("Target Connections:\n");
+  for (auto& [np, state] : target_connections) {
+    res += np.from->label() + '(' + np.from->numerical_IDStr() + ") -> " + np.to->label() + '(' + np.to->numerical_IDStr() + ")\n";
+  }
+  return res;
+}
+
+String completion_requirements::report_criteria_completed() {
+  String res("Achieved Target Connections:\n");
+  for (auto& [np, state] : target_connections) {
+    if (state) {
+      res += np.from->label() + '(' + np.from->numerical_IDStr() + ") -> " + np.to->label() + '(' + np.to->numerical_IDStr() + ")\n";
+    }
+  }
+  return res;
+}
+
+void completion_requirements::criteria_numbers(long& totnum, long& completed) {
+  totnum = 0;
+  completed = 0;
+  // Check target connections:
+  totnum += target_connections.size();
+  for (auto& [np, iscomplete] : target_connections) {
+    if (iscomplete) completed++;
+  }
+}
+
+double completion_requirements::completion_percentage() {
+  long totnum, completed;
+  criteria_numbers(totnum, completed);
+  return 100.0*double(completed)/double(totnum);
+}
+
+bool completion_requirements::is_complete() {
+  if (!enable_completion_requirements) return false;
+  long totnum, completed;
+  criteria_numbers(totnum, completed);
+  return completed >= totnum;
+}
+
+/**
+ * This prepares the completion structure.
+ * E.g. pairs of neurons that are attractors and attractedto are
+ * used to set up target_connections.
+ * 
+ * *** NOTE: In a more advanced version, completion requirements
+ *     could be that at least one source neuron is connected to
+ *     a target neuron, or something like that, or some minimum
+ *     number.
+ */
+void network::setup_completion_requirements() {
+  // Prepare the target_connections map.
+  PLL_LOOP_FORWARD(neuron, PLLRoot<neuron>::head(), 1) {
+    if (!e->chemdata.attractedto.empty()) {
+      for (auto& chemfactor : e->chemdata.attractedto) {
+        if (chemdata.attractor_somata.find(chemfactor)==chemdata.attractor_somata.end()) {
+          error("Missing attractor for factor "+chemindex_to_label[chemfactor]);
+        } else {
+          for (auto& target_nptr : chemdata.attractor_somata.at(chemfactor)) {
+            neuron_pair np(e, target_nptr);
+            completion.target_connections[np] = false;
+          }
+        }
+      }
+    }
+  }
 }
 
 String network::report_parameters() {
@@ -168,6 +374,14 @@ String network::report_parameters() {
   if (synapses_during_development) res += "  Generate actual synapses from candidates DURING development.\n";
   else res += "  Generate actual synapses from candidates AFTER development.\n";
   if (ndm) res += "  " + ndm->report_parameters() + '\n';
+  return res;
+}
+
+String network::neuron_specific_reports() {
+  String res;
+  PLL_LOOP_FORWARD(neuron, PLLRoot<neuron>::head(), 1) {
+    res += e->neuron_specific_reports();
+  }
   return res;
 }
 
@@ -431,6 +645,21 @@ Shape_Rectangle_Result network::shape_rectangle(Command_Line_Parameters & clp) {
   return res;
 }
 
+std::vector<String> get_chem_factors(String factorsstr) {
+    std::vector<String> chemfactors_vec;
+    while (!factorsstr.empty()) {
+      String factor(factorsstr.before(' '));
+      if (factor.empty()) {
+        factor = factorsstr;
+        factorsstr = "";
+      } else {
+        factorsstr = factorsstr.after(' ');
+      }
+      chemfactors_vec.emplace_back(factor);
+    }
+    return chemfactors_vec;
+}
+
 #ifdef VECTOR3D
 Shape_Box_Result network::shape_box(Command_Line_Parameters & clp) {
 // gives neurons in the network positions such that they form a box and
@@ -657,21 +886,6 @@ String region_parameters::report_parameters() {
 int attracts = 0;
 #endif
 
-std::vector<String> get_chem_factors(String factorsstr) {
-    std::vector<String> chemfactors_vec;
-    while (!factorsstr.empty()) {
-      String factor(factorsstr.before(' '));
-      if (factor.empty()) {
-        factor = factorsstr;
-        factorsstr = "";
-      } else {
-        factorsstr = factorsstr.after(' ');
-      }
-      chemfactors_vec.emplace_back(factor);
-    }
-    return chemfactors_vec;
-}
-
 neuron * region_parameters::add_neurons(PLLRoot<neuron> * all, neuron * n, neuron * psmin, neuron * psmax) {
   // The requisite number of neurons are recruited from the available
   // list in n and are given positions in the region.
@@ -733,6 +947,7 @@ neuron * region_parameters::add_neurons(PLLRoot<neuron> * all, neuron * n, neuro
         for (i =0; i<generalandspecificneurons; i++) {
           net_ptr->chemdata.attractor_somata[chemfactor].emplace(memberneurons[i]);
           memberneurons[i]->chemdata.attractor.emplace(chemfactor);
+          net_ptr->target_neurons.emplace(memberneurons[i]);
         }
       }
       net_ptr->chemdata.has_specified_factors = true;
@@ -879,7 +1094,7 @@ Shape_Regions_Result network::shape_regions(Command_Line_Parameters & clp,neuron
   netinfo += "average distance to the nearest neighbor neuron within a region is "+String(avnearestdist,"%.3f\n");
   return res;
 }
-#endif
+#endif // VECTOR3D
 
 Shape_Circle_Result network::shape_circle(Command_Line_Parameters & clp) {
 // gives neurons in the network positions such that they form a circle and
@@ -1016,6 +1231,13 @@ Shape_Result network::shape_network(Command_Line_Parameters & clp, neuron * psmi
   return Shape_Result();
 }
 
+neuron * network::find_neuron_by_idx(long idx) {
+  PLL_LOOP_FORWARD(neuron, PLLRoot<neuron>::head(), 1) {
+    if (e->numerical_ID()==idx) return e;
+  }
+  return NULL;
+}
+
 neuron * network::nearest(spatial & p) {
   neuron * res = PLLRoot<neuron>::head();
   if (!res) return NULL;
@@ -1141,6 +1363,10 @@ void network::develop_connection_structure(Connection_Statistics_Root & cstats, 
   while (1) {
     //cout << "t=" << t << '\n';
     if (sampled_output) sampled_output->Sample(t);
+    if (progress_percentage != nullptr) {
+      double pct = 100.0*(t/max_growth_time);
+      (*progress_percentage) = int(pct); // update external progress tracker (e.g. used by NES)
+    }
     if (t>=t_nextmark) {
       if (outattr_show_progress) progress('=');
       t_nextmark += dt_mark;
@@ -1157,6 +1383,7 @@ void network::develop_connection_structure(Connection_Statistics_Root & cstats, 
     // or after each step. I can make that a command line option.
     if (synapses_during_development) sfm->establish_connections();
     if (dgm.IsComplete(t)) break;
+    if (completion.is_complete()) break;
   }
   if (outattr_show_progress) progress("\ndone.\nPerforming growth post-op tasks.\n");
   dgm.postop(this,&cstats,t);
@@ -1164,7 +1391,7 @@ void network::develop_connection_structure(Connection_Statistics_Root & cstats, 
   agm.postop(this,&cstats,t);
   if (outattr_show_progress) progress(" Axons post-op complete.\n");
 #ifdef TEST_FOR_NAN
-  cout << " TEST_FOR_NAN: Not performing synapses post-op."; cout.flush();
+  progress(" TEST_FOR_NAN: Not performing synapses post-op.");
 #else
   sfm->establish_connections();
   remove_abstract_connections_without_synapses();

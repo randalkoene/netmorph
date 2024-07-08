@@ -32,7 +32,7 @@
 
 #include <limits.h>
 #include "BigString.hh"
-#include "templates.hh"
+#include <include/templates.hh>
 
 extern unsigned long int Fig_output_modified;
 extern long Fig_output_min_excess;

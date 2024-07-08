@@ -213,7 +213,7 @@ double van_Pelt_arbor_elongation_model::predict_elongation(fibre_structure * arb
   prev_t = eq->T();
   double res = nt_F*((double) nofarbor);
   //if ((eq->T()<200.0) || (eq->T()>1.8143e+06)) cout << "At t=" << eq->T() << ": n(t)*dt*nu0*N^(-F) = (" << nofarbor << ")*(" << (eq->T()-prev_t) << ")*(" << parameters._nu0 << ")*(" << nofF << ")^(-" << parameters._F << ") = " << res << '\n';
-  cout << " N=" << nofF << " n=" << nofarbor << " E[dL]=" << res;
+  progress(" N="+String((long)nofF)+" n="+String(nofarbor)+" E[dL]="+String(res));
   return res;
 #else
   double nt_F = exp(-parameters._F*log((double) total_terminal_segments(arbor,parameters._competition_with_all_trees)));
@@ -431,7 +431,7 @@ void terminal_segment_elongation_model_base::elongate(terminal_segment * ts) {
   double l_i = perturbed_expected_elongation();
   // 4. normalize with regard to the sum of all perturbed expected elongations
   //    of all terminal segments on the same arbor
-  register fibre_structure * arbor = ts->Arbor();
+  fibre_structure * arbor = ts->Arbor();
   double sum_l_i = arbor->sum_of_perturbed_expected_elongations();
   if (sum_l_i!=0.0) l_i /= sum_l_i; // otherwise all are "delayed"
 #ifdef LEGACY_ELONGATION
@@ -632,7 +632,7 @@ terminal_segment_elongation_model_base * initialized_CSO_terminal_segment_elonga
 
 String initialized_CSO_terminal_segment_elongation_model::report_parameters_specific() {
   String res(" initialized "+constrained_second_order_terminal_segment_elongation_model::report_parameters());
-  res += String(icsoparameters.initial_l_i_acceleration," tsem_initial_acceleration=%.2f (0.0 simulates delayed branching)");
+  res += " tsem_initial_acceleration="+String(icsoparameters.initial_l_i_acceleration,"%.2f")+" (0.0 simulates delayed branching)";
   return res;
 }
 

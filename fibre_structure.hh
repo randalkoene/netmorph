@@ -35,7 +35,7 @@
 #include <math.h>
 // Required class headers
 #include "global.hh"
-#include "templates.hh"
+#include <include/templates.hh>
 #include "spatial.hh"
 #include "state_storable.hh"
 #include "Command_Line_Parameters.hh"

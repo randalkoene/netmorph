@@ -29,8 +29,9 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <fstream>
-#include <iostream>
+#include <sstream>
 #include <cstddef>
+#include "global.hh"
 using namespace std;
 
 #ifdef EVALUATE_POSSIBLE_CONNECTION_PROFILING
@@ -176,15 +177,17 @@ void memory_statistics::after_allocation(allocation_event new_type, int n, long 
 debugging_data debugging;
 
 void global_debug_report() {
+  std::stringstream ss;
 #ifdef DEBUGGING_ELONGATION
-  cout << "ts_elongation_model_base::elongate decreasing *error*: " << debugging.tsemb_elongate_decreasing << '\n';
-  cout << "ts_elongation_model_base::elongate stopped           : " << debugging.tsemb_elongate_stopped << '\n';
-  cout << "randomize_last_segment_elongation negative *error*   : " << debugging.randomize_last_segment_elongation_negative << '\n';
-  cout << "  fixedstepelongation negative *error*               : " << debugging.randomize_last_segment_elongation_fixedstepelongation_negative << '\n';
-  cout << "randomize_last_segment_elongation zero length results: " << debugging.randomize_last_segment_elongation_zero_length << '\n';
-  cout << "  fixedstepelongation zero                           : " << debugging.randomize_last_segment_elongation_fixedstepelongation_zero << '\n';
+  ss << "ts_elongation_model_base::elongate decreasing *error*: " << debugging.tsemb_elongate_decreasing << '\n';
+  ss << "ts_elongation_model_base::elongate stopped           : " << debugging.tsemb_elongate_stopped << '\n';
+  ss << "randomize_last_segment_elongation negative *error*   : " << debugging.randomize_last_segment_elongation_negative << '\n';
+  ss << "  fixedstepelongation negative *error*               : " << debugging.randomize_last_segment_elongation_fixedstepelongation_negative << '\n';
+  ss << "randomize_last_segment_elongation zero length results: " << debugging.randomize_last_segment_elongation_zero_length << '\n';
+  ss << "  fixedstepelongation zero                           : " << debugging.randomize_last_segment_elongation_fixedstepelongation_zero << '\n';
 #endif
 #ifdef DEBUGGING_DIRECTION
-  cout << "tension_direction_model::direction no direction      : " << debugging.tension_direction_model_no_direction << '\n';
+  ss << "tension_direction_model::direction no direction      : " << debugging.tension_direction_model_no_direction << '\n';
 #endif
+  progress(ss.str().c_str());
 }

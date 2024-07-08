@@ -50,7 +50,7 @@ class network_statistics_base;
 
 #include <set>
 
-#include "templates.hh"
+#include <include/templates.hh>
 #include "global.hh"
 #include "Color_Table.hh"
 #include "prepost_structure.hh"
@@ -147,11 +147,15 @@ public:
   neuron(spatial & npos): P(npos), radius(5.0), Vm(VmREST), abstracted_connections(false), a(&NullActivity), figneuroncolor(colortable->colnum(CT_neuron_untyped)), figconnectionscolor(colortable->colnum(CT_connection_excitatory)), figdendritescolor(colortable->colnum(CT_dendrites)), figaxonscolor(colortable->colnum(CT_axon_excitatory)), figattr(0) { numberID = num_neurons_created; num_neurons_created++; }
   ~neuron() { if (a!=&NullActivity) delete a; }
   virtual void* this_neuron() = 0; // See Beware note above.
+  String label();
   // architecture geometry  
   virtual void parse_CLP(Command_Line_Parameters & clp) = 0;
+  virtual void neuron_specific_configurator(String config_clp, String valuestr);
+  String neuron_specific_reports();
   void set_position(spatial & npos) { P = npos; }
   void set_position_in_Z_plane(double xpos, double ypos) { P.set_all(xpos,ypos); }
   long numerical_ID() { return numberID; }
+  String numerical_IDStr() { return String(numberID); }
   spatial & Pos() { return P; }
   void set_radius(double r) { radius=r; }
   double Radius() { return radius; }
@@ -191,6 +195,8 @@ public:
   virtual void net_Slice(Slice * slice);
 #endif
   virtual neuron_type TypeID() { return UNTYPED_NEURON; }
+  const char * TypeChars() { return neuron_short_name[TypeID()]; }
+  String TypeStr() { return String(TypeChars()); }
   long figneuroncolor;
   long figconnectionscolor;
   long figsynapsescolor;

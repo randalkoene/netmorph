@@ -78,6 +78,9 @@ NOTE: THE FIXED STEP CONVENTION HERE IS TO COMPUTE FROM t TO t+dt. THIS IS
  */
 
 #include <math.h>
+#ifdef TEST_FOR_NAN
+#include <sstream>
+#endif
 #include "diagnostic.hh"
 #include "network.hh"
 #include "Sampled_Output.hh"
@@ -216,18 +219,19 @@ void Delayed_Branching_Model::continuation_node_to_branch(fibre_segment * fs, do
   fibre_segment * newbranch;
 #ifdef VECTOR3D
 #ifdef TEST_FOR_NAN
-  cout << "DB(" << DBcounter << "), fs used to get acoords: P0.X()=" << fs->P0.X() << ", P1.X()=" << fs->P1.X() << '\n'; cout.flush();
+  std::stringstream ss;
+  ss << "DB(" << DBcounter << "), fs used to get acoords: P0.X()=" << fs->P0.X() << ", P1.X()=" << fs->P1.X() << '\n';
   spatial a = fs->P1;
   a -= fs->P0;
-  cout << "acoords vector in Euler: (" << a.X() << ',' << a.Y() << ',' << a.Z() << ")\n"; cout.flush();
+  ss << "acoords vector in Euler: (" << a.X() << ',' << a.Y() << ',' << a.Z() << ")\n";
 #endif
   fs->get_angles_and_length(acoords);
 #ifdef TEST_FOR_NAN
-  cout << "DELAYED BRANCH acoords: [get:] length=" << acoords.X() << ", theta=" << acoords.Y() << ", phi=" << acoords.Z(); cout.flush();
+  ss << "DELAYED BRANCH acoords: [get:] length=" << acoords.X() << ", theta=" << acoords.Y() << ", phi=" << acoords.Z();
 #endif
   prepare_parent_coordinate_system(acoords);
 #ifdef TEST_FOR_NAN
-  cout << " [prep:] length=" << acoords.X() << ", theta=" << acoords.Y() << ", phi=" << acoords.Z() << '\n'; cout.flush();
+  ss << " [prep:] length=" << acoords.X() << ", theta=" << acoords.Y() << ", phi=" << acoords.Z() << '\n';
 #endif
   double newparenttheta = existingbranch->parent_theta()+M_PI;
   spatial S2(1.0,newparenttheta,angletoparent);
@@ -256,10 +260,11 @@ void Delayed_Branching_Model::continuation_node_to_branch(fibre_segment * fs, do
 #ifdef TEST_FOR_NAN
   String nanstr(newbranch->P0.X(),"%f");
   bool newisNAN = (nanstr==String("nan"));
-  if (newisNAN) { cout << "New branch fiber at Delayed Branch is NAN!\n"; cout.flush(); }
+  if (newisNAN) { ss << "New branch fiber at Delayed Branch is NAN!\n"; }
 #ifdef VECTOR3D
-  cout << " [result:] length=" << acoords.X() << ", theta=" << acoords.Y() << ", phi=" << acoords.Z() << '\n'; cout.flush();
+  ss << " [result:] length=" << acoords.X() << ", theta=" << acoords.Y() << ", phi=" << acoords.Z() << '\n';
 #endif
+  progress(ss.str().c_str());
 #endif
   DIAGNOSTIC_BEFORE_ALLOCATION(new_fibre_segment);
   // Here we create a new terminal segment and insure it has
@@ -268,8 +273,8 @@ void Delayed_Branching_Model::continuation_node_to_branch(fibre_segment * fs, do
   int centord = 1;
   for (fibre_segment * fsp = fs->Parent(); (fsp); fsp = fsp->Parent()) if ((fsp->Branch1()) && (fsp->Branch2())) centord++;
   terminal_segment * ts = new terminal_segment(*arbor,*newbranch,acoords,centord);
-  register PLLRoot<terminal_segment> * tsroot = arbor->TerminalSegments();
-  register direction_model_base * dirmodel = tsroot->head()->DirectionModel();
+  PLLRoot<terminal_segment> * tsroot = arbor->TerminalSegments();
+  direction_model_base * dirmodel = tsroot->head()->DirectionModel();
   // ALL HANDLERS FOR MODEL PROPAGATION SHOULD BE CALLED HERE (Look for similar notes such as this elsewhere, e.g. in terminal_segment::branch().)
   if (dirmodel) ts->set_direction_model(dirmodel->clone());
   ts->set_elongation_model(tsroot->head()->ElongationModel()->clone(ts));

@@ -39,7 +39,7 @@ class neuron; // forward declaration, resolved in neuron.hh
 //#include "neuron.hh" // include in .cc instead to avoid problems
 #include <stddef.h>
 #include "synapse.hh"
-#include "templates.hh"
+#include <include/templates.hh>
 #include "Fig_Object.hh"
 #include "state_storable.hh"
 

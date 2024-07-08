@@ -97,6 +97,7 @@ public:
   network * sampled_network() { return net; }
   double sampled_time() { return max_time; }
   double interval() { return sample_interval; }
+  double get_t_nextmark() { return t_nextmark; }
   int number_of_samples() { return numsamples; }
   virtual void parse_CLP(Command_Line_Parameters & clp);
   virtual String report_parameters();

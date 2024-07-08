@@ -26,6 +26,7 @@
 // Randal A. Koene, 20070710
 
 #include <math.h>
+#include <sstream>
 #include "environment_physics.hh"
 #include "event.hh"
 #include "neuron.hh"
@@ -116,13 +117,15 @@ unsigned long dsb_adjusted = 0;
 
 #ifdef DEBUG_SPHERICAL_BOUNDARY
 spherical_boundary::~spherical_boundary() {
-  cout << "DEBUG_SPHERICAL_BOUNDARY, number of returns per situation:\n";
-  cout << "  zero length terminal segment              : " << dsb_zerolength << '\n';
-  cout << "  within sphere after adjustment            : " << dsb_in_after_adjust << '\n';
-  cout << "  safely within sphere before maxrange field: " << dsb_safe << '\n';
-  cout << "  originates and remains beyond sphere      : " << dsb_from_beyond << '\n';
-  cout << "  grows toward center, not border           : " << dsb_no_move_to_border << '\n';
-  cout << "  ADJUSTED                                  : " << dsb_adjusted << '\n';
+  std::stringstream ss;
+  ss << "DEBUG_SPHERICAL_BOUNDARY, number of returns per situation:\n";
+  ss << "  zero length terminal segment              : " << dsb_zerolength << '\n';
+  ss << "  within sphere after adjustment            : " << dsb_in_after_adjust << '\n';
+  ss << "  safely within sphere before maxrange field: " << dsb_safe << '\n';
+  ss << "  originates and remains beyond sphere      : " << dsb_from_beyond << '\n';
+  ss << "  grows toward center, not border           : " << dsb_no_move_to_border << '\n';
+  ss << "  ADJUSTED                                  : " << dsb_adjusted << '\n';
+  progress(ss.str().c_str());
 }
 #endif
 

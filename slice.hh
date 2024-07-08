@@ -126,7 +126,7 @@
 
 #ifdef VECTOR3D
 
-#include "templates.hh"
+#include <include/templates.hh>
 #include "Command_Line_Parameters.hh"
 #include "spatial.hh"
 #include "BigString.hh"

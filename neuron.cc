@@ -375,6 +375,70 @@ String general_neuron_parameters_interface::report_parameters() {
   return res;
 }
 
+String neuron::label() {
+  return POINTER_TO_ID(this);
+}
+
+/**
+ * Neuron-specific configurations. See how the specified neuron is identified
+ * in network::neuron_specific_configurator().
+ * 
+ * For example, note that specifying chemical attractors that are unique to
+ * a pair of neurons can be used to "force" those two neurons to (tend to)
+ * make connections.
+ */
+void neuron::neuron_specific_configurator(String config_clp, String valuestr) {
+
+  // Chemical attractors/repellants.
+  if (eq) {
+    network * net_ptr = eq->Net();
+
+    if (config_clp=="attractors") {
+      // separate list of attractor factors
+      std::vector<String> factors = get_chem_factors(URI_unescape(valuestr));
+      for (auto & factor : factors) {
+        auto chemfactor = net_ptr->get_or_add_chemlabel(factor);
+        net_ptr->chemdata.attractor_somata[chemfactor].emplace(this);
+        chemdata.attractor.emplace(chemfactor);
+        net_ptr->target_neurons.emplace(this);
+      }
+      net_ptr->chemdata.has_specified_factors = true;
+
+    } else if (config_clp=="attractedto") {
+      // separate list of attractor factors
+      std::vector<String> factors = get_chem_factors(URI_unescape(valuestr));
+      for (auto & factor : factors) {
+        auto chemfactor = net_ptr->get_or_add_chemlabel(factor);
+        chemdata.attractedto.emplace(chemfactor);
+      }
+      net_ptr->chemdata.has_specified_factors = true;
+    }
+  }
+
+}
+
+String neuron::neuron_specific_reports() {
+  String res;
+  if (eq) {
+    network* net_ptr = eq->Net();
+    if (!chemdata.attractedto.empty()) {
+      res += "neuron "+numerical_IDStr()+" is attracted to: ";
+      for (auto& chemfactor : chemdata.attractedto) {
+        res += net_ptr->chemindex_to_label.at(chemfactor)+' ';
+      }
+      res += '\n';
+    }
+    if (!chemdata.attractor.empty()) {
+      res += "neuron "+numerical_IDStr()+" attracts with: ";
+      for (auto& chemfactor : chemdata.attractor) {
+        res += net_ptr->chemindex_to_label.at(chemfactor)+' ';
+      }
+      res += '\n';
+    }
+  }
+  return res;
+}
+
 connection * neuron::connect_to(neuron * postsyn) {
   // make a conection from this presynaptic neuron to a postsynaptic neuron
   return connection::create(this,postsyn);
@@ -809,7 +873,7 @@ void multipolar_nonpyramidal::initialize_multiple_poles_common(double mintotleng
 #ifdef VECTOR3D
 	double Stheta = 2.0*M_PI*X_misc.get_rand_real1();
 #ifdef DEBUG_INIT_SEGMENT_ANGLES
-	cout << "initStheta=" << Stheta << '\n'; cout.flush();
+	progress("initStheta="+String(Stheta)+'\n');
 #endif
 	spatial S1(1.0,Stheta,X_misc.get_rand_range_real1(minangle,maxangle)), acoords;
 	S1.convert_from_spherical();
@@ -824,7 +888,7 @@ void multipolar_nonpyramidal::initialize_multiple_poles_common(double mintotleng
 	acoords.convert_to_spherical();
 	acoords.set_X(radius);
 #ifdef DEBUG_INIT_SEGMENT_ANGLES
-	cout << "initTHETA=" << acoords.Y() << " initPHI=" << acoords.Z() << '\n'; cout.flush();
+	progress("initTHETA="+String(acoords.Y())+" initPHI="+String(acoords.Z())+'\n');
 #endif
 #endif
 #ifdef VECTOR2D
@@ -834,7 +898,7 @@ void multipolar_nonpyramidal::initialize_multiple_poles_common(double mintotleng
 	else randomangle += minangle; // positive random between minangle and maxangle
 	spatial acoords(radius,rc.Y()+randomangle); // valid relative location on membrane
 #ifdef DEBUG_INIT_SEGMENT_ANGLES
-	cout << "initTHETA=" << acoords.Y() << '\n'; cout.flush();
+	progress("initTHETA="+String(acoords.Y())+'\n');
 #endif
 #endif
 	Segment initseg(P,P);
@@ -842,9 +906,8 @@ void multipolar_nonpyramidal::initialize_multiple_poles_common(double mintotleng
 	initseg.P0 = initseg.P1; // segment starts on membrane at P+Euler(acoords)
 #ifdef DEBUG_INIT_SEGMENT_ANGLES
 #ifdef VECTOR3D
-	cout << "neuronCENTER=(" << P.X() << ',' << P.Y() << ',' << P.Z() << ')';
-	cout << " segP0=(" << initseg.P0.X() << ',' << initseg.P0.Y() << ',' << initseg.P0.Z() << ")\n";
-	cout.flush();
+	progress("neuronCENTER=("+String(P.X())+','+String(P.Y())+','+String(P.Z())+')');
+	progress(" segP0=("+String(initseg.P0.X())+','+String(initseg.P0.Y())+','+String(initseg.P0.Z())+")\n");
 #endif
 #endif
 	acoords.set_X(X_misc.get_rand_range_real1(mintotlength,maxtotlength)); // initial segment length

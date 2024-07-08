@@ -33,7 +33,7 @@
 #ifndef __EVENT_HH
 #define __EVENT_HH
 
-#include "templates.hh"
+#include <include/templates.hh>
 #include "state_storable.hh"
 #include "Command_Line_Parameters.hh"
 

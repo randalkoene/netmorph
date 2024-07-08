@@ -24,9 +24,7 @@
 */
 // nibr.hh
 // Randal A. Koene, 20040830
-
-#ifndef __NIBR_HH
-#define __NIBR_HH
+#pragma once
 
 #include "Command_Line_Parameters.hh"
 #include "network.hh"
@@ -45,11 +43,7 @@
 
 // function declarations
 
-void reliability_checklist();
-
-electrodearray * make_electrodes_hexagon(double centerx = 0.0, double centery = 0.0);
-
-extern const char helpstr[];
+// electrodearray* make_electrodes_hexagon(double centerx = 0.0, double centery = 0.0);
 
 void running_instance_preop();
 void running_instance_postop();
@@ -58,8 +52,26 @@ void single_instance_restriction();
 void report_form_aware(Command_Line_Parameters & clp, CLP_Modifiable * clpm);
 void report_form_aware(Command_Line_Parameters & clp, String s);
 
-void developmental_simulation(Command_Line_Parameters & clp);
 
-void copyright();
+// NETMORPH C++ API //
 
-#endif
+/**
+ * @brief Structure to contain all the data that is produced from a given netmorph run
+ * 
+ */
+struct NetmorphResult {
+
+    bool Status = false; /**Status variable, must be true otherwise data may be undefined*/
+
+};
+
+
+/**
+ * @brief Run netmorph on the provided modelfile. Will write the current status to the provided int pointer (0-100%).
+ * 
+ * @param _StatusPercent 
+ * @return NetmorphResult Struct containing all produced data. You must check Status is equal to true, otherwise all other data may not be initialized.
+ */
+NetmorphResult Netmorph(int* _StatusPercent, std::string _Modelfile);
+
+

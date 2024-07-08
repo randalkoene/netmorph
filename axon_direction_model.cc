@@ -42,6 +42,7 @@
 #include "dendritic_growth_model.hh"
 #include "environment_physics.hh"
 #include "Spatial_Presentation.hh"
+#include "Sampled_Output.hh"
 
 /* [***INCOMPLETE] Here I can include functions that parse the command line for
    general parameters to be used in specific direction models if no neuron or
@@ -83,7 +84,7 @@ String general_direction_model_parameters_interface::report_parameters() {
   switch (direction_history_selection_model) {
   case random_truncation_dhs:
     res += "  random fiber segment history truncation.\n    probability = ";
-    res += String(random_truncation_dh_probability,"%.3f, truncated to a fraction between ");
+    res += String(random_truncation_dh_probability,"%.3f")+", truncated to a fraction between ";
     res += String(random_truncation_dh_minfraction,"%.3f and ");
     res += String(random_truncation_dh_maxfraction,"%.3f.\n");
     break;;
@@ -592,23 +593,31 @@ void cell_attraction_direction_model::predict_direction(spatial & predicted, neu
 #ifdef TESTING_SIMPLE_ATTRACTION
   if (eq) {
     network * net_ptr = eq->Net();
+
+    // Calculate predicted direction based on attraction.
     if (net_ptr->chemdata.has_specified_factors) {
-      // For all the chemical factors this neuron is attracted to:
-      for (auto & attractor : n->chemdata.attractedto) {
-        // Find all the somata that are attractive:
-        if (net_ptr->chemdata.attractor_somata.find(attractor)==net_ptr->chemdata.attractor_somata.end()) {
-          std::cout << "MISSING ATTRACTOR SOMATA FOR " << net_ptr->chemindex_to_label.at(attractor) << '\n'; std::cout.flush();
-          exit(1);
-        }
-        std::set<neuron*>& neuronptr_set = net_ptr->chemdata.attractor_somata.at(attractor);
-        for (auto & n_ptr : neuronptr_set) {
-          if (n != n_ptr) {
-            spatial d(n_ptr->Pos());
-            d -= growthcone;
-            double SQdistance = d.len2();
-            d /= SQdistance; // square distance gravitational analogy
-            d /= sqrt(SQdistance); // working with weighted unit vectors
-            predicted += d;
+      if (net_ptr->chemdata.soma_attraction_weight>0.0) {
+        // For all the chemical factors this neuron is attracted to:
+        for (auto & attractor : n->chemdata.attractedto) {
+          // Find all the somata that are attractive:
+          if (net_ptr->chemdata.attractor_somata.find(attractor)==net_ptr->chemdata.attractor_somata.end()) {
+            error("Missing attractor somata for "+net_ptr->chemindex_to_label.at(attractor)+'\n');
+            return;
+          }
+          std::set<neuron*>& neuronptr_set = net_ptr->chemdata.attractor_somata.at(attractor);
+          for (auto & n_ptr : neuronptr_set) {
+            if (n != n_ptr) {
+              spatial d(n_ptr->Pos());
+              d -= growthcone;
+              double SQdistance = d.len2();
+
+              if (net_ptr->Track_Approach()) net_ptr->target_approach_samples(n, n_ptr, SQdistance);
+
+              d /= SQdistance; // square distance gravitational analogy
+              d /= sqrt(SQdistance); // working with weighted unit vectors
+              d *= net_ptr->chemdata.soma_attraction_weight;
+              predicted += d;
+            }
           }
         }
       }
@@ -625,6 +634,9 @@ void cell_attraction_direction_model::predict_direction(spatial & predicted, neu
                 spatial d(fs_ptr->P1);
                 d -= growthcone;
                 double SQdistance = d.len2();
+
+                if (net_ptr->Track_Approach()) net_ptr->target_approach_samples(n, fs_ptr->N(), SQdistance);
+
                 d /= SQdistance; // square distance gravitational analogy
                 d /= sqrt(SQdistance); // working with weighted unit vectors
                 predicted += d;

@@ -31,8 +31,9 @@
 
 #include <map>
 #include <set>
+#include <vector>
 
-#include "templates.hh"
+#include <include/templates.hh>
 #include "Network_Statistics.hh"
 #include "Spatial_Segment_Subset.hh"
 #include "Command_Line_Parameters.hh"
@@ -63,6 +64,31 @@ class network_statistics_base;
 #ifndef __NEURITE_DIAMETER_MODEL_HH
 class Neurite_Diameter_Model;
 #endif
+
+struct neuron_pair {
+  neuron* from;
+  neuron* to;
+  neuron_pair(neuron* _from, neuron* _to): from(_from), to(_to) {}
+};
+
+struct neuron_pair_approach {
+  double sqdistance = 999999999999999.9;
+  double t_sample = 0.0;
+  std::vector<double> sqdhistory;
+  
+  neuron_pair_approach() {}
+  neuron_pair_approach(double _tsample, double sqd): sqdistance(sqd), t_sample(_tsample) {
+    sqdhistory.emplace_back(sqd);
+  }
+};
+
+struct neuron_pair_comp {
+  bool operator() (const neuron_pair& lhs, const neuron_pair& rhs) const {
+    if (lhs.from < rhs.from) return true;
+    if (lhs.from > rhs.from) return false;
+    return lhs.to < rhs.to;
+  }
+};
 
 class region: public PLLHandle<region> {
   // A region object is an arbitrary collection of neurons. The network can
@@ -99,6 +125,8 @@ public:
   int find(neuron & n);
 };
 
+std::vector<String> get_chem_factors(String factorsstr);
+
 /**
  * Data cache to quickly find network components involved in various
  * forms of attracting and repelling using chemical factors.
@@ -123,6 +151,29 @@ struct chemical_factor_data {
 
   bool has_specified_factors = false;
   bool detailed_chemical_factors = false; // at neurites as well
+  double soma_attraction_weight = 1.0; // When 1.0, this weighs as strongly as other attraction points.
+};
+
+/**
+ * A flexible tracker of completion requirements to complete development
+ * before the days limit has been reached.
+ * E.g. this can be used to set a distant days limit and aim for the
+ * creation of specific connections.
+ * 
+ * A percentage of completion can be displayed instead of a percentage
+ * of time.
+ */
+struct completion_requirements {
+  std::map<neuron_pair, bool, neuron_pair_comp> target_connections;
+
+  bool enable_completion_requirements = false;
+
+  void update_connection(neuron* presyn, neuron* postsyn);
+  String report_completion_criteria();
+  String report_criteria_completed();
+  void criteria_numbers(long& totnum, long& completed);
+  double completion_percentage();
+  bool is_complete();
 };
 
 class network: public PLLRoot<neuron>, public Event_Queue {
@@ -139,15 +190,25 @@ protected:
   regionslist regions;
 
   bool NES_output = false;
+  bool track_approach = true;
 
 public:
   std::map<String, int> chemlabel_to_index;
   std::vector<String> chemindex_to_label;
   chemical_factor_data chemdata;
 
+  std::set<neuron*> target_neurons; // neurons among chemdata.attractor_somata
+  std::map<neuron_pair, neuron_pair_approach, neuron_pair_comp> neuron_pair_map; // used for distance tracking
+
+  completion_requirements completion;
+
 protected:
   void add_typed_neuron(neuron_type nt, neuron * psmin, neuron * psmax);
   void remove_abstract_connections_without_synapses();
+
+  void _innerloop_byregiontypecell_neuron_specific_configurator(Command_Line_Parameters & clp, int i, String identifier, String valuestr);
+  void _innerloop_byidx_neuron_specific_configurator(Command_Line_Parameters & clp, int i, String identifier, String valuestr);
+  void _innerloop_neuron_specific_configurator(Command_Line_Parameters & clp, int i, String identifier, String valuestr);
 public:
   network(): Event_Queue(this), edges(true), candidate_synapses(true), synapses_during_development(true), sss(NULL), ndm(NULL) {}
   network(int numneurons, bool e = true); // (see nibr.cc)
@@ -158,6 +219,9 @@ public:
   regionslist & Regions() { return regions; }
   spatial & Center() { return center; }
   double Time() { return t; }
+  bool Track_Approach() const { return track_approach; }
+  void target_approach_samples(neuron * from, neuron * to, double sqdistance);
+  String show_target_approach();
   int get_or_add_chemlabel(String chemlabel);
   void possibly_add_attractor(fibre_segment * new_branching_segment);
   bool Seek_Candidate_Synapses() { return candidate_synapses; }
@@ -169,6 +233,7 @@ public:
   Shape_Regions_Result shape_regions(Command_Line_Parameters & clp, neuron * psmin = NULL, neuron * psmax = NULL);
 #endif
   Shape_Result shape_network(Command_Line_Parameters & clp, neuron * psmin = NULL, neuron * psmax = NULL);
+  neuron * find_neuron_by_idx(long idx);
   neuron * nearest(spatial & p);
   neuronset * inrange(neuron * n, double radius, neuron_type ntype = UNTYPED_NEURON); // (see nibr.cc)
   void uniform_random_connectivity(double range, int minconn, int maxconn, neuron_type sourcetype = UNTYPED_NEURON, neuron_type targettype = UNTYPED_NEURON, bool clearexisting = true); // (see nibr.cc)
@@ -214,7 +279,10 @@ public:
   void set_figattr(int fattr); // (see nibr.cc)
   void visible_pre_and_target_post(neuron & n); // (see nibr.cc)
   virtual void parse_CLP(Command_Line_Parameters & clp);
+  void neuron_specific_configurator(Command_Line_Parameters & clp);
   virtual String report_parameters();
+  String neuron_specific_reports();
+  void setup_completion_requirements();
 
   void set_NES_Output(bool _NESoutput) { NES_output = _NESoutput; }
   bool NES_Output() const { return NES_output; }

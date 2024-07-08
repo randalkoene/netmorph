@@ -1,5 +1,5 @@
 /*
-  © Copyright 2008 Randal A. Koene <randalk@netmorph.org>
+  © Copyright 2008-2024 Randal A. Koene <randalk@netmorph.org>
   
   With design assistance from J. van Pelt & A. van Ooyen, and support
   from the Netherlands Organization for Scientific Research (NWO)
@@ -22,8 +22,8 @@
   You should have received a copy of the GNU General Public License
   along with NETMORPH.  If not, see <http://www.gnu.org/licenses/>.
 */
-// nibr.cc
-// Randal A. Koene, 20040830
+// Netmorph.cpp
+// Randal A. Koene, 20240628
 
 /*
    The ways to determine network connectivity are described in
@@ -69,6 +69,7 @@ using namespace std;
 #endif
 #include "global.hh"
 #include "mtprng.hh"
+#include "Netmorph.h"
 
 /*!
   \mainpage NETMORPH Class Documentation and UML
@@ -80,13 +81,14 @@ using namespace std;
 
   \section The simulation loop
  */
-int main(int argc, char * argv[]) {
+int main2(std::string & clpcontent) {
   copyright();
-#ifdef USE_RCFILE
-  Command_Line_Parameters clp(argc,argv,helpstr,RCFILE);
-#else
-  Command_Line_Parameters clp(argc,argv,helpstr);
-#endif
+  Command_Line_Parameters clp(clpcontent, helpstr);
+// #ifdef USE_RCFILE
+//   Command_Line_Parameters clp(argc,argv,helpstr,RCFILE);
+// #else
+//   Command_Line_Parameters clp(argc,argv,helpstr);
+// #endif
   main_clp = &clp;
 
   if (clp.IsFormInput()) outputdirectory = "../nibr/output/"; // the default when called by a form
@@ -185,5 +187,26 @@ int main(int argc, char * argv[]) {
 #endif
 
   warnings_on = WARN_OFF; // avoids the unnecessary warning about attempting to destruct the Null_Activity object
-  exit(0);
+  return 0;
+}
+
+/**
+ * @brief Run netmorph on the provided modelfile. Will write the current status to the provided int pointer (0-100%).
+ * 
+ * Note that _Modelfile is not a path to a file but rather contains the entire content of a model file.
+ * 
+ * @param _StatusPercent 
+ * @return NetmorphResult Struct containing all produced data. You must check Status is equal to true, otherwise all other data may not be initialized.
+ */
+NetmorphResult Netmorph(int* _StatusPercent, std::string _Modelfile) {
+
+  if (_StatusPercent != nullptr) {
+    progress_percentage = _StatusPercent;
+  }
+
+  NetmorphResult res;
+  int res_int = main2(_Modelfile);
+  res.Status = (res_int == 0);
+
+  return res;
 }

@@ -40,7 +40,7 @@
 #ifndef __NEURITE_DIAMETER_MODEL_HH
 #define __NEURITE_DIAMETER_MODEL_HH
 
-#include "templates.hh"
+#include <include/templates.hh>
 //#include "fibre_structure.hh"
 //#include "spatial.hh"
 #include "Command_Line_Parameters.hh"

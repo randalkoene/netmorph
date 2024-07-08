@@ -88,7 +88,7 @@
 #include "global.hh"
 #include "BigString.hh"
 #include "Command_Line_Parameters.hh"
-#include "templates.hh"
+#include <include/templates.hh>
 
 typedef double * stat_array;
 

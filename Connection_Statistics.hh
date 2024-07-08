@@ -31,7 +31,7 @@
 #define __CONNECTION_STATISTICS_HH
 
 #include "BigString.hh"
-#include "templates.hh"
+#include <include/templates.hh>
 #include "neuron.hh"
 
 class Connection_Statistics: public PLLHandle<Connection_Statistics> {

@@ -27,9 +27,11 @@
 
 #include <math.h>
 #include <time.h>
+#include <memory>
 #include "global.hh"
 #include "file.hh"
 #include "Fig_Object.hh"
+#include "Include/Embeddable.h"
 
 #define STRVECBUFSIZE 256
 
@@ -139,21 +141,24 @@ int progress_on = WARN_STDOUT;
 String quotas;
 #endif
 
+int* progress_percentage = nullptr;
+std::unique_ptr<Netmorph2NESLogging> embedlog;
+
 // A superior that is the same set means the set has no superior, which can only
 // be true for the universal set.
 natural_schema_parent_set superior_natural_set[NUM_NATURAL_SPS] = {
-  universal_sps,
-  universal_sps,
-  universal_sps,
-  all_axons_sps,
-  all_dendrites_sps,
-  all_axons_sps,
-  all_dendrites_sps,
-  all_axons_sps,
-  all_dendrites_sps,
-  all_axons_sps,
-  all_dendrites_sps,
-  all_pyramidal_dendrites_sps
+  universal_sps,              // superior of universal is universal
+  universal_sps,              // superior of axons is universal
+  universal_sps,              // superior of dendrites is universal
+  all_axons_sps,              // superior of multipolar axons is axons
+  all_dendrites_sps,          // superior of multipolar dendrites is dendrites
+  all_axons_sps,              // superior of bipolar axons is axons
+  all_dendrites_sps,          // superior of bipolar dendrites is dendrites
+  all_axons_sps,              // superior of pyramidal axons is axons
+  all_dendrites_sps,          // superior of pyramidal dendrites is dendrites
+  all_axons_sps,              // superior of interneuron axons is axons
+  all_dendrites_sps,          // superior of interneuron dendrites is dendrites
+  all_pyramidal_dendrites_sps // superior of apical pyramidal dendrites is pyramidal dendrites
 };
 
 // These are the random number generators.
@@ -175,26 +180,51 @@ String progressfile("");
 // functions
 
 void error(String msg) {
-  cerr << msg;
+  if (embedlog) {
+    embedlog->error(msg.chars());
+  } else {
+    cerr << msg;
+  }
   exit(1);
 }
 
 void warning(String msg) {
   if (warnings_on<=WARN_OFF) return;
-  if ((warnings_on<WARN_FILE) || (warningfile.empty())) { cerr << msg; cerr.flush(); }
-  if ((warnings_on>WARN_STDOUT) && (!warningfile.empty())) append_file_from_String(warningfile,msg);
+  if ((warnings_on<WARN_FILE) || (warningfile.empty())) {
+    if (embedlog) {
+      embedlog->warning(msg.chars());
+    } else {
+      cerr << msg;
+      cerr.flush();
+    }
+  }
+  if ((warnings_on>WARN_STDOUT) && (!warningfile.empty())) append_file_from_String(warningfile, msg);
 }
 
 void report(String msg) {
   if (reports_on<=WARN_OFF) return;
-  if ((reports_on<WARN_FILE) || (reportfile.empty())) { cout << msg; cout.flush(); }
-  if ((reports_on>WARN_STDOUT) && (!reportfile.empty())) append_file_from_String(reportfile,msg);
+  if ((reports_on<WARN_FILE) || (reportfile.empty())) {
+    if (embedlog) {
+      embedlog->report(msg.chars());
+    } else {
+      cout << msg;
+      cout.flush();
+    }
+  }
+  if ((reports_on>WARN_STDOUT) && (!reportfile.empty())) append_file_from_String(reportfile, msg);
 }
 
 void progress(String msg) {
   if (progress_on<=WARN_OFF) return;
-  if ((progress_on<WARN_FILE) || (progressfile.empty())) { cout << msg; cout.flush(); }
-  if ((progress_on>WARN_STDOUT) && (!progressfile.empty())) append_file_from_String(progressfile,msg);
+  if ((progress_on<WARN_FILE) || (progressfile.empty())) {
+    if (embedlog) {
+      embedlog->progress(msg.chars());
+    } else {
+      cout << msg;
+      cout.flush();
+    }
+  }
+  if ((progress_on>WARN_STDOUT) && (!progressfile.empty())) append_file_from_String(progressfile, msg);
 }
 
 void global_parse_CLP(Command_Line_Parameters & clp) {
@@ -571,7 +601,7 @@ double normal_pdf::random_selection_calculation() {
   iz=hz&127;
   if (standard) return ( (((unsigned) abs(hz))<kn[iz])? hz*wn[iz] : nfix() );
   else for (;;) {
-    register double r = ( (((unsigned) abs(hz))<kn[iz])? hz*wn[iz] : nfix() )*std + mean;
+    double r = ( (((unsigned) abs(hz))<kn[iz])? hz*wn[iz] : nfix() )*std + mean;
     if (abs(r)<=trunc) return r;
     hz=SHR3;
     iz=hz&127;

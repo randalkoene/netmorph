@@ -34,7 +34,7 @@
 //#include "global.hh"
 #include "BigString.hh"
 //#include "BigRegex.hh"
-//#include "templates.hh"
+//#include <include/templates.hh>
 //#include "network.hh"
 
 /* more about command parsing:

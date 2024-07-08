@@ -699,7 +699,7 @@ inline String::String(istream & ist)
   : rep(Salloc_istream(0,ist,-1,-1)) {}
 #endif
 #ifdef BIGSTRING_LONGLONG_INITIALIZATION
-inline String::String(long l) { char s[12]; snprintf(s,12,"%ld",l); rep = Salloc(0,s,-1,-1); }
+inline String::String(long l) { char s[21]; snprintf(s,21,"%ld",l); rep = Salloc(0,s,-1,-1); }
 #endif
 #ifdef BIGSTRING_BOOL_INITIALIZATION
 inline String::String(bool b) { if (b) rep = Salloc(0,"true",-1,-1); else rep = Salloc(0,"false",-1,-1); }

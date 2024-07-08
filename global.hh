@@ -53,6 +53,8 @@ extern unsigned long int aemrandomdist[];
 
 #define INV_FIGSCALED(scaledcoord) (((double) scaledcoord)/figscale)
 
+#define DSTR3(d) String(double(d), "%.3f")
+
 // bit pattens for neuron::figattr flags
 // cleared bit = visible
 #define FIGATTR_SHOWALL     0x00
@@ -224,6 +226,8 @@ extern String progressfile;
 extern String quotas;
 #endif
 
+extern int* progress_percentage;
+
 // function declarations
 
 void error(String msg);
@@ -296,7 +300,7 @@ public:
 class gnucrng { // see mtprng for an explanation of the member functions
 public:
   //! Defines the 32-bit integer type.
-  //typedef uint32_t int_type;  // needs to be a 32-bit type
+  typedef uint32_t int_type;  // needs to be a 32-bit type
   //typedef unsigned long int int_type;  // needs to be a 32-bit type
   //! Defines the 64-bit IEEE-754 type.
   typedef double        real_type; // needs to be a 64-bit or larger type
@@ -304,7 +308,7 @@ private:
   // Working storage
   unsigned int m_seed;
 public:
-  shiftrng(unsigned int seed = 19650218U) { init(seed); }
+  int shiftrng(unsigned int seed = 19650218U) { init(seed); }
   void init(unsigned int seed) { m_seed = seed; srand(seed); }
   unsigned int get_seed() { return m_seed; }
   unsigned int get_max() { return (unsigned int) RAND_MAX; }

@@ -33,7 +33,7 @@
 #define __SPATIAL_SEGMENT_SUBSET_HH
 
 #include <unistd.h>
-#include "templates.hh"
+#include <include/templates.hh>
 #include "spatial.hh"
 #include "fibre_structure.hh"
 

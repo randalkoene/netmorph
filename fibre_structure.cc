@@ -142,22 +142,21 @@ fibre_segment * fibre_segment::continuation_node_to_branch() {
   String nanstr(newbranch->P0.X(),"%f");
   bool newisNAN = (nanstr==String("nan"));
   if (newisNAN) { 
-    cout << "New branch DBM P0 is set to NAN!\n";
+    progress("New branch DBM P0 is set to NAN!\n");
     String oldnanstr(P1.X(),"%f");
     if (oldnanstr==String("nan")) {
-      cout << "The P1 from which it inherits is also NAN!\n";
+      progress("The P1 from which it inherits is also NAN!\n");
       String oldPOnanstr(P0.X(),"%f");
-      if (oldPOnanstr==String("nan")) cout << "The P0 of the existing branch was also NAN!\n";
+      if (oldPOnanstr==String("nan")) progress("The P0 of the existing branch was also NAN!\n");
       if (branch1) {
 	String branchnanstr(branch1->P0.X(),"%f");
-	if (branchnanstr==String("nan")) cout << "Its pre-existing continuation on branch1 had NAN P0!\n";
+	if (branchnanstr==String("nan")) progress("Its pre-existing continuation on branch1 had NAN P0!\n");
       }
       if (branch2) {
 	String branchnanstr(branch2->P0.X(),"%f");
-	if (branchnanstr==String("nan")) cout << "Its pre-existing continuation on branch2 had NAN P0!\n";
+	if (branchnanstr==String("nan")) progress("Its pre-existing continuation on branch2 had NAN P0!\n");
       }
     }
-    cout.flush();
   }  
 #endif
   if (!branch1) branch1 = newbranch;
@@ -385,7 +384,7 @@ Fig_Object * fibre_segment::net_Fig() {
   Fig_Line * fibre_segment_fig = NULL;
   if (figattr_fibres_nobox || (fig_in_zoom(P0) && fig_in_zoom(P1))) {
 #ifdef TEST_FOR_NAN
-    if (isnan(P0.X())) { cout << "DID DETECT NAN!\n"; cout.flush(); }
+    if (isnan(P0.X())) { progresss("DID DETECT NAN!\n"); }
 #endif
     P0.plane_mapped(x1,y1);
     P1.plane_mapped(x2,y2);
@@ -419,7 +418,7 @@ Fig_Object * fibre_segment::net_Fig() {
 #define TESTPOSTMA
 #ifdef TESTPOSTMA
 #ifdef VECTOR3D
-      if ((X1==-20) && (Y1==-710) && (X2==-2422) && (Y2==-2441)) cout << "FOUND ERROR LINE GENERATION:\nP0=(" << P0.X() << ',' << P0.Y() << ',' << P0.Z() << "), P1=(" << P1.X() << ',' << P1.Y() << ',' << P1.Z() << ")\n";
+      if ((X1==-20) && (Y1==-710) && (X2==-2422) && (Y2==-2441)) progress("FOUND ERROR LINE GENERATION:\nP0=("+DSTR3(P0.X())+','+DSTR3(P0.Y())+','+DSTR3(P0.Z())+"), P1=("+DSTR3(P1.X())+','+DSTR3(P1.Y())+','+DSTR3(P1.Z())+")\n");
 #endif
 #endif
       fibre_segment_fig = new Fig_Line(0,1,_figvar_connection_color,7,_figvar_connection_depth,-1,0.0,0,0,X1,Y1,X2,Y2);
@@ -618,7 +617,7 @@ void fibre_structure::batch_elongate() {
     bool NANbefore = (e->TerminalSegment()->P0.X()==NAN);
     e->ElongationModel()->elongate(e);
     bool NANafter = (e->TerminalSegment()->P0.X()==NAN);
-    if ((NANafter) && (!NANbefore)) { cout << "batch_elongate caused NAN\n"; cout.flush(); }
+    if ((NANafter) && (!NANbefore)) { progress("batch_elongate caused NAN\n"); }
   }
 #else
   terminal_segment * e_next = NULL; // Use this in case e self-destructs during the elongate() call (e.g. by branching in BESTLNN_pyramidal_AD_terminal_segment_elongation_model::elongate().
@@ -628,7 +627,7 @@ void fibre_structure::batch_elongate() {
   }
 #endif
 #ifdef TESTING_ELONGATION_TOTAL
-  if (usedarborelongationfraction<0.9999) cout << "TESTING_ELONGATION_TOTAL: Used arbor elongation fraction = " << usedarborelongationfraction << '\n';
+  if (usedarborelongationfraction<0.9999) progress("TESTING_ELONGATION_TOTAL: Used arbor elongation fraction = "+String(usedarborelongationfraction)+'\n');
 #endif
 }
 #endif

@@ -74,7 +74,7 @@
 #include "Point3D.hh"
 #define Vector Vector3D
 #define Point Point3D
-#define dot(u,v)   ((u).X() * (v).X() + (u).Y() * (v).Y() + (u).Z() * (v).Z())
+#define nm_dot(u,v)   ((u).X() * (v).X() + (u).Y() * (v).Y() + (u).Z() * (v).Z())
 
 class Spatial_Presentation;
 #endif
@@ -83,12 +83,12 @@ class Spatial_Presentation;
 #include "Point2D.hh"
 #define Vector Vector2D
 #define Point Point2D
-#define dot(u,v)   ((u).X() * (v).X() + (u).Y() * (v).Y())
+#define nm_dot(u,v)   ((u).X() * (v).X() + (u).Y() * (v).Y())
 #endif
 
 #define SMALL_NUM  0.00000001 // anything that avoids division overflow
 //#define Pabs(x)     ((x) >= 0 ? (x) : -(x))   // absolute value
-#define norm(v)    sqrt(dot(v,v))  // norm = length of vector
+#define norm(v)    sqrt(nm_dot(v,v))  // norm = length of vector
 //#define Pmax(a,b) ((a) >= (b) ? (a) : (b)) // maximum of two values
 
 // VECTOR2D or VECTOR3D should be supplied by a compiler directive

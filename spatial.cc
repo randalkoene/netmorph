@@ -45,8 +45,8 @@ void spatial::plane_mapped(double & px, double & py) {
   // given: point in view plane Pn.V0, normal vector of view plane, Pn.n
   //        and of course a point (this)
   //spatial w(*this); w -= viewplane.V0;
-  //double D = viewplane.n.len2(); // *** dot(viewplane.n,u);
-  //double N = -dot(viewplane.n,w);
+  //double D = viewplane.n.len2(); // *** nm_dot(viewplane.n,u);
+  //double N = -nm_dot(viewplane.n,w);
   //double sl = N / D;
   //px = x + (sl * viewplane.n.X());
   //py = y + (sl * viewplane.n.Y());
@@ -63,7 +63,7 @@ void spatial::convert_to_spherical() {
   bool showtest = false;
   if ((x>-0.00001) && (x<0.00001)) {
     showtest = true;
-    cout << "Converting ZERO: x=" << x << ", y=" << y << ", S=" << S << '\n'; cout.flush();
+    progrss("Converting ZERO: x="+String(x)+", y="+String(y)+", S="+String(S)+'\n');
   }
 #endif
 #ifdef VECTOR3D
@@ -75,7 +75,7 @@ void spatial::convert_to_spherical() {
   x = S;
 #endif
 #ifdef TEST_FOR_NAN
-  if (showtest) { cout << "After some steps: x=" << x << ", y=" << y << ", S=" << S << '\n'; cout.flush(); }
+  if (showtest) { progress("After some steps: x="+String(x)+", y="+String(y)+", S="+String(S)+'\n'); }
 #endif
 #ifdef VECTOR3D
 #ifdef TEST_FOR_NAN
@@ -90,7 +90,7 @@ void spatial::convert_to_spherical() {
     rho = sqrt(rho);
 #ifdef TEST_FOR_NAN
     String rhonanstr(rho,"%f");
-    if (rhonanstr==String("nan")) { cout << "convert_to_spherical rho==NAN (" << rho << "), rhosquared=" << rhosquared << ", S=" << S << ", z=" << z << ", x=" << x << ", y=" << y << '\n'; cout.flush(); }
+    if (rhonanstr==String("nan")) { progress("convert_to_spherical rho==NAN ("+String(rho)+"), rhosquared="+String(rhosquared)+", S="+String(S)+", z="+String(z)+", x="+String(x)+", y="+String(y)+'\n'); }
 #endif
     z = acos(z/rho);
     if (x>=0) y = asin(y/S);
@@ -100,7 +100,7 @@ void spatial::convert_to_spherical() {
 #endif
 #ifdef TEST_FOR_NAN
   String nanstr(x,"%f");
-  if (nanstr==String("nan")) { cout << "convert_to_spherical resulted in NAN!\n"; cout.flush(); }
+  if (nanstr==String("nan")) { progress("convert_to_spherical resulted in NAN!\n"); }
 #endif
 }
 
@@ -261,19 +261,19 @@ void Rotation::set_rotation(const spatial & a) {
 	0.0,
 	1.0);
   spatial // Ry Rz in columns
-    cyzx(dot(ryx,czx),
-	 dot(ryy,czx),
-	 dot(ryz,czx)), // Ry czx
-    cyzy(dot(ryx,czy),
-	 dot(ryy,czy),
-	 dot(ryz,czy)), // Ry czy
-    cyzz(dot(ryx,czz),
-	 dot(ryy,czz),
-	 dot(ryz,czz)); // Ry czz
+    cyzx(nm_dot(ryx,czx),
+	 nm_dot(ryy,czx),
+	 nm_dot(ryz,czx)), // Ry czx
+    cyzy(nm_dot(ryx,czy),
+	 nm_dot(ryy,czy),
+	 nm_dot(ryz,czy)), // Ry czy
+    cyzz(nm_dot(ryx,czz),
+	 nm_dot(ryy,czz),
+	 nm_dot(ryz,czz)); // Ry czz
   // Rx (Ry Rz) in rows
-  xr.set_all(dot(rxx,cyzx),dot(rxx,cyzy),dot(rxx,cyzz));
-  yr.set_all(dot(rxy,cyzx),dot(rxy,cyzy),dot(rxy,cyzz));
-  zr.set_all(dot(rxz,cyzx),dot(rxz,cyzy),dot(rxz,cyzz));
+  xr.set_all(nm_dot(rxx,cyzx),nm_dot(rxx,cyzy),nm_dot(rxx,cyzz));
+  yr.set_all(nm_dot(rxy,cyzx),nm_dot(rxy,cyzy),nm_dot(rxy,cyzz));
+  zr.set_all(nm_dot(rxz,cyzx),nm_dot(rxz,cyzy),nm_dot(rxz,cyzz));
 }
 
 void Rotation::set_rotation(const spatial & a, const spatial & o) {
@@ -283,9 +283,9 @@ void Rotation::set_rotation(const spatial & a, const spatial & o) {
 
 void Rotation::rotate(const spatial & s, spatial & rotated) {
   spatial translated(s); translated -= origin;
-  double x = dot(xr,translated);
-  double y = dot(yr,translated);
-  double z = dot(zr,translated);
+  double x = nm_dot(xr,translated);
+  double y = nm_dot(yr,translated);
+  double z = nm_dot(zr,translated);
   rotated.set_all(x,y,z);
   rotated += origin;
 }
@@ -293,8 +293,8 @@ void Rotation::rotate(const spatial & s, spatial & rotated) {
 void Rotation::rotate_extract_view(const spatial & s, double & x, double & y) {
   //cout << origin.X() << ',' << origin.Y() << '\n';
   spatial translated(s); translated -= origin;
-  x = dot(xr,translated);
-  y = dot(yr,translated);
+  x = nm_dot(xr,translated);
+  y = nm_dot(yr,translated);
 }
 
 double dist3D_Segment_to_Segment( Segment S1, Segment S2, Segment * distbar) {
@@ -304,11 +304,11 @@ double dist3D_Segment_to_Segment( Segment S1, Segment S2, Segment * distbar) {
   spatial u(S1.P1); u -= S1.P0;
   spatial v(S2.P1); v -= S2.P0;
   spatial w(S1.P0); w -= S2.P0;
-  double    a = dot(u,u);        // always >= 0
-  double    b = dot(u,v);
-  double    c = dot(v,v);        // always >= 0
-  double    d = dot(u,w);
-  double    e = dot(v,w);
+  double    a = nm_dot(u,u);        // always >= 0
+  double    b = nm_dot(u,v);
+  double    c = nm_dot(v,v);        // always >= 0
+  double    d = nm_dot(u,w);
+  double    e = nm_dot(v,w);
   double    D = a*c - b*b;       // always >= 0
   double    sc, sN, sD = D;      // sc = sN / sD, default sD = D >= 0
   double    tc, tN, tD = D;      // tc = tN / tD, default tD = D >= 0
@@ -395,10 +395,10 @@ void Projection::set_projection(const spatial & cl, const spatial & cr, const sp
 
 bool Projection::project_extract_view(const spatial & s, double & x, double & y) {
   spatial ac(s); ac-=cameralocation;
-  double dx = dot(xp,ac);
-  double dy = dot(yp,ac);
+  double dx = nm_dot(xp,ac);
+  double dy = nm_dot(yp,ac);
 #ifdef VECTOR3D
-  double dz = dot(zp,ac);
+  double dz = nm_dot(zp,ac);
   if (dz==0.0) return false;
   double ezdivdz = viewerposition.Z()/dz;
 #endif

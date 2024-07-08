@@ -34,10 +34,13 @@
 #include <limits>
 #include <cfloat>
 #include <climits>
+#include <string>
 //STL#include <vector>
 #include "StringList.hh"
 
 #define TRACK_RECOGNIZED_COMMANDS
+
+String URI_unescape(String escapedURI);
 
 class Command_Line_Parameters {
 protected:
@@ -51,6 +54,10 @@ protected:
 #else
   void Add_Parameter(String pname, String pvalue);
 #endif
+  void _ParseString(String & parstr, String origin);
+public:
+  void Parse_String(std::string & clpstr);
+protected:
   void Parse_File(const char filename[]);
   bool Detect_Form_Input();
   bool Parse_Command_Line();
@@ -71,6 +78,7 @@ protected:
 #endif
 public:
   Command_Line_Parameters(int _clpargc, char * _clpargv[], const char helpstr[], const char rcfile[] = "");
+  Command_Line_Parameters(std::string & clpcontent, const char helpstr[]);
   int NumParameters() { return numparameters; }
   String ParName(int n) { if (n<numparameters) return parname[n]; else return String(""); }
   String ParValue(int n) { if (n<numparameters) return parvalue[n]; else return String(""); }

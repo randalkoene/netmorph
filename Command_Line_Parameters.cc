@@ -52,11 +52,45 @@ Command_Line_Parameters::Command_Line_Parameters(int _clpargc, char * _clpargv[]
 #endif
   Parse_File(rcfile);
   if ((!Parse_Command_Line()) || (!Detect_Form_Input())) {
-    cout << helpstr;
-    cout << '\n';
+    progress(helpstr+'\n');
     report_compiler_directives();
     exit(0);
   }
+#ifdef TRACK_RECOGNIZED_COMMANDS
+  if (numparameters>0) {
+#ifndef FIXED_TRACKING_ARRAY
+    recognized = new int[numparameters];
+    recognizedsize = numparameters;
+    //STLcout << "Vector size: " << recognized->size() << '\n'; cout.flush();
+    //STLrecognized = new std::vector<int>(numparameters,(int) 0);
+    //STLcout << "Vector size: " << recognized->size() << '\n'; cout.flush();
+#else
+    if (numparameters<10240) recognizedsize=numparameters;
+    else recognizedsize=10240;
+#endif
+    for (int i=0; i<recognizedsize; i++) recognized[i] = 0;
+  }
+  initbatchaddparams = false;
+#endif
+}
+
+Command_Line_Parameters::Command_Line_Parameters(std::string & clpcontent, const char helpstr[]):
+  calledbyforminput(false),
+  clpargc(0),
+  clpargv(nullptr),
+  numparameters(0),
+  includefileerrors(0),
+  recognized(NULL),
+  recognizedsize(0),
+  numsubstitutions(0) {
+
+  initbatchaddparams = true;
+#ifdef FIXED_TRACKING_ARRAY
+  recognized = fixedrecognizedarray;
+#endif
+
+  Parse_String(clpcontent);
+
 #ifdef TRACK_RECOGNIZED_COMMANDS
   if (numparameters>0) {
 #ifndef FIXED_TRACKING_ARRAY
@@ -151,15 +185,7 @@ void Command_Line_Parameters::Add_Parameter(String pname, String pvalue) {
   }
 }
 
-void Command_Line_Parameters::Parse_File(const char filename[]) {
-  String fname(filename);
-  if (fname.empty()) return;
-  String parstr;
-  if (!read_file_into_String(fname,parstr)) {
-    includefileerrors++;
-    return;
-  }
-  CLP_recentinclude = fname;
+void Command_Line_Parameters::_ParseString(String & parstr, String origin) {
   // remove comment lines, which may not terminate with ';'
   BigRegex inithashcomments("^[ \t]*#[^\n]*\n"); // (init)hashcomment must be separated, since gsub treats the whole string as one line
   BigRegex hashcomments("\n[ \t]*#[^\n]*\n");
@@ -178,11 +204,28 @@ void Command_Line_Parameters::Parse_File(const char filename[]) {
     pname = plist[i].before('=');
     remove_preceding_whitespace(pname); // this also removes empty lines
 #ifdef TRACK_RECOGNIZED_COMMANDS
-    Add_Parameter(pname,plist[i].after('='),fname);
+    Add_Parameter(pname, plist[i].after('='), origin);
 #else
-    Add_Parameter(pname,plist[i].after('='));
+    Add_Parameter(pname, plist[i].after('='));
 #endif
   }
+}
+
+void Command_Line_Parameters::Parse_String(std::string & clpstr) {
+  String parstr(clpstr.c_str());
+  _ParseString(parstr, "clp_string");
+}
+
+void Command_Line_Parameters::Parse_File(const char filename[]) {
+  String fname(filename);
+  if (fname.empty()) return;
+  String parstr;
+  if (!read_file_into_String(fname,parstr)) {
+    includefileerrors++;
+    return;
+  }
+  CLP_recentinclude = fname;
+  _ParseString(parstr, fname);
 }
 
 bool Command_Line_Parameters::Detect_Form_Input() {
@@ -233,9 +276,7 @@ bool Command_Line_Parameters::Parse_Command_Line() {
   return true;
 }
 
-String Command_Line_Parameters::URI_unescape_ParValue(int n) {
-  if (n>=numparameters) return String("");
-  String escapedURI(parvalue[n]);
+String URI_unescape(String escapedURI) {
   String s; char c; int d1,d2;
   for (unsigned int i = 0; i<escapedURI.length(); i++) {
     c = escapedURI[i];
@@ -254,6 +295,11 @@ String Command_Line_Parameters::URI_unescape_ParValue(int n) {
     s += c;
   }
   return s;
+}
+
+String Command_Line_Parameters::URI_unescape_ParValue(int n) {
+  if (n>=numparameters) return String("");
+  return URI_unescape(parvalue[n]);
 }
 
 String Command_Line_Parameters::str(String sep) {

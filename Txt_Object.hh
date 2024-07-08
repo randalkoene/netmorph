@@ -43,7 +43,7 @@ cellnr , xcenter , ycenter , zcenter"
 
 #include <limits.h>
 #include "BigString.hh"
-#include "templates.hh"
+#include <include/templates.hh>
 
 // definitions
 

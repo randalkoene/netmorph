@@ -313,7 +313,9 @@ void Sampled_Growth_Fig_Output::Output(bool show_stats) {
     for (int i=0; i<netfigidx; i++) {
       fnamebase = figname+'-'+String(t(i),"%012.3f");
 #endif
-      system(String(FIG2DEV)+String(" -L png -g#"+RGBstr(colortable->coldef(CT_background))+magnificationstr+fnamebase+".fig > "+fnamebase+".png").chars());
+      if (system(String(FIG2DEV)+String(" -L png -g#"+RGBstr(colortable->coldef(CT_background))+magnificationstr+fnamebase+".fig > "+fnamebase+".png").chars())!=0) {
+        warning("fig2dev call failed.\n");
+      }
       progress('.');
     }
 #else
@@ -329,15 +331,23 @@ void Sampled_Growth_Fig_Output::Output(bool show_stats) {
     fnamebase = figname+'-'+String(t(netfigidx-1),"%012.3f");
 #endif
 #ifdef CONVERT_READS_FIG_FILES
-    system(String("cp -f "+fnamebase+".fig "+fnamebase+"last.fig"));
+    if (system(String("cp -f "+fnamebase+".fig "+fnamebase+"last.fig"))!=0) {
+      warning("Copy failed.\n");
+    }
 #else
-    system(String("cp -f "+fnamebase+".png "+fnamebase+"last.png"));
+    if (system(String("cp -f "+fnamebase+".png "+fnamebase+"last.png"))!=0) {
+      warning("Copy failed.\n");
+    }
 #endif
     progress("\nCombining samples into "+figname+'.'+combinetype+'\n');
 #ifdef CONVERT_READS_FIG_FILES
-    system(String("convert -delay "+String(sequencedelay)+' '+figname+"-*fig "+figname+'.'+combinetype).chars());
+    if (system(String("convert -delay "+String(sequencedelay)+' '+figname+"-*fig "+figname+'.'+combinetype).chars())!=0) {
+      warning("Convert failed.\n");
+    }
 #else
-    system(String("convert -delay "+String(sequencedelay)+' '+figname+"-*png "+figname+'.'+combinetype).chars());
+    if (system(String("convert -delay "+String(sequencedelay)+' '+figname+"-*png "+figname+'.'+combinetype).chars())!=0) {
+      warning("Convert failed.\n");
+    }
 #endif
 #ifdef SAMPLES_INCLUDE_NETWORK_STATISTICS_BASE
     if (netfigidx>0) PLL_LOOP_FORWARD(network_statistics_sample,netstats[0].head(),1) {

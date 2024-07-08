@@ -28,6 +28,7 @@
 #include "connection.hh"
 #include "neuron.hh"
 #include "Sampled_Output.hh"
+#include "network.hh"
 
 // variables
 
@@ -65,11 +66,19 @@ connection::~connection() {
   pllsignal = pllsignalbuf;
 }
 
+/**
+ * This also updates completion requirements.
+ * *** NOTE: Alternatively, do that in synapse_formation_model::establish_connections().
+ */
 connection::connection(neuron * presyn, neuron * postsyn): presynaptic(presyn), postsynaptic(postsyn) {
   ptpc = new posttopre_connection(*this);
   presyn->outputconnections.link_before(this);
   postsyn->inputconnections.link_before(ptpc);
   atc = abstoconn->create(*this);
+
+  if (eq) {
+    eq->Net()->completion.update_connection(presyn, postsyn);
+  }
 }
 
 connection * connection::create(neuron * presyn, neuron * postsyn) {

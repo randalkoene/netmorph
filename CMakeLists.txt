@@ -35,6 +35,8 @@ set(GEOMETRY_SOURCES
 # Configure Sources
 set(MAIN_SOURCES 
 
+    ${SRC_DIR}/common_entry.cc
+
     ${SRC_DIR}/axon_direction_model.cc
     ${SRC_DIR}/axon_direction_model.hh
 
@@ -96,8 +98,8 @@ set(MAIN_SOURCES
     ${SRC_DIR}/neurite_diameter_model.hh
     ${SRC_DIR}/neuron.cc
     ${SRC_DIR}/neuron.hh
-    ${SRC_DIR}/nibr.cc
-    ${SRC_DIR}/nibr.hh
+    # ${SRC_DIR}/nibr.cc
+    # ${SRC_DIR}/nibr.hh
     ${SRC_DIR}/prepost_structure.cc
     ${SRC_DIR}/prepost_structure.hh
     ${SRC_DIR}/ptest.c
@@ -176,18 +178,58 @@ target_compile_definitions("NetmorphGeometry" PRIVATE
 
 
 # Create Main Executable
-add_executable(${PROJECT_NAME} ${MAIN_SOURCES})
-set(EXECUTABLE_TYPE "Binary")
-target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_17)
+if (NOT ${BUILD_NETMORPH_AS_LIB})
+    add_executable(${PROJECT_NAME} "Include/Embeddable.h" "nibr.hh" "nibr.cc" ${MAIN_SOURCES})
+    set(EXECUTABLE_TYPE "Binary")
+    target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_17)
 
-target_link_libraries(${PROJECT_NAME} PRIVATE 
-    "NetmorphDIL2AL"
-    "NetmorphGeometry"
-)
-target_include_directories(${PROJECT_NAME} PUBLIC ${SRC_DIR})
-target_include_directories(${PROJECT_NAME} PRIVATE ${SRC_DIR}/include)
+    target_link_libraries(${PROJECT_NAME} PRIVATE 
+        "NetmorphDIL2AL"
+        "NetmorphGeometry"
+    )
+    target_include_directories(${PROJECT_NAME} PUBLIC ${SRC_DIR})
+    target_include_directories(${PROJECT_NAME} PRIVATE ${SRC_DIR}/include)
 
-target_compile_definitions(${PROJECT_NAME} PRIVATE
+    target_compile_definitions(${PROJECT_NAME} PRIVATE
+
+
+
+        -DVECTOR3D
+        
+        -D__DIL2AL__ 
+        -D_ALT_REGEX_H=\"regex-gnu.h\"
+        -D_USE_ALT_REGEX
+        -D_CPP_REGEX
+        -DEVALUATE_POSSIBLE_CONNECTION_PROFILING
+        -DSYNAPTOGENESIS_AND_LOSS_INVENTORY
+        -DSAMPLES_INCLUDE_NETWORK_STATISTICS_BASE
+        -DADM_PRIORITIZE_SPEED_OVER_SPACE
+        -DTESTING_SIMPLE_ATTRACTION
+        -DPRECISE_RNG
+        -DINCLUDE_SIMPLE_FIBER_DIAMETER
+        -DUSE_RCFILE
+        -DUSE_RCFILE
+        -DENABLE_FIXED_STEP_SIMULATION
+        -DFIXED_STEP_SIMULATION_START_AT_DT
+        -DTESTING_SPIKING
+        -DCHECK_XFIG_RANGES
+        -D_BIGREGEX_SAFE_MATCHES
+        -DFIG2DEV=\"fig2dev\"
+        
+    )
+else()
+    add_library(${PROJECT_NAME} "Include/Embeddable.h" "Include/Netmorph.h" "Include/Netmorph.cpp" ${MAIN_SOURCES})
+
+    target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_17)
+
+    target_link_libraries(${PROJECT_NAME} PUBLIC 
+        "NetmorphDIL2AL"
+        "NetmorphGeometry"
+    )
+    target_include_directories(${PROJECT_NAME} PUBLIC ${SRC_DIR})
+    target_include_directories(${PROJECT_NAME} PUBLIC ${SRC_DIR}/include)
+
+    target_compile_definitions(${PROJECT_NAME} PUBLIC
 
 
 
@@ -212,6 +254,6 @@ target_compile_definitions(${PROJECT_NAME} PRIVATE
     -DCHECK_XFIG_RANGES
     -D_BIGREGEX_SAFE_MATCHES
     -DFIG2DEV=\"fig2dev\"
-    
-)
-
+    )
+   
+endif()

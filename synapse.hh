@@ -32,7 +32,7 @@
 
 // Required class headers
 
-#include "templates.hh"
+#include <include/templates.hh>
 #include "Fig_Object.hh"
 #include "state_storable.hh"
 #include "Txt_Object.hh"

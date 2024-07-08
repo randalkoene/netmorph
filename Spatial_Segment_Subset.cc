@@ -26,6 +26,8 @@
 // Randal A. Koene, 20041206
 
 //#include "nibr.hh"
+#include <string>
+#include <cstdint>
 #include "diagnostic.hh"
 #include "global.hh"
 #include "Color_Table.hh"
@@ -38,22 +40,22 @@
 #ifdef __SPATIAL_SEGMENT_SUBSET_TEST
   int __recursiondepth = 0;
   #define __SPATIAL_SEGMENT_SUBSET_TEST_RECURSE_INIT \
-    if (!part0) { cout << "ERROR unable to allocate segments\n"; cout.flush(); return true; } \
+    if (!part0) { progress("ERROR unable to allocate segments\n"); return true; } \
     int __localrecursiondepth = __recursiondepth; \
     __recursiondepth++;
   #define __SPATIAL_SEGMENT_SUBSET_TEST_RECURSE_RETURN \
     __recursiondepth = __localrecursiondepth;
   #define __SPATIAL_SEGMENT_SUBSET_TEST_PARTITION_ACCESS_DENDRITIC \
-    cout << "Accessing P from " << this << " (dendritic)\n"; cout.flush();
+    progress(("Accessing P from "+std::to_string(uint64_t(this))+" (dendritic)\n").c_str());
   #define __SPATIAL_SEGMENT_SUBSET_TEST_PARTITION_ACCESS_AXONAL \
-    cout << "Accessing P from " << this << " (axonal)\n"; cout.flush();
+    progress(("Accessing P from "+std::to_string(uint64_t(this))+" (axonal)\n").c_str());
   #define __SPATIAL_SEGMENT_SUBSET_TEST_REPORT_PARTITION \
-    cout << "P at " << __recursiondepth << " (" << this << ") LRTB=[" << minvertex.X() << ',' << maxvertex.X() << ',' << minvertex.Y() << ',' << ,maxvertex.Y() << "]\n"; cout.flush(); \
-    cout << "  subset_array_size = " << subset_array_size << '\n'; cout.flush(); \
-    if ((numdendritesegments<subset_array_size) && (numaxonsegments<subset_array_size)) { cout << "  ERROR partitioning not needed!\n"; cout.flush(); return; }
+    progress(("P at "+std::to_string(__recursiondepth)+" ("+std::to_string(uint64_t(this))+") LRTB=[").c_str()+String(minvertex.X())+','+String(maxvertex.X())+','+String(minvertex.Y())+','+String(maxvertex.Y())+"]\n"); \
+    progress("  subset_array_size = "+String((long)subset_array_size)+'\n'); \
+    if ((numdendritesegments<subset_array_size) && (numaxonsegments<subset_array_size)) { progress("  ERROR partitioning not needed!\n"); return; }
   #define __SPATIAL_SEGMENT_SUBSET_TEST_REPORT_SUBDIVISIONS \
-    cout << "  subdivided by (" << part0 << ',' << part1 << ")\n"; cout.flush(); \
-    cout << "  subdividing: numdendritesegments = " << numdendritesegments << " and numaxonsegments = " << numaxonsegments << '\n'; cout.flush();
+    progress(("  subdivided by ("+std::to_string(uint64_t(part0))+','+std::to_string(uint64_t(part1))+")\n").c_str());\
+    progress("  subdividing: numdendritesegments = "+String((long)numdendritesegments)+" and numaxonsegments = "+String((long)numaxonsegments)+'\n');
 #else
   #define __SPATIAL_SEGMENT_SUBSET_TEST_RECURSE_INIT
   #define __SPATIAL_SEGMENT_SUBSET_TEST_RECURSE_RETURN
@@ -129,7 +131,7 @@ bool Spatial_Segment_Subset::intersects(Segment & s) {
   // Vector ne; // edge outward normal (not explicit in code)
   
   // [*] Note: This is specialized for partition boxes with the standard
-  // normal vectors, thus N = -dot(ni, s.P0-V[i]) and D = dot(ni,dS) are
+  // normal vectors, thus N = -nm_dot(ni, s.P0-V[i]) and D = nm_dot(ni,dS) are
   // converted to a rapid switch statement, since most elements of ni
   // are zero.
   // [***INCOMPLETE] I must check what happens with this code when a

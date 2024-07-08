@@ -1,5 +1,5 @@
 /*
-  © Copyright 2008 Randal A. Koene <randalk@netmorph.org>
+  © Copyright 2024 Randal A. Koene <randalk@netmorph.org>
   
   With design assistance from J. van Pelt & A. van Ooyen, and support
   from the Netherlands Organization for Scientific Research (NWO)
@@ -22,44 +22,20 @@
   You should have received a copy of the GNU General Public License
   along with NETMORPH.  If not, see <http://www.gnu.org/licenses/>.
 */
-// nibr.hh
-// Randal A. Koene, 20040830
+#pragma once
 
-#ifndef __NIBR_HH
-#define __NIBR_HH
+#include <memory>
 
-#include "Command_Line_Parameters.hh"
-#include "network.hh"
-#include "spatial.hh"
+/**
+ * Glue-class to seamlessly pass logging messages from Netmorph
+ * to the standard NES Logger.
+ */
+class Netmorph2NESLogging {
+public:
+  virtual void error(const std::string & msg) = 0;
+  virtual void warning(const std::string & msg) = 0;
+  virtual void report(const std::string & msg) = 0;
+  virtual void progress(const std::string & msg) = 0;
+};
 
-// definitions
-
-#ifdef VECTOR3D
-#define RCFILE "./.nibrrc"
-#define LASTCLPFILE ".nibr.clp"
-#endif
-#ifdef VECTOR2D
-#define RCFILE "./.nibr2Drc"
-#define LASTCLPFILE ".nibr2D.clp"
-#endif
-
-// function declarations
-
-void reliability_checklist();
-
-electrodearray * make_electrodes_hexagon(double centerx = 0.0, double centery = 0.0);
-
-extern const char helpstr[];
-
-void running_instance_preop();
-void running_instance_postop();
-void single_instance_restriction();
-
-void report_form_aware(Command_Line_Parameters & clp, CLP_Modifiable * clpm);
-void report_form_aware(Command_Line_Parameters & clp, String s);
-
-void developmental_simulation(Command_Line_Parameters & clp);
-
-void copyright();
-
-#endif
+extern std::unique_ptr<Netmorph2NESLogging> embedlog; /** Used if Netmorph should behave as an embedded component. */

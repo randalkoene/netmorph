@@ -39,7 +39,7 @@
 #ifndef __BRANCHING_MODELS_HH
 #define __BRANCHING_MODELS_HH
 
-#include "templates.hh"
+#include <include/templates.hh>
 //#include "fibre_structure.hh"
 #include "spatial.hh"
 #include "Command_Line_Parameters.hh"

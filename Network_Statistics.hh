@@ -30,7 +30,7 @@
 #ifndef __NETWORK_STATISTICS_HH
 #define __NETWORK_STATISTICS_HH
 
-#include "templates.hh"
+#include <include/templates.hh>
 #include "BigString.hh"
 #include "neuron.hh"
 
