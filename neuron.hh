@@ -64,6 +64,7 @@ class network_statistics_base;
 #include "Txt_Object.hh"
 #include "VRML_Object.hh"
 #include "Catacomb_Object.hh"
+#include "Include/Embeddable.h"
 
 enum neuron_type { PRINCIPAL_NEURON, INTERNEURON, MULTIPOLAR_NONPYRAMIDAL, BIPOLAR, PYRAMIDAL, UNTYPED_NEURON };
 // Note: Untyped is the last one in the enumeration list so that I can do
@@ -189,6 +190,7 @@ public:
   bool has_abstracted_connections() { return abstracted_connections; }
   virtual Fig_Object * net_Fig();
   virtual Txt_Object * net_Txt();
+  virtual bool net_NES(NetData& netdata);
   virtual VRML_Object * net_VRML();
   //virtual Catacomb_Object * net_Catacomb();
 #ifdef VECTOR3D
@@ -208,6 +210,7 @@ public:
   inline bool fig_postsyn_is_visible() { return (!(figattr & FIGMASK_SHOWPOSTSYN)); }
   inline bool fig_cell_is_visible() { return (!(figattr & FIGMASK_SHOWCELL)); }
   inline bool fig_report_depth() { return (figattr & FIGMASK_REPORTDEPTH); }
+  void tree_op(fibre_tree_op& op); // Fiber tree traversal operation, applied over all fiber structures.
 #ifdef TESTING_SIMPLE_ATTRACTION
   int attracts = 0;
   int attractedto = 0;

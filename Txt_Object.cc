@@ -29,14 +29,14 @@
 #include "global.hh"
 #include "Txt_Object.hh"
 
-String * Txt_neuronlist = NULL;
-String * Txt_synapselist = NULL;
-String * Txt_fiberrootlist = NULL;
-String * Txt_continuationnodelist = NULL;
-String * Txt_bifurcationnodelist = NULL;
-String * Txt_terminalgrowthconelist = NULL;
-String * Txt_tuftrootbranchnodelist = NULL;
-String * Txt_obliquerootbranchnodelist = NULL;
+std::unique_ptr<String> Txt_neuronlist;
+std::unique_ptr<String> Txt_synapselist;
+std::unique_ptr<String> Txt_fiberrootlist;
+std::unique_ptr<String> Txt_continuationnodelist;
+std::unique_ptr<String> Txt_bifurcationnodelist;
+std::unique_ptr<String> Txt_terminalgrowthconelist;
+std::unique_ptr<String> Txt_tuftrootbranchnodelist;
+std::unique_ptr<String> Txt_obliquerootbranchnodelist;
 long Txt_neuronindex = 0;
 long Txt_synapseindex = 0;
 long Txt_nodeindex = -1;

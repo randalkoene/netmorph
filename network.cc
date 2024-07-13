@@ -28,6 +28,7 @@
 #include <math.h>
 #include <iostream>
 #include <cstdint>
+#include <memory>
 #include "global.hh"
 #include "file.hh"
 #include "Network_Generated_Statistics.hh"
@@ -38,6 +39,7 @@
 #include "synapse_structure.hh"
 #include "network.hh"
 #include "neuron.hh"
+#include "Include/Embeddable.h"
 
 // variables
 
@@ -1360,15 +1362,16 @@ void network::develop_connection_structure(Connection_Statistics_Root & cstats, 
   if (outattr_show_progress) progress("Growing dendrites and axons in time steps of "+String(dgm.get_fixed_time_step_size(),"%.1f")+" seconds\nup to t = "+String(max_growth_time,"%.1f")+" seconds:\n0%                                   50%                                 100%\n");
   double dt_mark = max_growth_time/78.0; // 50.0;
   double t_nextmark = dt_mark;
-  while (1) {
+  while (netmorph_active) {
     //cout << "t=" << t << '\n';
     if (sampled_output) sampled_output->Sample(t);
     if (progress_percentage != nullptr) {
-      double pct = 100.0*(t/max_growth_time);
+      //double pct = 100.0*(t/max_growth_time);
+      double pct = 99.0*(t/max_growth_time); // Let's keep 1% for the embedded model builder.
       (*progress_percentage) = int(pct); // update external progress tracker (e.g. used by NES)
     }
     if (t>=t_nextmark) {
-      if (outattr_show_progress) progress('=');
+      if (outattr_show_progress && (!embedlog)) progress('=');
       t_nextmark += dt_mark;
     }
     dgm.grow(this,&cstats,t);
@@ -1875,18 +1878,17 @@ Fig_Group * network::Fig_Neurons(String figname, double width) {
 }
 
 Txt_Group * network::net_Txt() {
-  if (Txt_neuronlist) delete Txt_neuronlist;
-  if (Txt_synapselist) delete Txt_synapselist;
+  // Initialize strings and pre-allocate space
   if (outattr_Txt_separate_files) {
     if (NES_output) {
-      Txt_neuronlist = new String(COLUMN_LABELS_NEURONS_WITH_RADIUS);
+      Txt_neuronlist.reset(new String(COLUMN_LABELS_NEURONS_WITH_RADIUS));
     } else {
-      Txt_neuronlist = new String(COLUMN_LABELS_NEURONS);
+      Txt_neuronlist.reset(new String(COLUMN_LABELS_NEURONS));
     }
-    Txt_synapselist = new String(COLUMN_LABELS_SYNAPSES);
+    Txt_synapselist.reset(new String(COLUMN_LABELS_SYNAPSES));
   } else {
-    Txt_neuronlist = new String();
-    Txt_synapselist = new String();
+    Txt_neuronlist.reset(new String());
+    Txt_synapselist.reset(new String());
   }
   Txt_neuronindex = 0;
   Txt_synapseindex = 0;
@@ -1897,20 +1899,16 @@ Txt_Group * network::net_Txt() {
   Txt_synapselist->alloc((totnumsynapses+3)*128); // estimated from measurements in output
   if (outattr_track_nodegenesis) {
     Txt_nodeindex = -1;
-    if (Txt_fiberrootlist) delete Txt_fiberrootlist;
-    if (Txt_continuationnodelist) delete Txt_continuationnodelist;
-    if (Txt_bifurcationnodelist) delete Txt_bifurcationnodelist;
-    if (Txt_terminalgrowthconelist) delete Txt_terminalgrowthconelist;
     if (outattr_Txt_separate_files) {
-      Txt_fiberrootlist = new String(COLUMN_LABELS_ROOT_NODES);
-      Txt_continuationnodelist = new String(COLUMN_LABELS_FIBER_NODES);
-      Txt_bifurcationnodelist = new String(COLUMN_LABELS_FIBER_NODES);
-      Txt_terminalgrowthconelist = new String(COLUMN_LABELS_FIBER_NODES);
+      Txt_fiberrootlist.reset(new String(COLUMN_LABELS_ROOT_NODES));
+      Txt_continuationnodelist.reset(new String(COLUMN_LABELS_FIBER_NODES));
+      Txt_bifurcationnodelist.reset(new String(COLUMN_LABELS_FIBER_NODES));
+      Txt_terminalgrowthconelist.reset(new String(COLUMN_LABELS_FIBER_NODES));
     } else {
-      Txt_fiberrootlist = new String();
-      Txt_continuationnodelist = new String();
-      Txt_bifurcationnodelist = new String();
-      Txt_terminalgrowthconelist = new String();
+      Txt_fiberrootlist.reset(new String());
+      Txt_continuationnodelist.reset(new String());
+      Txt_bifurcationnodelist.reset(new String());
+      Txt_terminalgrowthconelist.reset(new String());
     }
     long unsigned int totalnumroots = 0, continuation = 0, bifurcation = 0, terminal = 0;
     PLL_LOOP_FORWARD(neuron,PLLRoot<neuron>::head(),1) {
@@ -1925,7 +1923,11 @@ Txt_Group * network::net_Txt() {
     Txt_bifurcationnodelist->alloc((bifurcation+3)*128);
     Txt_terminalgrowthconelist->alloc((terminal+3)*128);
   }
+
+  // Initialize a text output group
   Txt_Group * txtgroup = new Txt_Group(netinfo);
+
+  // Collect information from all neurons in the network
   //***  PLL_LOOP_FORWARD(neuron,PLLRoot<neuron>::head(),1) e->net_Txt();
   progress("Creating structure output files in text format:\n");
   int nnum = 0;
@@ -1945,23 +1947,21 @@ bool network::Txt_Output(String txtname) {
     Txt_Header txtheader;
     String fullheader(txtheader.str()+net_Txt()->str());
     write_file_from_String(txtname+".header",fullheader);
-    write_file_from_String(txtname+".neurons",*Txt_neuronlist);
-    delete Txt_neuronlist; Txt_neuronlist = NULL;
-    write_file_from_String(txtname+".synapses",*Txt_synapselist);
-    delete Txt_synapselist; Txt_synapselist = NULL;
+    write_file_from_String(txtname+".neurons",*(Txt_neuronlist));
+    //Txt_neuronlist.reset();
+    write_file_from_String(txtname+".synapses",*(Txt_synapselist));
+    //Txt_synapselist.reset();
     if (outattr_track_nodegenesis) {
-      write_file_from_String(txtname+".rootnodes",*Txt_fiberrootlist);
-      delete Txt_fiberrootlist; Txt_fiberrootlist = NULL;
-      write_file_from_String(txtname+".continuationnodes",*Txt_continuationnodelist);
-      delete Txt_continuationnodelist; Txt_continuationnodelist = NULL;
-      write_file_from_String(txtname+".bifurcationnodes",*Txt_bifurcationnodelist);
-      delete Txt_bifurcationnodelist; Txt_bifurcationnodelist = NULL;
-      write_file_from_String(txtname+".growthcones",*Txt_terminalgrowthconelist);
-      delete Txt_terminalgrowthconelist; Txt_terminalgrowthconelist = NULL;
-      write_file_from_String(txtname+".tuftnodes",*Txt_tuftrootbranchnodelist);
-      //delete Txt_tuftrootbranchnodelist; Txt_tuftrootbranchnodelist = NULL; [***NOTE] Don't delete, in case sequence.
-      write_file_from_String(txtname+".obliquenodes",*Txt_obliquerootbranchnodelist);
-      //delete Txt_obliquerootbranchnodelist; Txt_obliquerootbranchnodelist = NULL; [***NOTE] Don't delete, in case sequence.
+      write_file_from_String(txtname+".rootnodes",*(Txt_fiberrootlist));
+      //Txt_fiberrootlist.reset();
+      write_file_from_String(txtname+".continuationnodes",*(Txt_continuationnodelist));
+      //Txt_continuationnodelist.reset();
+      write_file_from_String(txtname+".bifurcationnodes",*(Txt_bifurcationnodelist));
+      //Txt_bifurcationnodelist.reset();
+      write_file_from_String(txtname+".growthcones",*(Txt_terminalgrowthconelist));
+      //Txt_terminalgrowthconelist.reset();
+      write_file_from_String(txtname+".tuftnodes",*(Txt_tuftrootbranchnodelist));
+      write_file_from_String(txtname+".obliquenodes",*(Txt_obliquerootbranchnodelist));
     }
   } else {
     String nettxt;
@@ -1972,31 +1972,56 @@ bool network::Txt_Output(String txtname) {
     nettxt += net_Txt()->str(); // processed 'netinfo'
     nettxt += "neurons:\n";
     nettxt += (*Txt_neuronlist);
-    delete Txt_neuronlist; Txt_neuronlist = NULL;
+    //Txt_neuronlist.reset();
     nettxt += "synapses:\n";
     nettxt += (*Txt_synapselist);
-    delete Txt_synapselist; Txt_synapselist = NULL;
+    //Txt_synapselist.reset();
     if (outattr_track_nodegenesis) {
       nettxt += "fiber structure root nodes:\n";
       nettxt += (*Txt_fiberrootlist);
-      delete Txt_fiberrootlist; Txt_fiberrootlist = NULL;
+      //Txt_fiberrootlist.reset();
       nettxt += "fiber continuation nodes:\n";
       nettxt += (*Txt_continuationnodelist);
-      delete Txt_continuationnodelist; Txt_continuationnodelist = NULL;
+      //Txt_continuationnodelist.reset();
       nettxt += "fiber bifurcation nodes:\n";
       nettxt += (*Txt_bifurcationnodelist);
-      delete Txt_bifurcationnodelist; Txt_bifurcationnodelist = NULL;
+      //Txt_bifurcationnodelist.reset();
       nettxt += "terminal fiber growth cones:\n";
       nettxt += (*Txt_terminalgrowthconelist);
-      delete Txt_terminalgrowthconelist; Txt_terminalgrowthconelist = NULL;
+      //Txt_terminalgrowthconelist.reset();
       nettxt += "apical dendrite tuft root nodes:\n";
       nettxt += (*Txt_tuftrootbranchnodelist);
-      //delete Txt_tuftrootbranchnodelist; Txt_tuftrootbranchnodelist = NULL; [***NOTE] Don't delete, in case sequence.
       nettxt += "apical dendrite oblique root nodes:\n";
       nettxt += (*Txt_obliquerootbranchnodelist);
-      //delete Txt_obliquerootbranchnodelist; Txt_obliquerootbranchnodelist = NULL; [***NOTE] Don't delete, in case sequence.
     }
     write_file_from_String(txtname,nettxt);
+  }
+  return true;
+}
+
+/**
+ * Generate output data structures used to deliver the grown model
+ * to NES (or another platform) within which Netmorph is embedded.
+ */
+bool network::net_NES() {
+  // *** NOTE: At present, including only those parts used in NES model building
+  //     as drafted in the Python frontend scripts netmorph2nes.py and netmorph2obj.py.
+  //     These use collected data about:
+  //     - neurons
+  //     - synapses
+  //     - bifurcationnodes
+  //     - continuationnodes
+  //     - growthcones
+  //     - rootnodes
+  std::unique_ptr<NetData> netdata = std::make_unique<NetData>();
+  progress("Collecting structure output data in NES format:\n");
+  int nnum = 0;
+  PLL_LOOP_FORWARD(neuron, PLLRoot<neuron>::head(), 1) {
+    progress("neuron "+String((long) nnum));
+    if (!e->net_NES(*netdata)) {
+      return false;
+    }
+    nnum++;
   }
   return true;
 }
@@ -2256,6 +2281,15 @@ void network::visible_pre_and_target_post(neuron & n) {
   // its output targets
   n.figattr = (n.figattr & FIGATTR_SHOWPRESYN & FIGATTR_SHOWCELL) | FIGATTR_REPORTDEPTH;
   PLL_LOOP_FORWARD(connection,n.OutputConnections()->head(),1) e->PostSynaptic()->figattr &= (FIGATTR_SHOWPOSTSYN & FIGATTR_SHOWCELL);
+}
+
+/**
+ * For all neurons in the network, traverse the tree of fibers
+ * down to the terminal segments and at each fiber segment apply
+ * the operation specified by the fibre_tree_op object.
+ */
+void network::tree_op(fibre_tree_op& op) {
+  PLL_LOOP_FORWARD(neuron, PLLRoot<neuron>::head(), 1) e->tree_op(op);
 }
 
 connectivity_graph::connectivity_graph(network & _n): net(&_n) {

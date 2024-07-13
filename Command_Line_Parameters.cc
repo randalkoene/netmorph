@@ -54,7 +54,7 @@ Command_Line_Parameters::Command_Line_Parameters(int _clpargc, char * _clpargv[]
   if ((!Parse_Command_Line()) || (!Detect_Form_Input())) {
     progress(helpstr+'\n');
     report_compiler_directives();
-    exit(0);
+    runnablescript = false;
   }
 #ifdef TRACK_RECOGNIZED_COMMANDS
   if (numparameters>0) {
@@ -74,7 +74,7 @@ Command_Line_Parameters::Command_Line_Parameters(int _clpargc, char * _clpargv[]
 #endif
 }
 
-Command_Line_Parameters::Command_Line_Parameters(std::string & clpcontent, const char helpstr[]):
+Command_Line_Parameters::Command_Line_Parameters(const std::string& clpcontent, const char helpstr[]):
   calledbyforminput(false),
   clpargc(0),
   clpargv(nullptr),
@@ -211,7 +211,7 @@ void Command_Line_Parameters::_ParseString(String & parstr, String origin) {
   }
 }
 
-void Command_Line_Parameters::Parse_String(std::string & clpstr) {
+void Command_Line_Parameters::Parse_String(const std::string & clpstr) {
   String parstr(clpstr.c_str());
   _ParseString(parstr, "clp_string");
 }

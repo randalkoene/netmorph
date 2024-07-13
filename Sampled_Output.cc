@@ -25,6 +25,7 @@
 // Sampled_Output.cc
 // Randal A. Koene, 20041118
 
+#include <memory>
 #include "global.hh"
 #include "Color_Table.hh"
 #include "file.hh"
@@ -39,7 +40,7 @@
 
 fanin_histogram net_fanin_histogram;
 
-Sampled_Growth_Output * sampled_output = NULL;
+std::unique_ptr<Sampled_Growth_Output> sampled_output;
 Activity_Results_Output * actres = NULL;
 
 bool camera = false;

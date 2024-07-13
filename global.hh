@@ -35,6 +35,7 @@
 #include "Command_Line_Parameters.hh"
 #include "mtprng.hh"
 #include <stdint.h>
+#include <memory>
 
 // global defines
 
@@ -112,6 +113,7 @@ extern natural_schema_parent_set superior_natural_set[NUM_NATURAL_SPS];
 
 // global variables
 
+extern bool netmorph_active;
 extern unsigned int random_seed;
 extern bool outattr_show_progress;
 extern bool outattr_show_figure;
@@ -159,7 +161,7 @@ class Fig_Group;
 extern Fig_Group * _figgroup;
 
 class Sampled_Growth_Output;
-extern Sampled_Growth_Output * sampled_output; // originally in Sampled_Output.hh
+extern std::unique_ptr<Sampled_Growth_Output> sampled_output; // originally in Sampled_Output.hh
 
 extern double max_growth_time;
 extern bool reduce_rand_calls;

@@ -28,6 +28,7 @@
 #ifndef __NIBR_HH
 #define __NIBR_HH
 
+#include <memory>
 #include "Command_Line_Parameters.hh"
 #include "network.hh"
 #include "spatial.hh"
@@ -51,14 +52,14 @@ electrodearray * make_electrodes_hexagon(double centerx = 0.0, double centery = 
 
 extern const char helpstr[];
 
-void running_instance_preop();
+bool running_instance_preop();
 void running_instance_postop();
-void single_instance_restriction();
+bool single_instance_restriction();
 
 void report_form_aware(Command_Line_Parameters & clp, CLP_Modifiable * clpm);
 void report_form_aware(Command_Line_Parameters & clp, String s);
 
-void developmental_simulation(Command_Line_Parameters & clp);
+std::unique_ptr<network> developmental_simulation(Command_Line_Parameters & clp);
 
 void copyright();
 

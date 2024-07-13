@@ -79,5 +79,5 @@ int main(int argc, char * argv[]) {
 
   terminal();
 
-  exit(0);
+  return 0;
 }

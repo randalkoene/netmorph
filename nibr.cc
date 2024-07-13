@@ -87,6 +87,7 @@ int main(int argc, char * argv[]) {
 #else
   Command_Line_Parameters clp(argc,argv,helpstr);
 #endif
+  if (!clp.runnablescript) return 0;
   main_clp = &clp;
 
   if (clp.IsFormInput()) outputdirectory = "../nibr/output/"; // the default when called by a form
@@ -157,7 +158,9 @@ int main(int argc, char * argv[]) {
 
   write_file_from_String(outputdirectory+LASTCLPFILE,clp.str(";\n")); // log command line
   if (clp.IsFormInput()) {
-    single_instance_restriction();
+    if (!single_instance_restriction()) {
+      return 0;
+    }
     progress("Content-Type: text/html\n\n<HTML>\n<BODY>\n<H1>Network Generation: Simulation</H1>\n\n<PRE>\n");
   }
   if (clp.IncludeFileErrors()>0) {
@@ -185,5 +188,5 @@ int main(int argc, char * argv[]) {
 #endif
 
   warnings_on = WARN_OFF; // avoids the unnecessary warning about attempting to destruct the Null_Activity object
-  exit(0);
+  return 0;
 }

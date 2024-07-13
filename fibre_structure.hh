@@ -49,6 +49,7 @@
 #include "diagnostic.hh"
 #include "Txt_Object.hh"
 #include "VRML_Object.hh"
+#include "Include/Embeddable.h"
 #define __FIBRE_STRUCTURE_HH
 
 // Class pointer forward declarations (to avoid recursive inclusion)
@@ -149,6 +150,28 @@ public:
 
 extern nodegenesis_data * NodeGenesis_Data;
 
+/**
+ * Base class for operators that should be applied to the whole tree of
+ * neurite fibers from a root (or a specified fiber) down to the terminal
+ * segments.
+ * See for example how this is used by BuildFromNetmorphNetwork when
+ * Netmorph is embedded in NES.
+ * (RK 20240713)
+ */
+class fibre_tree_op {
+public:
+  virtual void op(fibre_segment* fs) = 0;
+};
+
+/**
+ * Set common cache integer fiber tree operation.
+ */
+class set_cache_int: public fibre_tree_op {
+public:
+  int value = 0;
+  virtual void op(fibre_segment* fs);
+};
+
 class fibre_segment: public Segment, public state_storable {
 protected:
   neuron * n;
@@ -245,6 +268,7 @@ public:
   virtual Txt_Object * continuationnode_net_Txt(long parentnodeindex);
   virtual Txt_Object * net_Txt(long parentnodeindex);
   virtual VRML_Object * net_VRML();
+  void tree_op(fibre_tree_op& op); // Fiber tree traversal operation
   fibre_segment * connprocid; // flag used during connection evaluation
   common_cache cache;
 };
@@ -415,6 +439,7 @@ public:
   void set_colnum(long _colnum) { colnum=_colnum; }
   virtual Fig_Object * net_Fig();
   virtual Txt_Object * net_Txt();
+  bool net_NES(NetData& netdata);
   double cache; // cache used during statistics calculation
 #ifdef REDUCED_MEMORY_PTSEM
   probability_distribution_function * TSEM_Pdf() { return tsem_pdf; }

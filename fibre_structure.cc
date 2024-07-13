@@ -68,6 +68,13 @@ String general_fibre_structure_parameters_interface::report_parameters() {
 #ifdef VECTOR3D
 extra_fibre_data root_efd(0.0);
 
+/**
+ * Set common cache integer fiber tree operation.
+ */
+void set_cache_int::op(fibre_segment* fs) {
+  fs->cache.i = value;
+}
+
 bool fibre_segment::branch(extra_fibre_data & efd1, extra_fibre_data & efd2) {
 #endif
 #ifdef VECTOR2D
@@ -562,6 +569,20 @@ VRML_Object * fibre_segment::net_VRML() {
   return NULL;
 }
 
+/**
+ * Traverse the tree of fibers down to the terminal segments and
+ * at each fiber segment apply the operation specified by the
+ * fibre_tree_op object.
+ */
+void fibre_segment::tree_op(fibre_tree_op& op) {
+  // Apply to this segment.
+  op.op(this);
+
+  // Recurse to branches.
+  if (branch1) branch1->tree_op(op);
+  if (branch2) branch2->tree_op(op);
+}
+
 terminal_segment_ptr * fibre_structure::array_of_terminal_segments() {
   DIAGNOSTIC_BEFORE_ALLOCATION(new_fibre_segment);
   DIAGNOSTIC_AFTER_ALLOCATION(new_fibre_segment,terminalarraylength,-sizeof(terminal_segment_ptr));
@@ -686,6 +707,12 @@ Txt_Object * fibre_structure::net_Txt() {
   if (NodeGenesis_Data) (*Txt_fiberrootlist) += String(NodeGenesis_Data->find_t_genesis(this),",%f\n");
   fibre_segment::net_Txt(Txt_nodeindex);
   return NULL;
+}
+
+bool fibre_structure::net_NES(NetData& netdata) {
+  // *** I will add this if I determine that I cannot simply use the Network object directly
+  //     when embedded.
+  return true;
 }
 
 void nodegenesis_data::add(fibre_segment * s, double t) {

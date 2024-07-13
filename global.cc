@@ -39,6 +39,7 @@
 unsigned long int aemrandomdist[21] = {0,0,0,0,0,0,0,0,0,0,0};
 #endif
 
+bool netmorph_active = true;
 unsigned int random_seed = 0;
 bool outattr_show_progress = false;
 bool outattr_show_figure = true;
@@ -185,7 +186,11 @@ void error(String msg) {
   } else {
     cerr << msg;
   }
-  exit(1);
+  if (embedlog) {
+    netmorph_active = false;
+  } else {
+    exit(1);
+  }
 }
 
 void warning(String msg) {

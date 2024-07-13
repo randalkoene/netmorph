@@ -27,12 +27,14 @@
 
 // [Update AC 20110322:]  Added include fibre_structure.hh and APICAL/BASAL flag write to .synapses file
 
+#include <memory>
 #include "synapse.hh"
 #include "synapse_structure.hh"
 #include "connection.hh"
 #include "Color_Table.hh"
 #include "global.hh"
 #include "fibre_structure.hh"
+#include "Include/Embeddable.h"
 
 #define POINTER_TO_ID(pointer) String(std::to_string((int64_t) pointer).c_str())
 
@@ -156,16 +158,29 @@ Txt_Object * synapse::net_Txt() {
   (*Txt_synapselist) += ',';
   (*Txt_synapselist) += POINTER_TO_ID(Postsynaptic_Neuron());
   if (SynaptoGenesis_Data) (*Txt_synapselist) += String(SynaptoGenesis_Data->find_t_genesis(this),",%f");
-  if(s->DendriteSegment()->get_APICAL() == 6)
-  {
-	  (*Txt_synapselist) += String(",APICAL\n");
-  }
-  else
-  {
-	  (*Txt_synapselist) += String(",BASAL\n");
-  }
+  if (s->DendriteSegment()->get_APICAL() == 6) { (*Txt_synapselist) += String(",APICAL\n"); }
+  else { (*Txt_synapselist.get()) += String(",BASAL\n"); }
   Txt_synapseindex++;
   return NULL;
+}
+
+bool synapse::net_NES(NetData& netdata) {
+  // Collect data
+  std::unique_ptr<SynapseData> synapsedata = std::make_unique<SynapseData>();
+  synapsedata->index = netdata.synapses.size();
+  synapsedata->type = synapse_type_name[type_id];
+  (s->P0).get_all(synapsedata->P0.x, synapsedata->P0.y, synapsedata->P0.z);
+  (s->P1).get_all(synapsedata->P1.x, synapsedata->P1.y, synapsedata->P1.z);
+  synapsedata->axon_segment_label = std::to_string((int64_t) s->AxonSegment());
+  synapsedata->dendrite_segment_label = std::to_string((int64_t) s->DendriteSegment());
+  synapsedata->presyn_neuron_label = std::to_string((int64_t) Presynaptic_Neuron());
+  synapsedata->postsyn_neuron_label = std::to_string((int64_t) Postsynaptic_Neuron());
+  if (SynaptoGenesis_Data) synapsedata->t_genesis = SynaptoGenesis_Data->find_t_genesis(this);
+  synapsedata->is_apical = (s->DendriteSegment()->get_APICAL() == 6);
+
+  // Store data
+  netdata.synapses.emplace_back(synapsedata.release());
+  return true;
 }
 
 void synaptogenesis_data::add(synapse * s, double t) {

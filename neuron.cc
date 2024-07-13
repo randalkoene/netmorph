@@ -28,6 +28,7 @@
 #include <math.h>
 #include <cstdint>
 #include <string>
+#include <memory>
 #include "neuron.hh"
 #include "fibre_elongation_model.hh"
 #include "axon_direction_model.hh"
@@ -643,6 +644,16 @@ presynaptic_structures_fig->Add_Fig_Object(fo);
   return neuron_structure_fig;
 }
 
+int find_region_number_of_neuron(neuron& n) {
+  if (!eq) return -1;
+  return eq->Net()->Regions().find(n);
+}
+
+const char* get_region_name(int regnum) {
+  if ((!eq) || (regnum<0)) return "universal";
+  return eq->Net()->Regions().el(regnum)->Name().chars();
+}
+
 Txt_Object * neuron::net_Txt() {
   (*Txt_neuronlist) += String(Txt_neuronindex);
   (*Txt_neuronlist) += ',';
@@ -650,10 +661,7 @@ Txt_Object * neuron::net_Txt() {
   (*Txt_neuronlist) += ',';
   (*Txt_neuronlist) += neuron_short_name[TypeID()];
   (*Txt_neuronlist) += ',';
-  int regnum = -1;
-  if (eq) regnum = eq->Net()->Regions().find(*this); // *** Is this use of this safe?
-  if (regnum>=0) (*Txt_neuronlist) += eq->Net()->Regions().el(regnum)->Name();
-  else (*Txt_neuronlist) += "universal";
+  (*Txt_neuronlist) += get_region_name(find_region_number_of_neuron(*this));
   double x=0.0, y=0.0, z=0.0;
   P.get_all(x,y,z);
   (*Txt_neuronlist) += String(x,",%f");
@@ -681,6 +689,35 @@ Txt_Object * neuron::net_Txt() {
   } else progress(")\n");
   Txt_neuronindex++;
   return NULL;
+}
+
+bool neuron::net_NES(NetData& netdata) {
+  // Collect data
+  std::unique_ptr<NeuronData> neurondata = std::make_unique<NeuronData>();
+  neurondata->index = netdata.neurons.size();
+  neurondata->label = std::to_string((int64_t) this);
+  neurondata->type = neuron_short_name[TypeID()];
+  neurondata->region = get_region_name(find_region_number_of_neuron(*this));
+  P.get_all(neurondata->somapos.x, neurondata->somapos.y, neurondata->somapos.z);
+  neurondata->radius = Radius();
+  // synapses
+  if (outputconnections.head()) {
+    PLL_LOOP_FORWARD(connection,outputconnections.head(),1) {
+      PLL_LOOP_FORWARD_NESTED(synapse,e->Synapses()->head(),1,s) s->net_NES(netdata);
+    }
+  }
+  if (outattr_track_nodegenesis) {
+    // dendrite fibers
+    parsing_fs_type = dendrite_fs;
+    PLL_LOOP_FORWARD(fibre_structure,inputstructure.head(),1) e->net_NES(netdata);
+    // axon fibers
+    parsing_fs_type = axon_fs;
+    PLL_LOOP_FORWARD(fibre_structure,outputstructure.head(),1) e->net_NES(netdata);
+  }
+
+  // Store data
+  netdata.neurons.emplace_back(neurondata.release());
+  return true;
 }
 
 VRML_Object * neuron::net_VRML() {
@@ -745,6 +782,16 @@ void neuron::net_Slice(Slice * slice) { // [***INCOMPLETE] Change the return typ
   // Combine all the objects and return them.
 }
 #endif
+
+/**
+ * For all fiber structures of the neuron, traverse the tree of fibers
+ * down to the terminal segments and at each fiber segment apply
+ * the operation specified by the fibre_tree_op object.
+ */
+void neuron::tree_op(fibre_tree_op& op) {
+  PLL_LOOP_FORWARD(fibre_structure, inputstructure.head(), 1) e->tree_op(op);
+  PLL_LOOP_FORWARD(fibre_structure, outputstructure.head(), 1) e->tree_op(op);
+}
 
 void principal::parse_CLP(Command_Line_Parameters & clp) {
   // Note: Facilities for setting the parameters of individual neurons, as well as of all pyramidal neurons can be implemented here.

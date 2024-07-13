@@ -56,7 +56,8 @@ protected:
 #endif
   void _ParseString(String & parstr, String origin);
 public:
-  void Parse_String(std::string & clpstr);
+  bool runnablescript = true; /** This is set to false if Netmorph should exit after initializing Command_Line_Parameters. */
+  void Parse_String(const std::string& clpstr);
 protected:
   void Parse_File(const char filename[]);
   bool Detect_Form_Input();
@@ -78,7 +79,7 @@ protected:
 #endif
 public:
   Command_Line_Parameters(int _clpargc, char * _clpargv[], const char helpstr[], const char rcfile[] = "");
-  Command_Line_Parameters(std::string & clpcontent, const char helpstr[]);
+  Command_Line_Parameters(const std::string& clpcontent, const char helpstr[]);
   int NumParameters() { return numparameters; }
   String ParName(int n) { if (n<numparameters) return parname[n]; else return String(""); }
   String ParValue(int n) { if (n<numparameters) return parvalue[n]; else return String(""); }

@@ -50,6 +50,7 @@
 #include <iostream>
 #include <time.h>
 #include <cstddef>
+#include <memory>
 using namespace std;
 #include "diagnostic.hh"
 #include "Sampled_Output.hh"
@@ -69,6 +70,7 @@ using namespace std;
 #endif
 #include "global.hh"
 #include "mtprng.hh"
+#include "Include/Embeddable.h"
 
 void reliability_checklist() {
   // This function is used to check some essential variables
@@ -123,14 +125,15 @@ electrodearray * make_electrodes_hexagon(const spatial & center) {
   return els;
 }
 
-void running_instance_preop() {
+bool running_instance_preop() {
   // set PID file
   pid_t thispid = getpid();
   String thispidstr((long) thispid);
   if (!write_file_from_String(outputdirectory+"nibr.pid",thispidstr)) {
     progress("Content-Type: text/html\n\n<HTML>\n<BODY>\n<H1>Network Generation: Simulation</H1>\n\n<FONT COLOR=\"#FF0000\"><B>Error: Unable to store process ID in .pid file.</B></FONT>\n\n</BODY>\n</HTML>\n");
-    exit(1);
+    return false;
   }
+  return true;
 }
 
 void running_instance_postop() {
@@ -138,7 +141,7 @@ void running_instance_postop() {
   unlink(outputdirectory+"nibr.pid");
 }
 
-void single_instance_restriction() {
+bool single_instance_restriction() {
   String pidstr;
   if (read_file_into_String(outputdirectory+"nibr.pid",pidstr,false)) { // another instance may be running
 #ifdef LINUX
@@ -149,12 +152,12 @@ void single_instance_restriction() {
     if (res==0) {
 #endif
       progress("Content-Type: text/html\n\n<HTML>\n<BODY>\n<H1>Network Generation: Simulation</H1>\n\n<FONT COLOR=\"#FF0000\"><B>Another simulation is currently running. To conserve resources on the server, only one instance is permitted through the internet form interface. To run multiple instances concurrently, please contact Randal A. Koene as indicated at <A HREF=\"http://rak.minduploading.org\">http://rak.minduploading.org</A>.</B></FONT>\n\n</BODY>\n</HTML>\n");
-      exit(1);
+      return false;
 #ifdef LINUX
     }
 #endif
   }
-  running_instance_preop();
+  return running_instance_preop();
 }
 
 void report_form_aware(Command_Line_Parameters & clp, CLP_Modifiable * clpm) {
@@ -225,12 +228,49 @@ void devsim_present_HTML_graphical_output(String & statsdatafile, String & netfi
 #endif
 }
 
-// The following function is a built-in example of command sequences as they
-// would be used in command scripts.
+/**
+ * NOTES:
+ * 1. To create a truly realistic implementation of the van Pelt
+ *    algorithm, I would have to move away from the approach in which
+ *    all neurons and terminal segments are treated at the same time points.
+ *    Afterall, if a terminal branches at a different time than other
+ *    terminals, the new branches continue to elongate, while others are
+ *    still approaching their branch points. It would be necessary to
+ *    set up a stack of terminal segments in the order of their time step
+ *    treatment, along with necessary information about the tree they are
+ *    in. In this case, it may be best to focus immediately on a method that
+ *    does away with time-steps and instead tries to predict branching
+ *    events in a manner simialr to the event prediction method.
+ *    (Perhaps for now, the current implementation produces output that is
+ *    not significantly less realistic than that produced by the van Pelt
+ *    algorithms.)
+ * 2. Ask van Pelt if it is the meaning of the algorithm that it be
+ *    applied given a certain time for the initial segments, or that it
+ *    only start after those segments, i.e. that the time at the onset of
+ *    growth past the initial segments is 0.
+ * 3. There is probably a standard deviation of about 50% on nu0 that
+ *    needs to be built into the growth functions by multiplying their
+ *    return values with random_double(-std_nu0,std_nu0), but ask van Pelt
+ *    if that variance applies for each segment, or for a tree, or for
+ *    a neuron (i.e. is std_nu0 determined at a specific level, how variable
+ *    is it over the network, and what is the function that determines
+ *    the growth speed?). Note that there may be a resource supply function
+ *    that could be affected by input such as nutrition, blood flow, etc.
+ * 4. If growth includes periodic motility that leads to changes in
+ *    the angle or length of segments within the tree (other than terminal
+ *    segments) then coordinates or normal angles of the segments need
+ *    to be refreshed before drawing them or before computing a new
+ *    normal angle at a continuation point.
+ * 5. normal_random():
+ *    mean + sqrt(variance)*randn() uses F77 normal_dist
+ */
 
-void developmental_simulation(Command_Line_Parameters & clp) {
-  // A temporary function that mimics a command script for a simulation of
-  // dendritic and axonal growth with equations by van Pelt and Uylings.
+// Dendritic and axonal growth with equations by van Pely and Uylings.
+std::unique_ptr<network> developmental_simulation(Command_Line_Parameters & clp) {
+
+  /*****************************************
+   * BEGIN setup before simulating outgrowth
+   */
 
   // setting up parameters
   // Defaults (that differ from those compiled into the program) are given
@@ -238,6 +278,7 @@ void developmental_simulation(Command_Line_Parameters & clp) {
   int n;
   // Kludge: Eventually replace this with object
   // initialization and an object::parse_CLP() function call.
+
   // OUTPUT FORMAT PARAMETERS
   if ((n=clp.Specifies_Parameter("outattr_show_progress"))>=0) outattr_show_progress = (downcase(clp.ParValue(n))==String("true"));
   if ((n=clp.Specifies_Parameter("outattr_show_figure"))>=0) outattr_show_figure = (downcase(clp.ParValue(n))==String("true"));
@@ -309,6 +350,7 @@ void developmental_simulation(Command_Line_Parameters & clp) {
   colortable->parse_CLP(clp);
   report_form_aware(clp,colortable);
   report('\n');
+
   // NETWORK PARAMETERS
   if ((n=clp.Specifies_Parameter("days"))>=0) max_growth_time = atof(clp.ParValue(n))*24.0*60.0*60.0;
   if ((n=clp.Specifies_Parameter("seconds"))>=0) max_growth_time = atof(clp.ParValue(n));
@@ -333,15 +375,15 @@ void developmental_simulation(Command_Line_Parameters & clp) {
       approxproportion[i] = atof(clp.ParValue(n));
       //      cout << "approxproportion[" << i << "] = " << approxproportion[i] << '\n';
       if (approxproportion[i] < 0.0) {
-	approxproportion[i] = 0.0;
-	warning("Warning: The approximate proportion of neurons that are "+String(neuron_type_name[i])+" was set to < 0, defaulting to 0.0.\n");
+        approxproportion[i] = 0.0;
+        warning("Warning: The approximate proportion of neurons that are "+String(neuron_type_name[i])+" was set to < 0, defaulting to 0.0.\n");
       }
     }
   }
   for (int j = UNTYPED_NEURON; j>=0; j--) {
     double approxproportiontotal = approxproportion[0];
     for (int i = 1; i<=UNTYPED_NEURON; i++) approxproportiontotal += approxproportion[i];
-    if (approxproportiontotal == 1.0) break;
+      if (approxproportiontotal == 1.0) break;
     double newtotal = approxproportiontotal - approxproportion[j];
     approxproportion[j] = 1.0 - newtotal;
     if (approxproportion[j]<0.0) approxproportion[j] = 0.0;
@@ -360,8 +402,8 @@ void developmental_simulation(Command_Line_Parameters & clp) {
     if ((n=clp.Specifies_Parameter(parname))>=0) {
       populationsize[i] = atoi(clp.ParValue(n));
       if (populationsize[i] < 0) {
-	populationsize[i] = 0;
-	warning("Warning: The population size for neurons that are "+String(neuron_type_name[i])+" was set to < 0, defaulting to 0.\n");
+        populationsize[i] = 0;
+        warning("Warning: The population size for neurons that are "+String(neuron_type_name[i])+" was set to < 0, defaulting to 0.\n");
       }
       numneurons += populationsize[i];
       report("  Absolute size of "+String(neuron_type_name[i])+" population requested = "+String((long) populationsize[i])+" (total="+String((long) numneurons)+")\n");
@@ -375,9 +417,9 @@ void developmental_simulation(Command_Line_Parameters & clp) {
     if ((n=clp.Specifies_Parameter("neurons"))>=0) {
       numneurons = atoi(clp.ParValue(n));
       if (numneurons<1) {
-	numneurons = 9;
-	numneurons_is_default = true;
-	warning("Warning: The number of neurons was set to < 1, defaulting to "+String((long) numneurons)+" neurons.\n");
+        numneurons = 9;
+        numneurons_is_default = true;
+        warning("Warning: The number of neurons was set to < 1, defaulting to "+String((long) numneurons)+" neurons.\n");
       }
     } else {
       numneurons_is_default = true;
@@ -387,6 +429,7 @@ void developmental_simulation(Command_Line_Parameters & clp) {
   if ((n=clp.Specifies_Parameter("fibreswithturns"))>=0) fibreswithturns = (downcase(clp.ParValue(n))==String("true"));
   double timesteps = 0.0;
   if ((n=clp.Specifies_Parameter("dt"))>=0) timesteps = atof(clp.ParValue(n));
+
   // GROWTH FUNCTION PARAMETERS
   if ((n=clp.Specifies_Parameter("partitionsubsetsize"))>=0) {
     spatialsegmentsubsetsizelimit = atoi(clp.ParValue(n));
@@ -467,16 +510,16 @@ void developmental_simulation(Command_Line_Parameters & clp) {
     double load = ((double) numneurons) * max_growth_time / vPdgm->get_fixed_time_step_size();
     if (load > 2000000) {
       progress("</PRE><P><B><FONT COLOR=\"FF0000\">The computational requirements for the specified combination of the number of neurons, simulated duration of development and step size exceed the load permitted through the open internet form interface.<P>To run simulations of this or greater load, please contact Randal A. Koene as indicated at <A HREF=\"http://rak.minduploading.org\">rak.minduploading.org</A>.</FONT></B><PRE>\n");
-      return;
+      return std::make_unique<network>(2,&pspreadmin,&pspreadmax,nsr);
     }
   }
   // create network and electrode array
-  network * net = new network(numneurons,&pspreadmin,&pspreadmax,nsr); // ,false); // 1st call that can create neurons
-  eq = net;
+  std::unique_ptr<network> net = std::make_unique<network>(numneurons,&pspreadmin,&pspreadmax,nsr); // ,false); // 1st call that can create neurons
+  eq = net.get();
 
   // PARAMETERS THAT REQUIRE KNOWLEDGE OF THE NETWORK
   net->parse_CLP(clp);
-  report_form_aware(clp,net);
+  report_form_aware(clp,net.get());
   Shape_Result res = net->shape_network(clp,&pspreadmin,&pspreadmax); // 2nd call that can create neurons
   if (net->PLLRoot<neuron>::length()<1) error("Error: The network does not appear to contain any neurons!\n");
   general_neuron_parameters.parse_CLP(clp,*net); // detect main direction/elongation/neuron model stuff
@@ -504,13 +547,13 @@ void developmental_simulation(Command_Line_Parameters & clp) {
 #endif
   bool electrodes = false;
   if ((n=clp.Specifies_Parameter("electrodes"))>=0) electrodes = (downcase(clp.ParValue(n))==String("true"));
-  electrodearray * els = NULL;
+  std::unique_ptr<electrodearray> els;
   if (electrodes) {
-    els = make_electrodes_hexagon(net->Center());
+    els.reset(make_electrodes_hexagon(net->Center()));
     progress("Electrode placement completed.\n");
   }
-  if (figsequenceflag) sampled_output = new Sampled_Growth_Fig_Output(net,max_growth_time,sampleinterval,samplefigfiles,statsdatafile,autoplot,samplefigfiles,res.displaywidth,false,false,true);
-  else sampled_output = new Sampled_Growth_Output(net,max_growth_time,sampleinterval,samplefigfiles,statsdatafile,autoplot,true);
+  if (figsequenceflag) sampled_output = std::make_unique<Sampled_Growth_Fig_Output>(net.get(),max_growth_time,sampleinterval,samplefigfiles,statsdatafile,autoplot,samplefigfiles,res.displaywidth,false,false,true);
+  else sampled_output = std::make_unique<Sampled_Growth_Output>(net.get(),max_growth_time,sampleinterval,samplefigfiles,statsdatafile,autoplot,true);
   sampled_output->parse_CLP(clp);
 #ifdef SAMPLES_INCLUDE_NETWORK_STATISTICS_BASE
   if (!sampled_output->Collecting_Statistics()) { // for sanity
@@ -519,31 +562,39 @@ void developmental_simulation(Command_Line_Parameters & clp) {
 #endif
   if ((outattr_track_nodegenesis) && (outattr_make_full_Txt)) {
     int nlsize = net->PLLRoot<neuron>::length()*64;
-    if (Txt_tuftrootbranchnodelist) delete Txt_tuftrootbranchnodelist;
-    if (Txt_obliquerootbranchnodelist) delete Txt_obliquerootbranchnodelist;
     if (outattr_Txt_separate_files) {
-      Txt_tuftrootbranchnodelist = new String(COLUMN_LABELS_TUFT_NODES);
-      Txt_obliquerootbranchnodelist = new String(COLUMN_LABELS_OBLIQUE_NODES);
+      Txt_tuftrootbranchnodelist.reset(new String(COLUMN_LABELS_TUFT_NODES));
+      Txt_obliquerootbranchnodelist.reset(new String(COLUMN_LABELS_OBLIQUE_NODES));
     } else {
-      Txt_tuftrootbranchnodelist = new String();
-      Txt_obliquerootbranchnodelist = new String();
+      Txt_tuftrootbranchnodelist.reset(new String());
+      Txt_obliquerootbranchnodelist.reset(new String());
     }
     Txt_tuftrootbranchnodelist->alloc(nlsize);
     Txt_obliquerootbranchnodelist->alloc(nlsize*8);
   }
   bool combineflag = false;
-  if (figsequenceflag) combineflag = static_cast<Sampled_Growth_Fig_Output *>(sampled_output)->Combine();
-  report_form_aware(clp,sampled_output);
+  if (figsequenceflag) combineflag = static_cast<Sampled_Growth_Fig_Output *>(sampled_output.get())->Combine();
+  report_form_aware(clp,sampled_output.get());
   if (system("rm -f "+samplefigfiles+"*fig "+samplefigfiles+"*png")!=0) {
     warning("Remove call failed.\n");
   }
   if (pb.select_physical_boundary("",clp)>0) report_form_aware(clp,&pb);
   
   // select synapse formation model (*** currently only one available)
-  sfm = new synapse_formation_model(net,&cstats);
+  sfm = new synapse_formation_model(net.get(),&cstats);
 
-  // generate presynaptic and postsynaptic structure
+  /*****************************************
+   * END setup before simulating outgrowth
+   */
+
+  //--- generate presynaptic and postsynaptic structure ------
   net->develop_connection_structure(cstats,*vPdgm,*vPagm);
+  //----------------------------------------------------------
+
+  /*****************************************
+   * BEGIN output after simulating outgrowth
+   */
+
   if (warning_fibre_segment_net_Fig_zero_length>0) warning("nibr Warning: "+String((long) warning_fibre_segment_net_Fig_zero_length)+" occurrences of fibre_segment with length == 0.0 in fibre_segment::net_Fig()\n");
   if (warning_Spatial_Segment_Subset_intersects_zero_length>0) warning("nibr Warning: "+String((long) warning_Spatial_Segment_Subset_intersects_zero_length)+" occurrences of zero length segment in Spatial_Segment_Subset::intersects()\n");
   progress("Connections generated (total="+String((long) net->number_of_connections())+").\n");
@@ -558,14 +609,13 @@ void developmental_simulation(Command_Line_Parameters & clp) {
   //actres = new Activity_Results_Output();
   if (eq->T_End()>max_growth_time) {
     report("Simulating "+String((eq->T_End()-max_growth_time),"%.1f")+" additional seconds of ACTIVITY in the generated network.\n");
-    actres = new ARO_to_File(outputdirectory+"activity.ascii");
+    std::unique_ptr<ARO_to_File> actres = std::make_unique<ARO_to_File>(outputdirectory+"activity.ascii");
     net->abstract_connections();
     PLL_LOOP_FORWARD(neuron,net->PLLRoot<neuron>::head(),1) e->set_activity(new IFactivity(e));
     
     eq->add(new Random_Spikes()); // first random spike is immediate
     eq->variablesteps();
     actres->postop();
-    delete actres;
   } else report("NOT simulating additional ACTIVITY events following network generation (parameters: event_seconds <= seconds).\n");
 #endif
 
@@ -589,80 +639,82 @@ void developmental_simulation(Command_Line_Parameters & clp) {
     progress("Number of candidate synapses disstance checks = "+String((long) candidate_synapses_num_distance_checks)+"\n");
     String hist_str;
     for (size_t i = 0; i<10; i++) hist_str += String((long) candidate_synapse_distances_histogram[i])+" ";
-    progress("Histogram of candidate synapse distances (steps of 0.1) = "+hist_str+"\n");
+      progress("Histogram of candidate synapse distances (steps of 0.1) = "+hist_str+"\n");
     hist_str = "";
     for (size_t i = 0; i<10; i++) hist_str += String((long) threshold_distances_histogram[i])+" ";
-    progress("Histogram of threshold distances (steps of 0.1) = "+hist_str+"\n");
+      progress("Histogram of threshold distances (steps of 0.1) = "+hist_str+"\n");
   }
 #endif
 #ifdef SYNAPTOGENESIS_AND_LOSS_INVENTORY
   if (net->Seek_Candidate_Synapses()) {
     progress("Inventory of synapse genesis and loss:\n");
     for (int i=0; i<syntype_IDs; i++) progress("  "+String(synapse_type_name[i])+"\tgenesis="+String((long) synapse_inventory[i][SYNGENESIS])+"\tloss="+String((long) synapse_inventory[i][SYNLOSS])+'\n');
-    progress("Attempted conversions of candidate synapses = "+String((long) candidates_conversion_attempted)+'\n');
+      progress("Attempted conversions of candidate synapses = "+String((long) candidates_conversion_attempted)+'\n');
   }
 #endif
   if (empty_data_samples>0) warning("During the collection of simulation statistics, "+String((long) empty_data_samples)+" samples were empty.\n");
   int showprogresscache = 0;
 #ifdef TEST_FOR_NAN
   PLL_LOOP_FORWARD(neuron,net->PLLRoot<neuron>::head(),1)
-    PLL_LOOP_FORWARD_NESTED(fibre_structure,e->OutputStructure()->head(),1,ps)
-      PLL_LOOP_FORWARD_NESTED(terminal_segment,ps->TerminalSegments()->head(),1,ts) {
-      if (isnan(ts->TerminalSegment()->P0.X())) { progress("NAN before Figure calls!\n"); }
+  PLL_LOOP_FORWARD_NESTED(fibre_structure,e->OutputStructure()->head(),1,ps)
+  PLL_LOOP_FORWARD_NESTED(terminal_segment,ps->TerminalSegments()->head(),1,ts) {
+    if (isnan(ts->TerminalSegment()->P0.X())) { progress("NAN before Figure calls!\n"); }
   }
 #endif
+
+  // FIG FORMAT OUTPUT
   if (outattr_show_figure) {
     if (figattr_show_abstract_connections) net->abstract_connections();
     if (figattr_make_full_Fig) {
       set_focus_box(net->Center(),-1.0);
       net->Fig_Output(netfigfile,res.displaywidth,true);
       if (electrodes) {
-	showprogresscache=figattr_sample_show_progress;
-	figattr_sample_show_progress = 0;
-	els->Fig_Output(netfigfile);
-	figattr_sample_show_progress=showprogresscache;
+        showprogresscache=figattr_sample_show_progress;
+        figattr_sample_show_progress = 0;
+        els->Fig_Output(netfigfile);
+        figattr_sample_show_progress=showprogresscache;
       }
 #ifdef VECTOR3D
       if (general_slice_parameters.show_slice_outlines()) net->Slice_Outlines_Output(netfigfile,general_slice_parameters);
 #endif
       if (figattr_connections_thresholdlistlength>1) { // make a set of connection figures
-	bool fsncache = figattr_show_neurons, fspscache = figattr_show_presynaptic_structure;
-	figattr_show_neurons = true; figattr_show_presynaptic_structure = false;
-	net->set_figattr(FIGATTR_SHOWCELL & FIGATTR_SHOWPRESYN);
-	bool fsaccache = figattr_show_abstract_connections;
-	double fctcache = figattr_connections_threshold;
-	figattr_show_abstract_connections = true;
-	String netfigfilebase(netfigfile.before(".fig"));
-	for (long i = 0; i<figattr_connections_thresholdlistlength; i++) {
-	  figattr_connections_threshold = figattr_connections_thresholdlist[i];
-	  net->Fig_Output(netfigfilebase+"-threshold-"+String(figattr_connections_threshold,"%08.2f.fig"),res.displaywidth,true);
-	}
-	figattr_show_abstract_connections = fsaccache;
-	figattr_connections_threshold = fctcache;
-	figattr_show_neurons = fsncache; figattr_show_presynaptic_structure = fspscache;
-	net->set_figattr(FIGATTR_SHOWALL);
+        bool fsncache = figattr_show_neurons, fspscache = figattr_show_presynaptic_structure;
+        figattr_show_neurons = true; figattr_show_presynaptic_structure = false;
+        net->set_figattr(FIGATTR_SHOWCELL & FIGATTR_SHOWPRESYN);
+        bool fsaccache = figattr_show_abstract_connections;
+        double fctcache = figattr_connections_threshold;
+        figattr_show_abstract_connections = true;
+        String netfigfilebase(netfigfile.before(".fig"));
+        for (long i = 0; i<figattr_connections_thresholdlistlength; i++) {
+          figattr_connections_threshold = figattr_connections_thresholdlist[i];
+          net->Fig_Output(netfigfilebase+"-threshold-"+String(figattr_connections_threshold,"%08.2f.fig"),res.displaywidth,true);
+        }
+        figattr_show_abstract_connections = fsaccache;
+        figattr_connections_threshold = fctcache;
+        figattr_show_neurons = fsncache; figattr_show_presynaptic_structure = fspscache;
+        net->set_figattr(FIGATTR_SHOWALL);
       }
     }
 #ifdef TEST_FOR_NAN
-  PLL_LOOP_FORWARD(neuron,net->PLLRoot<neuron>::head(),1)
+    PLL_LOOP_FORWARD(neuron,net->PLLRoot<neuron>::head(),1)
     PLL_LOOP_FORWARD_NESTED(fibre_structure,e->OutputStructure()->head(),1,ps)
-      PLL_LOOP_FORWARD_NESTED(terminal_segment,ps->TerminalSegments()->head(),1,ts) {
+    PLL_LOOP_FORWARD_NESTED(terminal_segment,ps->TerminalSegments()->head(),1,ts) {
       if (isnan(ts->TerminalSegment()->P0.X())) { progress("NAN after net.fig call!\n"); }
-  }
+    }
 #endif
     if (figattr_make_connections_Fig) {
       neuron * zoomneuron = net->nearest(net->Center());
       if (zoomneuron) {
-	net->set_figattr(FIGATTR_SHOWNOCONN);
-	net->visible_pre_and_target_post(*zoomneuron);
-	net->Fig_Output(connectionexamplefigfile,res.displaywidth,true);
-	if (electrodes) {
-	  showprogresscache=figattr_sample_show_progress;
-	  figattr_sample_show_progress = 0;
-	  els->Fig_Output(connectionexamplefigfile);
-	  figattr_sample_show_progress=showprogresscache;
-	}
-	net->set_figattr(FIGATTR_SHOWALL);
+        net->set_figattr(FIGATTR_SHOWNOCONN);
+        net->visible_pre_and_target_post(*zoomneuron);
+        net->Fig_Output(connectionexamplefigfile,res.displaywidth,true);
+        if (electrodes) {
+          showprogresscache=figattr_sample_show_progress;
+          figattr_sample_show_progress = 0;
+          els->Fig_Output(connectionexamplefigfile);
+          figattr_sample_show_progress=showprogresscache;
+        }
+        net->set_figattr(FIGATTR_SHOWALL);
       }
     }
     if (figattr_make_zoom_Fig) {
@@ -671,27 +723,27 @@ void developmental_simulation(Command_Line_Parameters & clp) {
       //usewidth = figattr_focus_box_x2-figattr_focus_box_x1;
       net->Fig_Output(zoomfigfile,figattr_focus_box_x2-figattr_focus_box_x1,true);
       if (electrodes) {
-	showprogresscache=figattr_sample_show_progress;
-	figattr_sample_show_progress = 0;
-	els->Fig_Output(zoomfigfile);
-	figattr_sample_show_progress=showprogresscache;
+        showprogresscache=figattr_sample_show_progress;
+        figattr_sample_show_progress = 0;
+        els->Fig_Output(zoomfigfile);
+        figattr_sample_show_progress=showprogresscache;
       }
       if (figattr_connections_thresholdlistlength>1) { // make a set of connection figures
-	bool fsncache = figattr_show_neurons, fspscache = figattr_show_presynaptic_structure;
-	figattr_show_neurons = true; figattr_show_presynaptic_structure = false;
-	net->set_figattr(FIGATTR_SHOWCELL & FIGATTR_SHOWPRESYN);
-	bool fsaccache = figattr_show_abstract_connections;
-	double fctcache = figattr_connections_threshold;
-	figattr_show_abstract_connections = true;
-	String netfigfilebase(zoomfigfile.before(".fig"));
-	for (long i = 0; i<figattr_connections_thresholdlistlength; i++) {
-	  figattr_connections_threshold = figattr_connections_thresholdlist[i];
-	  net->Fig_Output(netfigfilebase+"-threshold-"+String(figattr_connections_threshold,"%08.2f.fig"),res.displaywidth,true);
-	}
-	figattr_show_abstract_connections = fsaccache;
-	figattr_connections_threshold = fctcache;
-	figattr_show_neurons = fsncache; figattr_show_presynaptic_structure = fspscache;
-	net->set_figattr(FIGATTR_SHOWALL);
+        bool fsncache = figattr_show_neurons, fspscache = figattr_show_presynaptic_structure;
+        figattr_show_neurons = true; figattr_show_presynaptic_structure = false;
+        net->set_figattr(FIGATTR_SHOWCELL & FIGATTR_SHOWPRESYN);
+        bool fsaccache = figattr_show_abstract_connections;
+        double fctcache = figattr_connections_threshold;
+        figattr_show_abstract_connections = true;
+        String netfigfilebase(zoomfigfile.before(".fig"));
+        for (long i = 0; i<figattr_connections_thresholdlistlength; i++) {
+          figattr_connections_threshold = figattr_connections_thresholdlist[i];
+          net->Fig_Output(netfigfilebase+"-threshold-"+String(figattr_connections_threshold,"%08.2f.fig"),res.displaywidth,true);
+        }
+        figattr_show_abstract_connections = fsaccache;
+        figattr_connections_threshold = fctcache;
+        figattr_show_neurons = fsncache; figattr_show_presynaptic_structure = fspscache;
+        net->set_figattr(FIGATTR_SHOWALL);
       }
     }
     if (figattr_make_abstract_Fig) {
@@ -699,13 +751,13 @@ void developmental_simulation(Command_Line_Parameters & clp) {
       set_focus_box(net->Center(),-1.0);
       net->Fig_Abstract_Connections(abstractfigfile,res.displaywidth,true);
       if (figattr_connections_thresholdlistlength>1) { // make a set of connection figures
-	double fctcache = figattr_connections_threshold;
-	String abstractfigfilebase(abstractfigfile.before(".fig"));
-	for (long i = 0; i<figattr_connections_thresholdlistlength; i++) {
-	  figattr_connections_threshold = figattr_connections_thresholdlist[i];
-	  net->Fig_Abstract_Connections(abstractfigfilebase+"-threshold-"+String(figattr_connections_threshold,"%08.2f.fig"),res.displaywidth,true);
-	}
-	figattr_connections_threshold = fctcache;
+        double fctcache = figattr_connections_threshold;
+        String abstractfigfilebase(abstractfigfile.before(".fig"));
+        for (long i = 0; i<figattr_connections_thresholdlistlength; i++) {
+          figattr_connections_threshold = figattr_connections_thresholdlist[i];
+          net->Fig_Abstract_Connections(abstractfigfilebase+"-threshold-"+String(figattr_connections_threshold,"%08.2f.fig"),res.displaywidth,true);
+        }
+        figattr_connections_threshold = fctcache;
       }
     }
     if (figattr_make_neurons_Figs) {
@@ -713,19 +765,35 @@ void developmental_simulation(Command_Line_Parameters & clp) {
       net->Fig_Neurons(neuronfigfilesbase,res.displaywidth);
     }
   }
+
+  // TXT FORMAT OUTPUT
   if (outattr_make_full_Txt) net->Txt_Output(nettxtfile);
+
+  // NES FORMAT OUTPUT
+  // (see below) if (embedlog) net->NES_Output();
+
+
+  // X3D/VRML FORMAT OUTPUT
   if (outattr_make_full_X3D) {
     if (net_zoomwidth>0.0) set_focus_volume(net_zoom_center,net_zoomwidth,net_zoomheight,net_zoomdepth);
     else set_focus_box(net_zoom_center,net_zoom_disttoedge);
     net->VRML_Output(netvrmlfile);
   }
+
+  // CATACOMB FORMAT OUTPUT
   if (outattr_make_full_Catacomb) net->Catacomb_Output(netccmfile);
+
+  // OCTAVE FORMAT OUTPUT
   if (outattr_synapse_distance_frequency) net->Data_Output_Synapse_Distance(netdatasyndistfile);
   if (outattr_connection_distance_frequency) net->Data_Output_Connection_Distance(netdataconndistfile);
   if (max_abstract_strength>0.0) progress("Maximum abstract connection strength computed = "+String(max_abstract_strength,"%.3f")+'\n');
+
+  // VIRTUAL SLICE OUTPUT
 #ifdef VECTOR3D
   if (general_slice_parameters.get_slice()) net->Slice_Output(slicefile,general_slice_parameters);
 #endif
+
+  // ANALYSIS + OCTAVE FORMAT OUTPUT
   // [***BEWARE] Unless a network copy is made, the following optional analysis changes the network.
   if (statsattr_fan_in_analysis!=NUM_fs) { // [***NOTE] This should be moved into a separate function.
     spatial * origpos = new spatial[net->PLLRoot<neuron>::length()];
@@ -761,12 +829,11 @@ void developmental_simulation(Command_Line_Parameters & clp) {
   if (zerocoordinateconversions>0) progress("Conversion from Euler to Spherical coordinates was attempted for "+String((long) zerocoordinateconversions)+" ZERO vectors.\n");
 
   // clean up to make more memory available
-  delete els;
-  delete net;
   delete vPdgm;
   delete vPagm;
   sampled_output->Null_Net();
 
+  // HTML FORM OUTPUT
   // Place HTML output in advance
   String combinetype;
   if (clp.IsFormInput()) {
@@ -774,7 +841,7 @@ void developmental_simulation(Command_Line_Parameters & clp) {
     if (outattr_show_figure && figattr_make_zoom_Fig)  progress("An enlargement of the center of the network: <A HREF=\""+absoluteoutputURL+"zoom.pdf\">zoom.pdf</A>\n");
     if (outattr_show_figure && figattr_make_abstract_Fig) progress("The abstracted connections: <A HREF=\""+absoluteoutputURL+"abstract.pdf\">abstract.pdf</A>\n");
     if (figsequenceflag && combineflag) {
-      combinetype = static_cast<Sampled_Growth_Fig_Output *>(sampled_output)->CombineType();
+      combinetype = static_cast<Sampled_Growth_Fig_Output *>(sampled_output.get())->CombineType();
       progress("The combined and animated sequence: <A HREF=\""+absoluteoutputURL+"sample."+combinetype+"\">sample."+combinetype+"</A>\n");
     }
     if (outattr_show_figure && figattr_make_neurons_Figs)  progress("A set of morphology .fig plots of individual neurons has also been prepared with base name "+neuronfigfilesbase+".\n");
@@ -785,9 +852,6 @@ void developmental_simulation(Command_Line_Parameters & clp) {
   sampled_output->Output(outattr_show_stats);
 
   // more clean up
-  if (Txt_tuftrootbranchnodelist) delete Txt_tuftrootbranchnodelist;
-  if (Txt_obliquerootbranchnodelist) delete Txt_obliquerootbranchnodelist;
-  delete sampled_output;
 #ifdef VECTOR3D
   delete spat_pres;
 #endif
@@ -795,52 +859,25 @@ void developmental_simulation(Command_Line_Parameters & clp) {
 #ifdef TESTING_RANDOM_DISTRIBUTION
   progress("TESTING_RANDOM_DISTRIBUTION:\n");
   for (int ndi = 0; ndi<11; ndi++) progress(String((long)randomdist[ndi])+' ');
-  progress('\n');
+    progress('\n');
 #endif
 #ifdef TESTING_AEM_RANDOM_DISTRIBUTION
   progress("TESTING_AEM_RANDOM_DISTRIBUTION:\n");
   for (int ndi = 0; ndi<21; ndi++) progress(String((long)aemrandomdist[ndi])+' ');
-  progress('\n');
+    progress('\n');
 #endif
 
   if (clp.IsFormInput()) devsim_present_HTML_graphical_output(statsdatafile,netfigfile,zoomfigfile,abstractfigfile,statsfile,figsequenceflag,combineflag,combinetype);
   // some additional output
 
-  // *** To create a truly realistic implementation of the van Pelt
-  // algorithm, I would have to move away from the approach in which
-  // all neurons and terminal segments are treated at the same time points.
-  // Afterall, if a terminal branches at a different time than other
-  // terminals, the new branches continue to elongate, while others are
-  // still approaching their branch points. It would be necessary to
-  // set up a stack of terminal segments in the order of their time step
-  // treatment, along with necessary information about the tree they are
-  // in. In this case, it may be best to focus immediately on a method that
-  // does away with time-steps and instead tries to predict branching
-  // events in a manner simialr to the event prediction method.
-  // (Perhaps for now, the current implementation produces output that is
-  // not significantly less realistic than that produced by the van Pelt
-  // algorithms.)
-  // *** Ask van Pelt if it is the meaning of the algorithm that it be
-  // applied given a certain time for the initial segments, or that it
-  // only start after those segments, i.e. that the time at the onset of
-  // growth past the initial segments is 0.
-  // *** There is probably a standard deviation of about 50% on nu0 that
-  // needs to be built into the growth functions by multiplying their
-  // return values with random_double(-std_nu0,std_nu0), but ask van Pelt
-  // if that variance applies for each segment, or for a tree, or for
-  // a neuron (i.e. is std_nu0 determined at a specific level, how variable
-  // is it over the network, and what is the function that determines
-  // the growth speed?). Note that there may be a resource supply function
-  // that could be affected by input such as nutrition, blood flow, etc.
-  // *** If growth includes periodic motility that leads to changes in
-  // the angle or length of segments within the tree (other than terminal
-  // segments) then coordinates or normal angles of the segments need
-  // to be refreshed before drawing them or before computing a new
-  // normal angle at a continuation point.
-  // *** normal_random():
-  // mean + sqrt(variance)*randn() uses F77 normal_dist
-
   progress("DEVELOPMENTAL (MORPHOGENESIS) SIMULATION: Successful, clean exit.\n");
+
+  /*****************************************
+   * END output after simulating outgrowth
+   */
+
+  // NES DIRECT EMBEDDED OUTPUT THROUGH RETURN VALUE
+  return net;
 }
 
 const char helpstr[] = "\
@@ -1341,7 +1378,7 @@ Usage: netmorph [parameter=value]\n\
   X2_norm.set_sample_max(2.0);
   for (int i=0; i<1000000; i++) X2_norm.random_selection();
   cout << X2_norm.sample_histogram_data();
-  exit(0);
+  return 0;
  */
 
 void copyright() {

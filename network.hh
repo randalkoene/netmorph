@@ -264,6 +264,7 @@ public:
   Fig_Group * Fig_Output(String figname, double width = 0.0, bool overwrite = false); // (see nibr.cc)
   Fig_Group * Fig_Neurons(String figname, double width = 0.0);
   Txt_Group * net_Txt();
+  bool net_NES();
   bool Txt_Output(String txtname);
   bool Data_Output_Synapse_Distance(String dataname);
   bool Data_Output_Connection_Distance(String dataname);
@@ -283,6 +284,8 @@ public:
   virtual String report_parameters();
   String neuron_specific_reports();
   void setup_completion_requirements();
+
+  void tree_op(fibre_tree_op& op); // Fiber tree traversal operation, applied over all neurons.
 
   void set_NES_Output(bool _NESoutput) { NES_output = _NESoutput; }
   bool NES_Output() const { return NES_output; }

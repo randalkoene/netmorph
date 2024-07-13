@@ -37,6 +37,7 @@
 #include "state_storable.hh"
 #include "Txt_Object.hh"
 #include "event.hh"
+#include "Include/Embeddable.h"
 
 // Class pointer forward declarations (to avoid recursive inclusion)
 #ifndef __SPATIAL_HH
@@ -93,6 +94,7 @@ public:
   void fanin_rot();
   Fig_Object * net_Fig();
   Txt_Object * net_Txt();
+  bool net_NES(NetData& netdata);
 };
 
 typedef synapse * synapseptr;

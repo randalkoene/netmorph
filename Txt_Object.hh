@@ -42,6 +42,7 @@ cellnr , xcenter , ycenter , zcenter"
 #define __TXT_OBJECT_HH
 
 #include <limits.h>
+#include <memory>
 #include "BigString.hh"
 #include <include/templates.hh>
 
@@ -84,14 +85,14 @@ public:
   void Add_Txt_Object(Txt_Object * txtobject);
 };
 
-extern String * Txt_neuronlist;
-extern String * Txt_synapselist;
-extern String * Txt_fiberrootlist;
-extern String * Txt_continuationnodelist;
-extern String * Txt_bifurcationnodelist;
-extern String * Txt_terminalgrowthconelist;
-extern String * Txt_tuftrootbranchnodelist;
-extern String * Txt_obliquerootbranchnodelist;
+extern std::unique_ptr<String> Txt_neuronlist;
+extern std::unique_ptr<String> Txt_synapselist;
+extern std::unique_ptr<String> Txt_fiberrootlist;
+extern std::unique_ptr<String> Txt_continuationnodelist;
+extern std::unique_ptr<String> Txt_bifurcationnodelist;
+extern std::unique_ptr<String> Txt_terminalgrowthconelist;
+extern std::unique_ptr<String> Txt_tuftrootbranchnodelist;
+extern std::unique_ptr<String> Txt_obliquerootbranchnodelist;
 extern long Txt_neuronindex;
 extern long Txt_synapseindex;
 extern long Txt_nodeindex;
