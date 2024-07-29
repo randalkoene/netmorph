@@ -299,6 +299,12 @@ std::unique_ptr<network> developmental_simulation(Command_Line_Parameters & clp)
   if ((n=clp.Specifies_Parameter("outattr_Txt_separate_files"))>=0) outattr_Txt_separate_files = (downcase(clp.ParValue(n))==String("true"));
   if ((n=clp.Specifies_Parameter("outattr_make_full_X3D"))>=0) outattr_make_full_X3D = (downcase(clp.ParValue(n))==String("true"));
   if ((n=clp.Specifies_Parameter("outattr_make_full_Catacomb"))>=0) outattr_make_full_Catacomb = (downcase(clp.ParValue(n))==String("true"));
+  if ((n=clp.Specifies_Parameter("outattr_make_full_OBJ"))>=0) outattr_make_full_OBJ = (downcase(clp.ParValue(n))==String("true"));
+  if ((n=clp.Specifies_Parameter("outattr_OBJ_bevdepth_axon"))>=0) outattr_OBJ_bevdepth_axon = atof(clp.ParValue(n));
+  if ((n=clp.Specifies_Parameter("outattr_OBJ_bevdepth_dendrite"))>=0) outattr_OBJ_bevdepth_dendrite = atof(clp.ParValue(n));
+  if ((n=clp.Specifies_Parameter("outattr_make_full_blend"))>=0) outattr_make_full_blend = (downcase(clp.ParValue(n))==String("true"));
+  if (outattr_make_full_blend) outattr_make_full_OBJ = true;
+  if ((n=clp.Specifies_Parameter("blender_exec_path"))>=0) blender_exec_path = clp.ParValue(n);
   if ((n=clp.Specifies_Parameter("statsattr_fan_in_analysis"))>=0) {
     if (downcase(clp.ParValue(n))==String("axons")) statsattr_fan_in_analysis = axon_fs;
     else if (downcase(clp.ParValue(n))==String("dendrites")) statsattr_fan_in_analysis = dendrite_fs;
@@ -503,7 +509,25 @@ std::unique_ptr<network> developmental_simulation(Command_Line_Parameters & clp)
   //reduce_rand_calls = true;
   bool autoplot = false;
   if (clp.IsFormInput()) autoplot = true;
-  String samplefigfiles(outputdirectory+"sample"), netfigfile(outputdirectory+"net.fig"), zoomfigfile(outputdirectory+"zoom.fig"), connectionexamplefigfile(outputdirectory+"connections-example.fig"), abstractfigfile(outputdirectory+"abstract.fig"), neuronfigfilesbase(outputdirectory+"neuron-XXXXX.fig"), statsdatafile(outputdirectory+"stats.m"), statsfile(outputdirectory+"nibr.m"), nettxtfile(outputdirectory+"net.txt"), netvrmlfile(outputdirectory+"net.x3d"), netccmfile(outputdirectory+"net.ccm"), slicefile(outputdirectory+"slice"), netdatasyndistfile(outputdirectory+"netdata-synapsedistance.m"), netdataconndistfile(outputdirectory+"netdata-connectiondistance.m"), faninfigfile(outputdirectory+"fanin.fig"), faninhistfile(outputdirectory+"fanin.m");
+
+  // LOCAL FILE DEFINITIONS BASED ON A COMMON ROOT
+  String samplefigfiles(outputdirectory+"sample"),
+    netfigfile(outputdirectory+"net.fig"),
+    zoomfigfile(outputdirectory+"zoom.fig"),
+    connectionexamplefigfile(outputdirectory+"connections-example.fig"),
+    abstractfigfile(outputdirectory+"abstract.fig"),
+    neuronfigfilesbase(outputdirectory+"neuron-XXXXX.fig"),
+    statsdatafile(outputdirectory+"stats.m"),
+    statsfile(outputdirectory+"nibr.m"),
+    nettxtfile(outputdirectory+"net.txt"),
+    netobjfile(outputdirectory+"net.obj"),
+    netvrmlfile(outputdirectory+"net.x3d"),
+    netccmfile(outputdirectory+"net.ccm"),
+    slicefile(outputdirectory+"slice"),
+    netdatasyndistfile(outputdirectory+"netdata-synapsedistance.m"),
+    netdataconndistfile(outputdirectory+"netdata-connectiondistance.m"),
+    faninfigfile(outputdirectory+"fanin.fig"),
+    faninhistfile(outputdirectory+"fanin.m");
 
   // LOAD TEST FOR OPEN FORM ACCESS
   if (clp.IsFormInput()) {
@@ -516,6 +540,7 @@ std::unique_ptr<network> developmental_simulation(Command_Line_Parameters & clp)
   // create network and electrode array
   std::unique_ptr<network> net = std::make_unique<network>(numneurons,&pspreadmin,&pspreadmax,nsr); // ,false); // 1st call that can create neurons
   eq = net.get();
+  net->set_outputdirectory(outputdirectory);
 
   // PARAMETERS THAT REQUIRE KNOWLEDGE OF THE NETWORK
   net->parse_CLP(clp);
@@ -528,6 +553,8 @@ std::unique_ptr<network> developmental_simulation(Command_Line_Parameters & clp)
   report(res.message);
   progress("Network creation completed.\n");
 
+  // RK 20240725 - look for explicit specification of input_neurons (otherwise will be deduced later)
+  net->explicit_input_neurons(clp);
   // RK 20240621 - neuron specific configurator call, must be called after the network is known
   net->neuron_specific_configurator(clp);
   //std::cout << net->neuron_specific_reports();
@@ -598,9 +625,10 @@ std::unique_ptr<network> developmental_simulation(Command_Line_Parameters & clp)
   if (warning_fibre_segment_net_Fig_zero_length>0) warning("nibr Warning: "+String((long) warning_fibre_segment_net_Fig_zero_length)+" occurrences of fibre_segment with length == 0.0 in fibre_segment::net_Fig()\n");
   if (warning_Spatial_Segment_Subset_intersects_zero_length>0) warning("nibr Warning: "+String((long) warning_Spatial_Segment_Subset_intersects_zero_length)+" occurrences of zero length segment in Spatial_Segment_Subset::intersects()\n");
   progress("Connections generated (total="+String((long) net->number_of_connections())+").\n");
+  progress("Completion requirements: "+String(net->completion.completion_percentage(), "%.1f\n"));
 
   report(net->show_target_approach());
-  report(net->completion.report_criteria_completed());
+  report(net->completion.report_criteria_completed(net.get()));
 
 #ifdef TESTING_SPIKING
   // [***INCOMPLETE] The following temporary, as the proper implementation
@@ -773,6 +801,22 @@ std::unique_ptr<network> developmental_simulation(Command_Line_Parameters & clp)
   // (see below) if (embedlog) net->NES_Output();
 
 
+  // OBJ FORMAT OUTPUT
+  if (outattr_make_full_OBJ) {
+    progress("Creating Wavefront OBJ file...");
+    if (!net->Obj_Output(netobjfile, outattr_OBJ_bevdepth_axon, outattr_OBJ_bevdepth_dendrite)) {
+      warning("Failed to produce Wavefront OBJ output to "+netobjfile+'\n');
+    }
+  }
+
+  // BLEND FORMAT OUTPUT
+  if (outattr_make_full_blend) {
+    progress("Creating Gzipped Blender file...");
+    if (!net->Blend_Output(netobjfile)) {
+      warning("Failed to produce Blender output to "+netobjfile+".blend\n");
+    }
+  }
+
   // X3D/VRML FORMAT OUTPUT
   if (outattr_make_full_X3D) {
     if (net_zoomwidth>0.0) set_focus_volume(net_zoom_center,net_zoomwidth,net_zoomheight,net_zoomdepth);
@@ -897,6 +941,8 @@ Usage: netmorph [parameter=value]\n\
     dt=<decimal#>                        time step size (seconds)\n\
     enable_completion_requirements=<true/false> enable testing if requirements\n\
                                          other than days can achieve completion\n\
+    inputs=<regionA regionB>             list of regions with input neurons\n\
+                                         (by default those with no attractors)\n\
 \n\
     Complete simulated network:\n\
 \n\
@@ -1097,6 +1143,10 @@ Usage: netmorph [parameter=value]\n\
     tension parameters:\n\
       .history_power=<decimal#>          history has increasing (<0),equal (0)\n\
                                          or decreasing (>0) influence\n\
+    cell attraction parameters:\n\
+      .attraction_moderation_base=<decimal#> base (>=1.0) which to raise to the\n\
+                                         power of existing number of connections\n\
+                                         for divide-by moderator\n\
     radial parameters:\n\
       .Samsonovich_hypothesis=<true/false> do turns return to a normal vector\n\
     vector parameters:\n\
@@ -1112,6 +1162,14 @@ Usage: netmorph [parameter=value]\n\
     detailed_chemical_factors=<true/false> use chemical factors at neurites\n\
     soma_attraction_weight=<decimal#>    if 1.0 then somas attract as much as\n\
                                          other contributors.\n\
+    <region>.attractors=<chem-id chem-id> list of attractor chemical IDs\n\
+    <region>.attractedto=<checm-id chem-id> list of chemical IDs attracted to\n\
+    idx.<region>.<type>.<idx>.attractedto=<chem-id chem-id> list of chemical IDs\n\
+                                         the <idx>ed neuron of <type> in <region>\n\
+                                         is attracted to\n\
+    idx.<region>.<type>.<idx>.attractors=<chem-id chem-id> list of chemical IDs\n\
+                                         with which the <idx>ed neuron of\n\
+                                         <type> in <region> attract\n\
 \n\
     Morphological Development - Neurite Fiber Diameter:\n\
 \n\
@@ -1127,6 +1185,8 @@ Usage: netmorph [parameter=value]\n\
       ndm.d_term.PDF=<PDF-id>            delta, uniform, linear, spline_normal,\n\
                                          spline_normal_with_min, normal,\n\
                                          exponential\n\
+      ndm.d_max=<decimal#>               Optional maximum neurite diameter (off\n\
+                                         by default when < 0.0)\n\
 \n\
     Connectivity Development - Synapse formation:\n\
 \n\
@@ -1178,11 +1238,18 @@ Usage: netmorph [parameter=value]\n\
     outattr_Txt_separate_files=<true/false> store full_Txt in separate files\n\
     outattr_track_synaptogenesis=<true/false> track times of synapse creation\n\
     outattr_track_nodegenesis=<true/false> track times of node creation\n\
+    outattr_make_full_OBJ=<true/false>   create .obj of network structure\n\
+    outattr_OBJ_bevdepth_axon=#decimal   bevel depth for axons\n\
+    outattr_OBJ_bevdepth_dendrite=#decimal bevel depth for dendrites\n\
+    outattr_make_full_blend=<true/false> create .blend of network structure\n\
+    blend_exec_path=<path>               path to Blender executable\n\
     outattr_make_full_X3D=<true/false>   create .x3d of network structure\n\
     outattr_make_full_Catacomb=<true/false> create .ccm of network structure\n\
     outattr_synapse_distance_frequency=<true/false> synapses by distance\n\
     outattr_connection_distance_frequency=<true/false> connection by distance\n\
     outattr_distance_frequency_distbinsize=<decimal#> distance bin size\n\
+    track_appraoch=<true/false>          Track and show how axons approach\n\
+                                         dendritic attraction targets\n\
 \n\
     Simulation Output - Statistical Data:\n\
 \n\

@@ -108,6 +108,19 @@ extern general_neuron_parameters_interface general_neuron_parameters;
 extern long num_neurons_created;
 
 /**
+ * Base class for operators that should be applied to the whole set of
+ * neurons.
+ * See for example how this is used by BuildFromNetmorphNetwork when
+ * Netmorph is embedded in NES.
+ * (RK 20240713)
+ */
+class neuron_list_op {
+public:
+  // This is run whenever entering a new neuron.
+  virtual void op(neuron* n) = 0;
+};
+
+/**
  * This data is used when cell attraction is identical for all
  * growthcones of a specific neuron. This is used by cell_attraction
  * in axon_direction_model.
@@ -129,65 +142,100 @@ struct neuron_chemical_factors {
  */
 class neuron: public PLLHandle<neuron>, public state_storable {
   friend class connection;
+
 protected:
   long numberID; // numerical ID that is unique for one neuron that is labeled by its address, and which is assigned automatically
+
   spatial P; // spatial position of center of soma
   double radius; // half diameter in micrometers
+
   // For the following, also see TL#200603101357.2.
   PLLRoot<fibre_structure> outputstructure; // axonal morphology (allocate presynaptic_structure)
   PLLRoot<fibre_structure> inputstructure; // dendritic morphology (allocate postsynaptic_structure)
   PLLRoot<posttopre_connection> inputconnections; // abstract connection reference post from pre
   PLLRoot<connection> outputconnections; // abstract connection reference pre to post
-  double Vm;
   bool abstracted_connections;
+
+  double Vm;
   Activity * a;
-public:
-  neuron_chemical_factors chemdata;
+
+  int chemdata_index = 0;
+  int RotateToNextAttractor(int reuse_attractor);
+
 public:
   neuron(): radius(5.0), Vm(VmREST), abstracted_connections(false), a(&NullActivity), figneuroncolor(colortable->colnum(CT_neuron_untyped)), figconnectionscolor(colortable->colnum(CT_connection_excitatory)), figsynapsescolor(colortable->colnum(CT_synapses)), figdendritescolor(colortable->colnum(CT_dendrites)), figaxonscolor(colortable->colnum(CT_axon_excitatory)), figattr(0) { numberID = num_neurons_created; num_neurons_created++; }
   neuron(spatial & npos): P(npos), radius(5.0), Vm(VmREST), abstracted_connections(false), a(&NullActivity), figneuroncolor(colortable->colnum(CT_neuron_untyped)), figconnectionscolor(colortable->colnum(CT_connection_excitatory)), figdendritescolor(colortable->colnum(CT_dendrites)), figaxonscolor(colortable->colnum(CT_axon_excitatory)), figattr(0) { numberID = num_neurons_created; num_neurons_created++; }
   ~neuron() { if (a!=&NullActivity) delete a; }
+
+  // self references and identifiers
   virtual void* this_neuron() = 0; // See Beware note above.
   String label();
-  // architecture geometry  
+  long numerical_ID() { return numberID; }
+  String numerical_IDStr() { return String(numberID); }
+
+  virtual neuron_type TypeID() { return UNTYPED_NEURON; }
+  const char * TypeChars() { return neuron_short_name[TypeID()]; }
+  String TypeStr() { return String(TypeChars()); }
+
+  // configuration  
   virtual void parse_CLP(Command_Line_Parameters & clp) = 0;
   virtual void neuron_specific_configurator(String config_clp, String valuestr);
   String neuron_specific_reports();
+
+  // architecture, morphology
   void set_position(spatial & npos) { P = npos; }
   void set_position_in_Z_plane(double xpos, double ypos) { P.set_all(xpos,ypos); }
-  long numerical_ID() { return numberID; }
-  String numerical_IDStr() { return String(numberID); }
   spatial & Pos() { return P; }
   void set_radius(double r) { radius=r; }
   double Radius() { return radius; }
-  bool is_attractor() const { return !chemdata.attractor.empty(); }
-  bool is_repellor() const { return !chemdata.repellor.empty(); }
-  void set_activity(Activity * _a) { a = _a; }
-  Activity * activity() { return a; }
-  // neuroanatomical functions
-  void clear_output_connections() { outputconnections.clear(); }
-  void clear_input_connections() { inputconnections.clear(); }
-  connection * connect_to(neuron * postsyn); // (see nibr.cc)
-  connection * connect_from(neuron * presyn); // (see nibr.cc)
-  PLLRoot<connection> * OutputConnections() { return &outputconnections; }
-  virtual void initialize_output_structure(double mintotlength, double maxtotlength); // (see nibr.cc)
-  virtual void initialize_input_structure(double mintotlength, double maxtotlength); // (see nibr.cc)
-  PLLRoot<fibre_structure> * InputStructure() { return &inputstructure; }
-  PLLRoot<fibre_structure> * OutputStructure() { return &outputstructure; }
-  // information output
-#ifdef SAMPLES_INCLUDE_NETWORK_STATISTICS_BASE
-  void Collect_Data(network_statistics_base & nsb);
-#endif
-  int number_of_synapses();
+
   int total_input_segments();
   int total_output_segments();
   int total_input_terminal_segments();
   int total_output_terminal_segments();
-  virtual double Membrane_Potential() { return Vm; }
-  void move(spatial & pos); // Recenter a neuron on pos
+
+  void move(spatial & pos); // Re-center a neuron on pos
   void fanin_rot(); // in spherical coordinates, rotate all points to theta=0
+
+  // chemical attraction
+  neuron_chemical_factors chemdata;
+  bool is_attractor() const { return !chemdata.attractor.empty(); }
+  bool is_repellor() const { return !chemdata.repellor.empty(); }
+  int NextAttractor(int reuse_attractor, bool possibly_rotate_attractors);
+#ifdef TESTING_SIMPLE_ATTRACTION
+  int attracts = 0;
+  int attractedto = 0;
+#endif
+
+  // dynamics
+  void set_activity(Activity * _a) { a = _a; }
+  Activity * activity() { return a; }
+  virtual double Membrane_Potential() { return Vm; }
+
+  // connections
+  virtual void initialize_output_structure(double mintotlength, double maxtotlength); // (see nibr.cc)
+  virtual void initialize_input_structure(double mintotlength, double maxtotlength); // (see nibr.cc)
+  PLLRoot<connection> * OutputConnections() { return &outputconnections; }
+  PLLRoot<fibre_structure> * InputStructure() { return &inputstructure; }
+  PLLRoot<fibre_structure> * OutputStructure() { return &outputstructure; }
+  void clear_output_connections() { outputconnections.clear(); }
+  void clear_input_connections() { inputconnections.clear(); }
+  connection * connect_to(neuron * postsyn); // (see nibr.cc)
+  connection * connect_from(neuron * presyn); // (see nibr.cc)
+  bool is_connected_to(neuron* postsyn) const;
+  bool is_connected_from(neuron* presyn) const;
   void abstract_connections();
   bool has_abstracted_connections() { return abstracted_connections; }
+  int num_input_connections() const;
+  int num_output_connections() const;
+  int number_of_synapses();
+
+  // information output
+#ifdef SAMPLES_INCLUDE_NETWORK_STATISTICS_BASE
+  void Collect_Data(network_statistics_base & nsb);
+#endif
+
+  // development output
   virtual Fig_Object * net_Fig();
   virtual Txt_Object * net_Txt();
   virtual bool net_NES(NetData& netdata);
@@ -196,9 +244,7 @@ public:
 #ifdef VECTOR3D
   virtual void net_Slice(Slice * slice);
 #endif
-  virtual neuron_type TypeID() { return UNTYPED_NEURON; }
-  const char * TypeChars() { return neuron_short_name[TypeID()]; }
-  String TypeStr() { return String(TypeChars()); }
+
   long figneuroncolor;
   long figconnectionscolor;
   long figsynapsescolor;
@@ -210,11 +256,14 @@ public:
   inline bool fig_postsyn_is_visible() { return (!(figattr & FIGMASK_SHOWPOSTSYN)); }
   inline bool fig_cell_is_visible() { return (!(figattr & FIGMASK_SHOWCELL)); }
   inline bool fig_report_depth() { return (figattr & FIGMASK_REPORTDEPTH); }
+
+  // traversing operations
   void tree_op(fibre_tree_op& op); // Fiber tree traversal operation, applied over all fiber structures.
-#ifdef TESTING_SIMPLE_ATTRACTION
-  int attracts = 0;
-  int attractedto = 0;
-#endif
+  void neuron_op(neuron_list_op& op);
+  void synapse_op(synapse_tree_op& op); // Synapse tree traversal operation, applied over all connections.
+
+  // cache variables
+  common_cache cache;
 };
 
 typedef neuron * neuronptr;

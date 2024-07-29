@@ -119,6 +119,7 @@ private:
 public:
   posttopre_connection(connection & conn) { c = &conn; }
   ~posttopre_connection(); // (see nibr.cc)
+  connection* Connection() { return c; }
 };
 
 class connection: public PLLHandle<connection>, public state_storable {
@@ -148,6 +149,7 @@ public:
   double Abstract_PropDelay() { return atc->PropDelay(); }
   void abstract() { atc->abstract(); }
   virtual Fig_Object * net_Fig(); // (see nibr.cc)
+  void synapse_op(synapse_tree_op& op); // Applied over all synapses.
 };
 
 typedef connection * connectionptr;

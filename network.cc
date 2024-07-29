@@ -41,6 +41,9 @@
 #include "neuron.hh"
 #include "Include/Embeddable.h"
 
+// Python embedded as a const char string
+#include "objcurves.py"
+
 // variables
 
 bool numneurons_is_default = false; // flag to indicate that numneurons was set by a fallback to default
@@ -98,6 +101,15 @@ int regionslist::find(neuron & n) {
   int i=0;
   PLL_LOOP_FORWARD(region,head(),1) {
     if (e->find(n)>=0) return i;
+    i++;
+  }
+  return -1;
+}
+
+int regionslist::find_by_name(const String& _name) {
+  int i=0;
+  PLL_LOOP_FORWARD(region,head(),1) {
+    if (e->Name()==_name) return i;
     i++;
   }
   return -1;
@@ -186,6 +198,8 @@ void network::parse_CLP(Command_Line_Parameters & clp) {
 
   if ((n=clp.Specifies_Parameter("NES_output"))>=0) NES_output = (downcase(clp.ParValue(n))==String("true"));
 
+  if ((n=clp.Specifies_Parameter("track_approach"))>=0) track_approach = (downcase(clp.ParValue(n))==String("true"));
+
   if ((n=clp.Specifies_Parameter("detailed_chemical_factors"))>=0) chemdata.detailed_chemical_factors = (downcase(clp.ParValue(n))==String("true"));
 
   if ((n=clp.Specifies_Parameter("soma_attraction_weight"))>=0) chemdata.soma_attraction_weight = atof(clp.ParValue(n));
@@ -270,6 +284,47 @@ void network::_innerloop_neuron_specific_configurator(Command_Line_Parameters & 
 }
 
 /**
+ * Check for explicit "input=" declaration to identify input receiving
+ * neurons. These are use for I/O path specific region-to-region connectome
+ * completion checks. If not specified explicitly, these are later
+ * determined automatically by `deduce_input_neurons_by_chemattraction()`.
+ */
+void network::explicit_input_neurons(Command_Line_Parameters & clp) {
+  int n;
+  if ((n=clp.Specifies_Parameter("inputs"))>=0) {
+    String inputsstr(clp.URI_unescape_ParValue(n));
+    while (!inputsstr.empty()) {
+      // Find a region name
+      String regionname(inputsstr.before(' '));
+      if (regionname.empty()) {
+        regionname = inputsstr;
+        inputsstr = "";
+      } else {
+        inputsstr = inputsstr.after(' ');
+      }
+
+      // Find all the neurons in that region
+      int num_region = Region_by_name(regionname);
+      if (num_region<0) {
+        warning("Unknown region: "+regionname);
+      } else {
+        region* r = Region_by_idx(num_region);
+        PLL_LOOP_FORWARD(neuronptrlist, r->Nlist().head(), 1) {
+          input_neurons.emplace_back(e->N());
+        }
+      }
+    }
+  }
+  if (input_neurons.size()<1) error("No input neurons specified.\n");
+  else {
+    report("Input neurons: \n");
+    for (auto& nptr : input_neurons) {
+      report(nptr->label()+'\n');
+    }
+  }
+}
+
+/**
  * This applies a neuron identification protocol within an already-known network
  * architecture to identify specific neurons and to call a configuration function
  * on those.
@@ -295,7 +350,7 @@ void completion_requirements::update_connection(neuron* presyn, neuron* postsyn)
   auto it = target_connections.find(np);
   if (it != target_connections.end()) {
     it->second = true;
-    progress("Completion requirements: "+String(completion_percentage(), "%.1f\n"));
+    //progress("Completion requirements: "+String(completion_percentage(), "%.1f\n"));
   }
 }
 
@@ -307,11 +362,19 @@ String completion_requirements::report_completion_criteria() {
   return res;
 }
 
-String completion_requirements::report_criteria_completed() {
+String completion_requirements::report_criteria_completed(network* net) {
   String res("Achieved Target Connections:\n");
   for (auto& [np, state] : target_connections) {
     if (state) {
       res += np.from->label() + '(' + np.from->numerical_IDStr() + ") -> " + np.to->label() + '(' + np.to->numerical_IDStr() + ")\n";
+    }
+  }
+  if (net->input_neurons.empty()) net->input_neurons = net->deduce_input_neurons_by_chemattraction();
+  double percentage = net->compare_region_connection_requirements(net->input_neurons);
+  res += "Achieved Target Region Connections (" + String(percentage, "%.1f") + "%):\n";
+  for (auto& [rp, state] : region_target_connections) {
+    if (state>0) {
+      res += net->Region_by_idx(rp.from)->Name() +" (" + String(long(state))+ ") -> " + net->Region_by_idx(rp.to)->Name() + '\n';
     }
   }
   return res;
@@ -340,10 +403,28 @@ bool completion_requirements::is_complete() {
   return completed >= totnum;
 }
 
+void completion_requirements::region_criteria_numbers(long& totnum, long& completed) {
+  totnum = 0;
+  completed = 0;
+  // Check target connections:
+  totnum += region_target_connections.size();
+  for (auto& [rp, num_connections] : region_target_connections) {
+    if (num_connections>0) completed++;
+  }
+}
+
+double completion_requirements::region_completion_percentage() {
+  long totnum, completed;
+  region_criteria_numbers(totnum, completed);
+  return 100.0*double(completed)/double(totnum);
+}
+
 /**
  * This prepares the completion structure.
  * E.g. pairs of neurons that are attractors and attractedto are
  * used to set up target_connections.
+ * Also, pairs of regions that are attractors and attractedto are
+ * used to set up region_target_connections.
  * 
  * *** NOTE: In a more advanced version, completion requirements
  *     could be that at least one source neuron is connected to
@@ -354,6 +435,7 @@ void network::setup_completion_requirements() {
   // Prepare the target_connections map.
   PLL_LOOP_FORWARD(neuron, PLLRoot<neuron>::head(), 1) {
     if (!e->chemdata.attractedto.empty()) {
+      int region_from = regions.find(*e);
       for (auto& chemfactor : e->chemdata.attractedto) {
         if (chemdata.attractor_somata.find(chemfactor)==chemdata.attractor_somata.end()) {
           error("Missing attractor for factor "+chemindex_to_label[chemfactor]);
@@ -361,11 +443,114 @@ void network::setup_completion_requirements() {
           for (auto& target_nptr : chemdata.attractor_somata.at(chemfactor)) {
             neuron_pair np(e, target_nptr);
             completion.target_connections[np] = false;
+            int region_to = regions.find(*const_cast<neuron*>(target_nptr));
+            if ((region_from>=0) && (region_to>=0)) {
+              region_number_pair rp(region_from, region_to);
+              completion.region_target_connections[rp] = 0;
+            }
           }
         }
       }
     }
   }
+}
+
+class has_no_chemattraction: public neuron_list_op {
+protected:
+  std::vector<neuron*>& nptr_set;
+public:
+  has_no_chemattraction(std::vector<neuron*>& _nptr_set): nptr_set(_nptr_set) {}
+  virtual void op(neuron* n) {
+    if (!n->is_attractor()) {
+      nptr_set.emplace_back(n);
+    }
+  }
+};
+
+/**
+ * Returns a set of neurons identified as input neurons based on
+ * having no specified attractor chemicals.
+ */
+std::vector<neuron*> network::deduce_input_neurons_by_chemattraction() {
+  std::vector<neuron*> input_neurons;
+  has_no_chemattraction nonchemattractors(input_neurons);
+  neuron_op(nonchemattractors);
+  return input_neurons;
+}
+
+/**
+ * Use this to set an integer cache value in neurons.
+ */
+class neuron_set_cache_int: public neuron_list_op {
+public:
+  int value = 0;
+  neuron_set_cache_int() {}
+  neuron_set_cache_int(int _value): value(_value) {}
+  virtual void op(neuron* n) {
+    n->cache.i = value;
+  }
+};
+
+/**
+ * From a non-traversed neuron traverse all connections, find target
+ * neurons and traverse further.
+ * While traversing, check all region pairs of the neurons involved
+ * and if they are in the region_target_connections list then set
+ * that pair's completion to true.
+ * The main activity for this op all takes place in the
+ * connection_op() call.
+ */
+class region_connections_search: public synapse_tree_op {
+protected:
+  network* net = nullptr;
+public:
+  region_connections_search(network* _net): net(_net) {}
+  // This is run whenever entering a new neuron, if started there or above.
+  virtual void neuron_op(neuron* n) {
+    n->cache.i = 1; // Set the traversed flag for this neuron.
+  }
+  // This is run whenever entering a new connection, if started there or above.
+  virtual void connection_op(connection * c) {
+    // At the neuron level, this is running through the OutputConnections, from
+    // pre to post.
+    neuron* post_traverse = c->PostSynaptic();
+    int region_from = net->Regions().find(*c->PreSynaptic());
+    int region_to = net->Regions().find(*c->PostSynaptic());
+    if ((region_from>=0) && (region_to>=0)) {
+      region_number_pair rp(region_from, region_to);
+      auto it = net->completion.region_target_connections.find(rp);
+      if (it != net->completion.region_target_connections.end()) {
+        it->second++;
+      }
+    }
+    if (post_traverse->cache.i == 0) post_traverse->synapse_op(*this);
+  }
+  // This is run whenever entering a new synapse.
+  virtual void op(synapse* s) {};
+};
+
+/**
+ * Using a specified set of input neurons, search recursively
+ * through connected neurons to compare established region-to-region
+ * connection pairs with the set of region-to-region connections
+ * required in region_target_connections.
+ * Indirect, unspecified connection paths are normally permitted,
+ * but only connection paths that begin at the input neurons are
+ * checked, because it is assumed that possible I/O functions are
+ * the reason for connection requirements.
+ * Returns the percentage of required region connections completed.
+ */
+double network::compare_region_connection_requirements(std::vector<neuron*> input_neurons) {
+  // Prepare cache flags of all neurons in the network.
+  neuron_set_cache_int clear_flags(0);
+  neuron_op(clear_flags);
+  // Carry out this search for all of the neurons in the specified
+  // input_regions.
+  region_connections_search regconnsearch(this);
+  for (auto& nptr : input_neurons) {
+    nptr->synapse_op(regconnsearch);
+  }
+  return completion.region_completion_percentage();
 }
 
 String network::report_parameters() {
@@ -1029,9 +1214,11 @@ void region_parameters_root::parse_CLP(Command_Line_Parameters & clp) {
     while (!regionstr.empty()) {
       String regionname(regionstr.before(' '));
       if (regionname.empty()) {
-	regionname = regionstr;
-	regionstr = "";
-      } else regionstr = regionstr.after(' ');
+        regionname = regionstr;
+        regionstr = "";
+      } else {
+        regionstr = regionstr.after(' ');
+      }
       link_before(new region_parameters(regionname,clp));
     }
   }
@@ -1663,7 +1850,7 @@ Fig_Group * network::abstract_connections_Fig() {
   // [***NOTE] If I want to, I can later find an elegant way to delegate
   // much of the following to member functions of the objects involved.
   // I could also move all of the functions that are involved in creating
-  // the abtract connections graphs into the connectivity_graph class.
+  // the abstract connections graphs into the connectivity_graph class.
   int j;
   long color, depth, linewidth, linestyle;
   connectivity_graph cg(*this);
@@ -2290,6 +2477,376 @@ void network::visible_pre_and_target_post(neuron & n) {
  */
 void network::tree_op(fibre_tree_op& op) {
   PLL_LOOP_FORWARD(neuron, PLLRoot<neuron>::head(), 1) e->tree_op(op);
+}
+
+/**
+ * For all neurons in the network, apply the operation specified
+ * by the neuron_list_op object.
+ */
+void network::neuron_op(neuron_list_op& op) {
+  PLL_LOOP_FORWARD(neuron, PLLRoot<neuron>::head(), 1) e->neuron_op(op);
+}
+
+/**
+ * For all neurons in the network, traverse the set of connections
+ * and subset of synapses of each connection, and apply the
+ * operation specified by the synapse_tree_op object.
+ */
+void network::synapse_op(synapse_tree_op& op) {
+  PLL_LOOP_FORWARD(neuron, PLLRoot<neuron>::head(), 1) e->synapse_op(op);
+}
+
+const String cube_header = R"HEAD(# netmorph_output.obj
+#
+
+)HEAD";
+
+const String cube_top_begin = R"TOP(o soma)TOP";
+const String cube_top_end = R"TOP(
+mtllib cube.mtl
+)TOP";
+
+
+const String dendrites_top_begin = R"TOP(o dendrites)TOP";
+const String dendrites_top_end = R"TOP(
+)TOP";
+
+const String axon_top_begin = R"TOP(o axon)TOP";
+const String axon_top_end = R"TOP(
+)TOP";
+
+const String faces = R"FACES(
+vn 0.000000 0.000000 1.000000
+vn 0.000000 1.000000 0.000000
+vn 0.000000 0.000000 -1.000000
+vn 0.000000 -1.000000 0.000000
+vn 1.000000 0.000000 0.000000
+vn -1.000000 0.000000 0.000000
+)FACES";
+
+const String simple_cube_faces = R"FACES(
+vn 0.000000 -1.000000 0.000000
+vn 0.000000 1.000000 0.000000
+vn 1.000000 0.000000 0.000000
+vn -0.000000 0.000000 1.000000
+vn -1.000000 -0.000000 -0.000000
+vn 0.000000 0.000000 -1.000000
+)FACES";
+
+const String cube_extras = R"EXTRAS(
+usemtl cube
+s off
+)EXTRAS";
+
+const int face_lines[6][4][2] = {
+  {{0,0}, {1,0}, {2,0}, {3,0}},
+  {{4,1}, {7,1}, {6,1}, {5,1}},
+  {{0,2}, {4,2}, {5,2}, {1,2}},
+  {{1,3}, {5,3}, {6,3}, {2,3}},
+  {{2,4}, {6,4}, {7,4}, {3,4}},
+  {{4,5}, {0,5}, {3,5}, {7,5}}
+};
+
+#define PYRAMID_FACES 6
+const int pyramid_face_lines[PYRAMID_FACES][3] = {
+  {3, 0, 1},
+  {2, 3, 1},
+  {4, 1, 0},
+  {3, 4, 0},
+  {2, 4, 3},
+  {4, 2, 1}
+};
+
+#define TWO_SIDED_CUBE_FACES 12
+const int two_sided_cube_faces[TWO_SIDED_CUBE_FACES][3] = {
+  {1, 2, 3},
+  {7, 6, 5},
+  {4, 5, 1},
+  {5, 6, 2},
+  {2, 6, 7},
+  {0, 3, 7},
+  {0, 1, 3},
+  {4, 7, 5},
+  {0, 4, 1},
+  {1, 5, 2},
+  {3, 2, 7},
+  {4, 0, 7}
+};
+
+const std::vector<spatial> simple_cube_lines = {
+  { 1.0, -1.0, -1.0 },
+  { 1.0, -1.0, 1.0 },
+  { -1.0, -1.0, 1.0 },
+  { -1.0, -1.0, -1.0 },
+  { 1.0, 1.0, -1.0 },
+  { 1.0, 1.0, 1.0 },
+  { -1.0, 1.0, 1.0 },
+  { -1.0, 1.0, -1.0 }
+};
+
+const std::vector<spatial> pyramid = {
+  {0.0, 0.0, 0.0},
+  {1.0, 0.0, 0.0},
+  {1.0, 1.0, 0.0},
+  {0.0, 1.0, 0.0},
+  {0.5, 0.5, 1.6}
+};
+
+String obj_vertex(const spatial& v, const String& extra = "") {
+  String objstr("v");
+  objstr += String(v.X(), " %.3f");
+  objstr += String(v.Y(), " %.3f");
+  objstr += String(v.Z(), " %.3f");
+  objstr += extra;
+  objstr += '\n';
+  return objstr;
+}
+
+String obj_faces(int start, const int* face_id) {
+  String objstr("f");
+  for (int j = 0; j < 3; j++) {
+    objstr += ' '+String(long(start+face_id[j]));
+  }
+  objstr += '\n';
+  return objstr;
+}
+
+String obj_line(long v1_idx, long v2_idx) {
+  String objstr("l");
+  objstr += ' '+String(v1_idx);
+  objstr += ' '+String(v2_idx);
+  objstr += '\n';
+  return objstr;
+}
+
+struct ObjData {
+  network& net;
+  spatial center;
+  std::vector<String> soma_obj_names;
+  std::vector<String> axon_obj_names;
+  std::vector<String> dendrite_obj_names;
+  std::vector<String> synapse_obj_names;
+  int cube_num = 0;
+  int synapse_idx = 0;
+  int face_start = 1;
+  int vertex_start = 1;
+  ObjData(network* _net): net(*_net) {}
+};
+
+String add_soma_pyramid(ObjData& data, neuron* n) {
+  String pyramid_data(cube_top_begin + String(long(data.cube_num)) + cube_top_end);
+
+  double r = n->Radius();
+  double scale = 2.0*r;
+  spatial offset = n->Pos() - spatial(r, r, r) - data.center;
+  for (auto& line : pyramid) {
+    spatial vertex = scale*line + offset;
+    pyramid_data += obj_vertex(vertex);
+  }
+  pyramid_data += faces;
+  pyramid_data += cube_extras;
+
+  for (size_t i = 0; i < PYRAMID_FACES; i++) {
+    pyramid_data += obj_faces(data.vertex_start, pyramid_face_lines[i]); // face_start or vertex_start?
+  }
+
+  data.vertex_start += pyramid.size();
+  data.face_start += PYRAMID_FACES;
+
+  return pyramid_data;
+}
+
+String add_neuron_neurites(ObjData& data, const String& somalabel, bool doaxon, neuron* n) {
+  String neurite_segments;
+
+  class Neurites2Obj: public fibre_tree_op {
+  public:
+    ObjData& data;
+    String& neurite_segments;
+    Neurites2Obj(ObjData& _data, String& _neuritesegments): data(_data), neurite_segments(_neuritesegments) {}
+    // Selection of neuron an pre- or postsynaptic fiber structure happens
+    // outside of this class. See below.
+    virtual void op(fibre_segment* fs) {
+      spatial v1 = fs->P0 - data.center;
+      spatial v2 = fs->P1 - data.center;
+      neurite_segments += obj_vertex(v1, " 1.0 0.0 0.0");
+      neurite_segments += obj_vertex(v2, " 1.0 0.0 0.0");
+      neurite_segments += obj_line(data.vertex_start, data.vertex_start+1);
+      data.vertex_start += 2;
+    }
+  };
+
+  Neurites2Obj neurites2obj(data, neurite_segments);
+  neurites2obj.do_dendrites = !doaxon;
+  neurites2obj.do_axons = doaxon;
+  n->tree_op(neurites2obj);
+
+  return neurite_segments;
+}
+
+String add_simple_cube(ObjData& data, const String& synapsestr, double radius, spatial& receptor_loc) {
+  String cube_data("o "+synapsestr+'\n');
+
+  spatial offset = receptor_loc - data.center;
+  for (auto& line : simple_cube_lines) {
+    spatial vertex = radius*line + offset;
+    cube_data += obj_vertex(vertex);
+  }
+
+  for (size_t i = 0; i < TWO_SIDED_CUBE_FACES; i++) {
+    cube_data += obj_faces(data.vertex_start, two_sided_cube_faces[i]); // face_start or vertex_start?
+  }
+
+  data.vertex_start += simple_cube_lines.size();
+  data.face_start += TWO_SIDED_CUBE_FACES;
+
+  return cube_data;
+}
+
+String make_Wavefront_OBJ(ObjData& data) {
+  String output(cube_header);
+
+  class Somas2Obj: public neuron_list_op {
+  public:
+    ObjData& data;
+    String& output;
+    Somas2Obj(ObjData& _data, String& _output): data(_data), output(_output) {}
+    virtual void op(neuron* n) {
+      String cubenumstr(std::to_string(data.cube_num).c_str());
+
+      data.soma_obj_names.emplace_back("soma"+cubenumstr);
+      output += add_soma_pyramid(data, n);
+
+      data.axon_obj_names.emplace_back("axon"+cubenumstr);
+      output += axon_top_begin + cubenumstr + axon_top_end;
+      output += '\n' + add_neuron_neurites(data, n->label(), true, n);
+
+      data.dendrite_obj_names.emplace_back("dendrites"+cubenumstr);
+      output += dendrites_top_begin + cubenumstr + dendrites_top_end;
+      output += '\n' + add_neuron_neurites(data, n->label(), false, n);
+
+      data.cube_num++;
+    }
+  };
+
+  Somas2Obj somas2obj(data, output);
+  data.net.neuron_op(somas2obj);
+
+  class Synapse2Obj: public synapse_tree_op {
+  public:
+    ObjData& data;
+    String& output;
+    Synapse2Obj(ObjData& _data, String& _output): data(_data), output(_output) {}
+    virtual void op(synapse* s) {
+        String synapsestr(("synapse"+std::to_string(data.synapse_idx)).c_str());
+
+        spatial receptor_loc = s->Structure()->P1;
+        spatial spine_loc = s->Structure()->P0;
+
+        double synapse_size = norm(receptor_loc - spine_loc);
+
+        data.synapse_obj_names.emplace_back(synapsestr);
+
+        output += '\n' + add_simple_cube(data, synapsestr, synapse_size/2.0, receptor_loc);
+
+        data.synapse_idx++;
+    }
+  };
+
+  Synapse2Obj synapse2obj(data, output);
+  data.net.synapse_op(synapse2obj);
+
+  return output;
+}
+
+class FindCenter: public neuron_list_op {
+public:
+  spatial center;
+  size_t num = 0;
+  virtual void op(neuron* n) {
+    center += n->Pos();
+    num++;
+  }
+  spatial get_center() {
+    center /= double(num);
+    return center;
+  }
+};
+
+String VecOfStrings2JSONList(const std::vector<String>& vec) {
+  String jsonlist("[");
+  for (const auto& s : vec) {
+    jsonlist += '"'+s+"\",";
+  }
+  if (vec.empty()) jsonlist += ']';
+  else jsonlist[jsonlist.length()-1] = ']';
+  return jsonlist;
+}
+
+/**
+ * Generate Wavefront OBJ output file containing the network
+ * morphology.
+ */
+bool network::Obj_Output(String objpath, double axonbevdepth, double dendritebevdepth) {
+
+  ObjData data(this);
+
+  FindCenter find_center;
+  neuron_op(find_center);
+  data.center = find_center.get_center();
+
+  String obj_data = make_Wavefront_OBJ(data);
+
+  write_file_from_String(objpath, obj_data);
+
+  String blender_obj_data = "{\n"
+    "\t\"obj_path\": \""+objpath+"\",\n"
+    "\t\"axons\": "+VecOfStrings2JSONList(data.axon_obj_names)+",\n"
+    "\t\"dendrites\": "+VecOfStrings2JSONList(data.dendrite_obj_names)+",\n"
+    "\t\"somas\": "+VecOfStrings2JSONList(data.soma_obj_names)+",\n"
+    "\t\"synapses\": "+VecOfStrings2JSONList(data.synapse_obj_names)+" ,\n"
+    "\t\"blend_path\": \""+objpath+".blend\",\n"
+    "\t\"axonbevdepth\": "+String(axonbevdepth, "%.3f")+",\n"
+    "\t\"dendritebevdepth\": "+String(dendritebevdepth, "%.3f")+"\n"
+    "}\n";
+
+  write_file_from_String(objpath+".json", blender_obj_data);
+  return true;
+}
+
+bool network::Blend_Output(String objpath) {
+  // 1. Load template Blender Python file and create specific temporary one.
+  String objcurves_content(objcurves_py);
+  // if (!read_file_into_String("../Source/objcurves.py", objcurves_content)) {
+  //   warning("Unable to read Blender Python template file objcurves.py.");
+  //   return false;
+  // }
+  int objdata_pos = objcurves_content.index("OBJDATA_JSON");
+  if (objdata_pos<0) {
+    warning("OBJDATA_JSON not found in objcurves.py.");
+    return false;
+  }
+  String specific_objcurves(objcurves_content.before(objdata_pos));
+  specific_objcurves += objpath+".json";
+  specific_objcurves += objcurves_content.from(objdata_pos+12);
+  if (!write_file_from_String("objcurves_specific.py", specific_objcurves)) {
+    warning("Unable to write objcurves_specific.py.");
+    return false;
+  }
+  // 2. Call Blender with the specific Blender Python file.
+  String blendercmd(blender_exec_path+" -b -P objcurves_specific.py");
+  if (system(blendercmd)!=0) {
+    warning("Blender call failed with command: "+blendercmd);
+    return false;
+  }
+  String gzipcmd("gzip -9 "+objpath+".blend");
+  if (system(gzipcmd)!=0) {
+    warning("Gzip call failed with command:"+gzipcmd);
+    return false;
+  }
+  // Delete temporary Blender Python file.
+  // ...or don't...
+  return true;
 }
 
 connectivity_graph::connectivity_graph(network & _n): net(&_n) {

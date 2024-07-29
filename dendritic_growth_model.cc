@@ -272,8 +272,8 @@ void Delayed_Branching_Model::continuation_node_to_branch(fibre_segment * fs, do
   // Determine centrifugal order:
   int centord = 1;
   for (fibre_segment * fsp = fs->Parent(); (fsp); fsp = fsp->Parent()) if ((fsp->Branch1()) && (fsp->Branch2())) centord++;
-  terminal_segment * ts = new terminal_segment(*arbor,*newbranch,acoords,centord);
   PLLRoot<terminal_segment> * tsroot = arbor->TerminalSegments();
+  terminal_segment * ts = new terminal_segment(tsroot->head()->SingleAttractor(), true, *arbor,*newbranch,acoords,centord);
   direction_model_base * dirmodel = tsroot->head()->DirectionModel();
   // ALL HANDLERS FOR MODEL PROPAGATION SHOULD BE CALLED HERE (Look for similar notes such as this elsewhere, e.g. in terminal_segment::branch().)
   if (dirmodel) ts->set_direction_model(dirmodel->clone());

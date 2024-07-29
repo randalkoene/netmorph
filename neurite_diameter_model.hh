@@ -96,6 +96,7 @@ class rall_power_law_ndm: public Neurite_Diameter_Model {
 protected:
   probability_distribution_function * PDF_e_power;
   probability_distribution_function * PDF_d_term;
+  double d_max = -1.0;
   double fibre_diameter(fibre_segment * fs);
 public:
   rall_power_law_ndm(network & _net): Neurite_Diameter_Model(_net), PDF_e_power(NULL), PDF_d_term(NULL) {

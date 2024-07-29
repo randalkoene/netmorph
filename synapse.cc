@@ -183,6 +183,14 @@ bool synapse::net_NES(NetData& netdata) {
   return true;
 }
 
+/**
+ * Apply the operation specified by the synapse_tree_op object.
+ */
+void synapse::synapse_op(synapse_tree_op& op) {
+  // Apply to this synapse.
+  op.op(this);
+}
+
 void synaptogenesis_data::add(synapse * s, double t) {
   if (dataidx>=datalen) {
     unsigned int newdatalen = datalen + 10240;

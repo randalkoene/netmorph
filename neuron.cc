@@ -108,8 +108,11 @@ general_neuron_parameters_interface general_neuron_parameters;
 // principal, interneuron, multipolar, bipolar, pyramidal, untyped
 int min_basal[UNTYPED_NEURON+1] = { 2, 2, 2, 1, 4, 2 };
 int max_basal[UNTYPED_NEURON+1] = { 5, 4, 5, 1, 8, 5 };
+// Note that the following angles are in either direction from the base vector, i.e.
+// an angle of M_PI already means all the way around in either direction, meaning
+// anywhere on the circle.
 double min_angle[UNTYPED_NEURON+1] = { 0.1*M_PI, 0.1*M_PI, 0.1*M_PI, 0.1*M_PI, 0.1*M_PI, 0.1*M_PI };
-double max_angle[UNTYPED_NEURON+1] = { 0.5*M_PI, 2.0*M_PI, 2.0*M_PI, 0.25*M_PI, 0.5*M_PI, 0.5*M_PI };
+double max_angle[UNTYPED_NEURON+1] = { 0.5*M_PI, 1.0*M_PI, 1.0*M_PI, 0.25*M_PI, 0.5*M_PI, 0.5*M_PI };
 int max_axons[UNTYPED_NEURON+1] = { 1, 1, 1, 1, 1, 1 };
 
 basal_force_model bfm = unrestricted_bfm;
@@ -293,7 +296,7 @@ String general_neuron_parameters_interface::report_parameters() {
   if (!cached_net_ptr) error("Error: Please use the general_neuron_parameters_interface::parse_CLP(Command_Line_Parameters & clp, network & net) function in order to cache a pointer for network regions access.\n");
   int numschemasets = cached_net_ptr->Regions().length()+1;
   for (int regid = 0; regid<numschemasets; regid++) {
-    res += "\nRegion '";
+    res += "\n\nRegion '";
     if (regid<1) res += "universal network"; else res += cached_net_ptr->Regions().el(regid-1)->Name();
     res += "':";
     for (natural_schema_parent_set i = universal_sps; i<NUM_NATURAL_SPS; i = natural_schema_parent_set(i+1)) {
@@ -302,62 +305,62 @@ String general_neuron_parameters_interface::report_parameters() {
     }
     for (natural_schema_parent_set i = universal_sps; i<NUM_NATURAL_SPS; i = natural_schema_parent_set(i+1)) {
       if (arbor_elongation_model_region_subset_schemas[regid][i]) {
-	res += "\n  Subset '"; res += natural_subset_idstr[i]; res += "' arbor elongation model: ";
-	res += arbor_elongation_model_region_subset_schemas[regid][i]->report_parameters();
+        res += "\n  Subset '"; res += natural_subset_idstr[i]; res += "' arbor elongation model: ";
+        res += arbor_elongation_model_region_subset_schemas[regid][i]->report_parameters();
       }
     }
     for (natural_schema_parent_set i = universal_sps; i<NUM_NATURAL_SPS; i = natural_schema_parent_set(i+1)) {
       if (terminal_segment_elongation_model_region_subset_schemas[regid][i]) {
-	res += "\n  Subset '"; res += natural_subset_idstr[i]; res += "' terminal segment elongation model: ";
-	res += terminal_segment_elongation_model_region_subset_schemas[regid][i]->report_parameters();
+        res += "\n  Subset '"; res += natural_subset_idstr[i]; res += "' terminal segment elongation model: ";
+        res += terminal_segment_elongation_model_region_subset_schemas[regid][i]->report_parameters();
       }
     }
     for (natural_schema_parent_set i = universal_sps; i<NUM_NATURAL_SPS; i = natural_schema_parent_set(i+1)) {
       if (elongation_rate_initialization_model_region_subset_schemas[regid][i]) {
-	if (i==universal_sps) res += "\nUniversal elongation rate initialization model: ";
-	else { res += "\nSubset '"; res += natural_subset_idstr[i]; res += "' elongation rate initialization model: "; }
-	res += elongation_rate_initialization_model_region_subset_schemas[regid][i]->report_parameters();
-	if (i==universal_sps) if (!universal_elongation_rate_initialization_model_root.empty()) res += " (contributing models with root "+universal_elongation_rate_initialization_model_root+".)";
+        if (i==universal_sps) res += "\nUniversal elongation rate initialization model: ";
+        else { res += "\nSubset '"; res += natural_subset_idstr[i]; res += "' elongation rate initialization model: "; }
+        res += elongation_rate_initialization_model_region_subset_schemas[regid][i]->report_parameters();
+        if (i==universal_sps) if (!universal_elongation_rate_initialization_model_root.empty()) res += " (contributing models with root "+universal_elongation_rate_initialization_model_root+".)";
       }
     }
     for (natural_schema_parent_set i = universal_sps; i<NUM_NATURAL_SPS; i = natural_schema_parent_set(i+1)) {
       if (direction_model_region_subset_schemas[regid][i]) {
-	if (i==universal_sps) res += "\nUniversal direction model: ";
-	else { res += "\n  Subset '"; res += natural_subset_idstr[i]; res += "' direction model: "; }
-	res += direction_model_region_subset_schemas[regid][i]->report_parameters();
-	if (i==universal_sps) if (!universal_direction_model_root.empty()) res += " (contributing models with root "+universal_direction_model_root+".)";
+        if (i==universal_sps) res += "\nUniversal direction model: ";
+        else { res += "\n  Subset '"; res += natural_subset_idstr[i]; res += "' direction model: "; }
+        res += direction_model_region_subset_schemas[regid][i]->report_parameters();
+        if (i==universal_sps) if (!universal_direction_model_root.empty()) res += " (contributing models with root "+universal_direction_model_root+".)";
       }
     }
     for (natural_schema_parent_set i = universal_sps; i<NUM_NATURAL_SPS; i = natural_schema_parent_set(i+1)) {
       if (branching_model_region_subset_schemas[regid][i]) {
-	if (i==universal_sps) res += "\nUniversal branching model: ";
-	else { res += "\n  Subset '"; res += natural_subset_idstr[i]; res += "' branching model: "; }
-	res += branching_model_region_subset_schemas[regid][i]->report_parameters();
-	if (i==universal_sps) if (!universal_branching_model_root.empty()) res += " (contributing models with root "+universal_branching_model_root+".)";
+        if (i==universal_sps) res += "\nUniversal branching model: ";
+        else { res += "\n  Subset '"; res += natural_subset_idstr[i]; res += "' branching model: "; }
+        res += branching_model_region_subset_schemas[regid][i]->report_parameters();
+        if (i==universal_sps) if (!universal_branching_model_root.empty()) res += " (contributing models with root "+universal_branching_model_root+".)";
       }
     }
     for (natural_schema_parent_set i = universal_sps; i<NUM_NATURAL_SPS; i = natural_schema_parent_set(i+1)) {
       if (TSBM_region_subset_schemas[regid][i]) {
-	if (i==universal_sps) res += "\nUniversal TSBM: ";
-	else { res += "\n  Subset '"; res += natural_subset_idstr[i]; res += "' TSBM: "; }
-	res += TSBM_region_subset_schemas[regid][i]->report_parameters();
-	if (i==universal_sps) if (!universal_TSBM_root.empty()) res += " (contributing models with root "+universal_TSBM_root+".)";
+        if (i==universal_sps) res += "\nUniversal TSBM: ";
+        else { res += "\n  Subset '"; res += natural_subset_idstr[i]; res += "' TSBM: "; }
+        res += TSBM_region_subset_schemas[regid][i]->report_parameters();
+        if (i==universal_sps) if (!universal_TSBM_root.empty()) res += " (contributing models with root "+universal_TSBM_root+".)";
       }
     }
     for (natural_schema_parent_set i = universal_sps; i<NUM_NATURAL_SPS; i = natural_schema_parent_set(i+1)) {
       if (TSTM_region_subset_schemas[regid][i]) {
-	if (i==universal_sps) res += "\nUniversal TSTM: ";
-	else { res += "\n  Subset '"; res += natural_subset_idstr[i]; res += "' TSTM: "; }
-	res += TSTM_region_subset_schemas[regid][i]->report_parameters();
-	if (i==universal_sps) if (!universal_TSTM_root.empty()) res += " (contributing models with root "+universal_TSTM_root+".)";
+        if (i==universal_sps) res += "\nUniversal TSTM: ";
+        else { res += "\n  Subset '"; res += natural_subset_idstr[i]; res += "' TSTM: "; }
+        res += TSTM_region_subset_schemas[regid][i]->report_parameters();
+        if (i==universal_sps) if (!universal_TSTM_root.empty()) res += " (contributing models with root "+universal_TSTM_root+".)";
       }
     }
     for (natural_schema_parent_set i = universal_sps; i<NUM_NATURAL_SPS; i = natural_schema_parent_set(i+1)) {
       if (branch_angle_model_region_subset_schemas[regid][i]) {
-	if (i==universal_sps) res += "\nUniversal branch angle model: ";
-	else { res += "\n  Subset '"; res += natural_subset_idstr[i]; res += "' branch angle model: "; }
-	res += branch_angle_model_region_subset_schemas[regid][i]->report_parameters();
-	if (i==universal_sps) if (!universal_branch_angle_model_root.empty()) res += " (contributing models with root "+universal_branch_angle_model_root+".)";
+        if (i==universal_sps) res += "\nUniversal branch angle model: ";
+        else { res += "\n  Subset '"; res += natural_subset_idstr[i]; res += "' branch angle model: "; }
+        res += branch_angle_model_region_subset_schemas[regid][i]->report_parameters();
+        if (i==universal_sps) if (!universal_branch_angle_model_root.empty()) res += " (contributing models with root "+universal_branch_angle_model_root+".)";
       }
     }
   }
@@ -448,6 +451,28 @@ connection * neuron::connect_to(neuron * postsyn) {
 connection * neuron::connect_from(neuron * presyn) {
   // make a conection to this postsynaptic neuron from a presynaptic neuron
   return connection::create(presyn,this);
+}
+
+bool neuron::is_connected_to(neuron* postsyn) const {
+  PLL_LOOP_FORWARD(connection, outputconnections.head(), 1) {
+    if (e->PostSynaptic() == postsyn) return true;
+  }
+  return false;
+}
+
+bool neuron::is_connected_from(neuron* presyn) const {
+  PLL_LOOP_FORWARD(posttopre_connection, inputconnections.head(), 1) {
+    if (e->Connection()->PreSynaptic() == presyn) return true;
+  }
+  return false;
+}
+
+int neuron::num_input_connections() const {
+  return inputconnections.length();
+}
+
+int neuron::num_output_connections() const {
+  return outputconnections.length();
 }
 
 void neuron::initialize_output_structure(double mintotlength, double maxtotlength) {
@@ -553,6 +578,65 @@ void neuron::fanin_rot() {
   }
 }
 
+
+/**
+ * The idea here:
+ * 1. If you're not supposed to possibly rotate then deliver whatever the
+ *    reuse_attractor is (must be >= 0).
+ * 2. If you may rotate then:
+ *    a) if each chemical has had a turn then: i) if reuse_attractor>=0 then
+ *       reuse that one, ii) otherwise, use the first attractor.
+ *    b) otherwise, advance the index and sent that attractor.
+ */
+
+int neuron::RotateToNextAttractor(int reuse_attractor) {
+  if (chemdata.attractedto.empty()) {
+    //std::cout << "DEBUG neuron " << numerical_ID() << " chem attractor (0)\n";
+    return -1;
+  }
+
+// if (chemdata.attractedto.size()>1) {
+//   std::cout << 'M';
+// }
+
+  if (chemdata_index>=chemdata.attractedto.size()) {
+    if (reuse_attractor>=0) {
+      //std::cout << "DEBUG neuron " << numerical_ID() << " chem attractor " << reuse_attractor << '\n';
+      //std::cout << 'r' << reuse_attractor;
+      return reuse_attractor;
+    }
+    //std::cout << "DEBUG neuron " << numerical_ID() << " chem attractor " << *(chemdata.attractor.begin()) << '\n';
+    //std::cout << 'i' << *(chemdata.attractor.begin());
+    return *(chemdata.attractedto.begin());
+  }
+
+  auto it = chemdata.attractedto.begin();
+  std::advance(it, chemdata_index);
+  chemdata_index++;
+
+  //std::cout << 'a' << *it;
+  //std::cout << "DEBUG neuron " << numerical_ID() << " chem attractor " << *it << '\n';
+
+  return *it;
+}
+
+/**
+ * This rotates through molecular attraction receptors that affect this
+ * neuron. It is used when 'single_attractor_per_growthcone' is selected.
+ * Whether to rotate or return the same attractor depends on whether
+ * a new growth cone is created or not (branching).
+ * 
+ * If possibly_rotate_attractors is false then we must reuse the attractor
+ * chemical given by an existing growth cone.
+ * 
+ * Otherwise, if not all of a neuron's attractor chemicals have been
+ * rotated through yet the find the next one, otherwise, reuse.
+ */
+int neuron::NextAttractor(int reuse_attractor, bool possibly_rotate_attractors) {
+  if (!possibly_rotate_attractors) return reuse_attractor;
+  return RotateToNextAttractor(reuse_attractor);
+}
+
 Fig_Object * neuron::net_Fig() {
   /* Documentation:
      The parameter "figattr_box_fibre_independently" allows fibre that is
@@ -649,9 +733,14 @@ int find_region_number_of_neuron(neuron& n) {
   return eq->Net()->Regions().find(n);
 }
 
-const char* get_region_name(int regnum) {
+// const char* get_region_name(int regnum) {
+//   if ((!eq) || (regnum<0)) return "universal";
+//   return eq->Net()->Regions().el(regnum)->Name().chars();
+// }
+
+String get_region_name(int regnum) {
   if ((!eq) || (regnum<0)) return "universal";
-  return eq->Net()->Regions().el(regnum)->Name().chars();
+  return eq->Net()->Regions().el(regnum)->Name();
 }
 
 Txt_Object * neuron::net_Txt() {
@@ -789,8 +878,28 @@ void neuron::net_Slice(Slice * slice) { // [***INCOMPLETE] Change the return typ
  * the operation specified by the fibre_tree_op object.
  */
 void neuron::tree_op(fibre_tree_op& op) {
-  PLL_LOOP_FORWARD(fibre_structure, inputstructure.head(), 1) e->tree_op(op);
-  PLL_LOOP_FORWARD(fibre_structure, outputstructure.head(), 1) e->tree_op(op);
+  op.neuron_op(this);
+  if (op.do_dendrites) PLL_LOOP_FORWARD(fibre_structure, inputstructure.head(), 1) e->tree_op(op);
+  if (op.do_axons) PLL_LOOP_FORWARD(fibre_structure, outputstructure.head(), 1) e->tree_op(op);
+}
+
+/**
+ * Apply the operation specified by the neuron_list_op object.
+ */
+void neuron::neuron_op(neuron_list_op& op) {
+  // Apply to this neuron.
+  op.op(this);
+}
+
+/**
+ * Traverse the set of connections and subset of synapses of each connection,
+ * and apply the operation specified by the synapse_tree_op object.
+ */
+void neuron::synapse_op(synapse_tree_op& op) {
+  op.neuron_op(this);
+  if (outputconnections.head()) {
+    PLL_LOOP_FORWARD(connection, outputconnections.head(), 1) e->synapse_op(op);
+  }
 }
 
 void principal::parse_CLP(Command_Line_Parameters & clp) {
@@ -808,63 +917,64 @@ void principal::parse_CLP(Command_Line_Parameters & clp) {
 
 void multipolar_nonpyramidal::surface_division_basal_force_model(int numpoles, double mintotlength, double maxtotlength, double minangle, double maxangle, const spatial & rc, bool isinputstructure, int _typeid) {
   // 1. Compute the average surface area available to each.
-    double dnumpoles = (double) numpoles;
-    mintotlength /= dnumpoles; maxtotlength /= dnumpoles;
-    // Approximating: Calculating angles on available circle rather than sphere, then comparing with angles between vectors.
-    spatial * S1array = new spatial[numpoles];
+  double dnumpoles = (double) numpoles;
+  mintotlength /= dnumpoles;
+  maxtotlength /= dnumpoles;
+  // Approximating: Calculating angles on available circle rather than sphere, then comparing with angles between vectors.
+  spatial * S1array = new spatial[numpoles];
   // 2. Place randomly, use surface distance to angle conversion to test distance to nearest neighbors for acceptance or renewed placement attempt. 
 #ifdef VECTOR3D
-    double minsepangle = (2.0*(maxangle-minangle)) / dnumpoles;
-    double sinphi(sin(rc.Z())), cosphi(cos(rc.Z()));
-    double sintheta(sin(rc.Y())), costheta(cos(rc.Y()));
-    for (int i = 0; i<numpoles; i++) {
-      bool acceptinit = false; int cnt = 0;
-      do {
-	cnt++;
-	S1array[i].set_all(1.0,2.0*M_PI*X_misc.get_rand_real1(),X_misc.get_rand_range_real1(minangle,maxangle));
-	S1array[i].convert_from_spherical();
-	acceptinit = true;
-	for (int j = 0; j<i; j++) {
-	  double dotp = S1array[j]*S1array[i]; // and they all have length 1.0
-	  if (acos(dotp)<minsepangle) { acceptinit = false; break; };
-	}
-	if ((!acceptinit) && (cnt>500)) {
-	  warning("Warning: Unable to place arbors at desired minimum angular separation.\n  Affected neuron type: "+String(neuron_type_name[TypeID()])+", neuron ID:"+String((long) numerical_ID())+", angle constraints: ["+String(minangle,"%.3f,")+String(maxangle,"%.3f")+"], number of arbors: "+String((long) numpoles)+".\n");
-	  break;
-	}
-      } while (!acceptinit);
-    }
+  double minsepangle = (2.0*(maxangle-minangle)) / dnumpoles;
+  double sinphi(sin(rc.Z())), cosphi(cos(rc.Z()));
+  double sintheta(sin(rc.Y())), costheta(cos(rc.Y()));
+  for (int i = 0; i<numpoles; i++) {
+    bool acceptinit = false; int cnt = 0;
+    do {
+      cnt++;
+      S1array[i].set_all(1.0,2.0*M_PI*X_misc.get_rand_real1(),X_misc.get_rand_range_real1(minangle,maxangle));
+      S1array[i].convert_from_spherical();
+      acceptinit = true;
+      for (int j = 0; j<i; j++) {
+        double dotp = S1array[j]*S1array[i]; // and they all have length 1.0
+        if (acos(dotp)<minsepangle) { acceptinit = false; break; };
+      }
+      if ((!acceptinit) && (cnt>500)) {
+        warning("Warning: Unable to place arbors at desired minimum angular separation.\n  Affected neuron type: "+String(neuron_type_name[TypeID()])+", neuron ID:"+String((long) numerical_ID())+", angle constraints: ["+String(minangle,"%.3f,")+String(maxangle,"%.3f")+"], number of arbors: "+String((long) numpoles)+".\n");
+        break;
+      }
+    } while (!acceptinit);
+  }
 #endif
-    for (int i = 0; i<numpoles; i++) {
+  for (int i = 0; i<numpoles; i++) {
 #ifdef VECTOR3D
-      // Double rotation transformation T S, for phi and theta of the parent
-      spatial acoords;
-      double cosphiSx(cosphi*S1array[i].X()), sinphiSz(sinphi*S1array[i].Z());
-      //   Sx(in x,y,z) = cos(phi)cos(theta)Sx-sin(theta)Sy+sin(phi)cos(theta)Sz
-      acoords.set_X((costheta*cosphiSx) - (sintheta*S1array[i].Y()) + (costheta*sinphiSz));
-      //   Sy(in x,y,z) = cos(phi)sin(theta)Sx+cos(theta)Sy+sin(phi)sin(theta)Sz
-      acoords.set_Y((sintheta*cosphiSx) + (costheta*S1array[i].Y()) + (sintheta*sinphiSz));
-      //   Sz(in x,y,z) = -sin(phi)Sx+0Sy+cos(phi)Sz
-      acoords.set_Z((cosphi*S1array[i].Z()) - (sinphi*S1array[i].X()));
-      acoords.convert_to_spherical();
-      acoords.set_X(radius);
+    // Double rotation transformation T S, for phi and theta of the parent
+    spatial acoords;
+    double cosphiSx(cosphi*S1array[i].X()), sinphiSz(sinphi*S1array[i].Z());
+    //   Sx(in x,y,z) = cos(phi)cos(theta)Sx-sin(theta)Sy+sin(phi)cos(theta)Sz
+    acoords.set_X((costheta*cosphiSx) - (sintheta*S1array[i].Y()) + (costheta*sinphiSz));
+    //   Sy(in x,y,z) = cos(phi)sin(theta)Sx+cos(theta)Sy+sin(phi)sin(theta)Sz
+    acoords.set_Y((sintheta*cosphiSx) + (costheta*S1array[i].Y()) + (sintheta*sinphiSz));
+    //   Sz(in x,y,z) = -sin(phi)Sx+0Sy+cos(phi)Sz
+    acoords.set_Z((cosphi*S1array[i].Z()) - (sinphi*S1array[i].X()));
+    acoords.convert_to_spherical();
+    acoords.set_X(radius);
 #endif
 #ifdef VECTOR2D
-      warning("Warning: Surface division BFM is not yet implemented for 2D\n");
-      double anglespread = maxangle - minangle;
-      double randomangle = anglespread*((2.0*X_misc.get_rand_real1()) - 1.0); // +/- random angle
-      if (randomangle<0.0) randomangle -= minangle; // negative random between minangle and maxangle
-      else randomangle += minangle; // positive random between minangle and maxangle
-      spatial acoords(radius,rc.Y()+randomangle); // valid relative location on membrane
+    warning("Warning: Surface division BFM is not yet implemented for 2D\n");
+    double anglespread = maxangle - minangle;
+    double randomangle = anglespread*((2.0*X_misc.get_rand_real1()) - 1.0); // +/- random angle
+    if (randomangle<0.0) randomangle -= minangle; // negative random between minangle and maxangle
+    else randomangle += minangle; // positive random between minangle and maxangle
+    spatial acoords(radius,rc.Y()+randomangle); // valid relative location on membrane
 #endif
-      Segment initseg(P,P);
-      initseg.set_by_angular_coordinates(acoords); // segment [P,P+Euler(acoords)]
-      initseg.P0 = initseg.P1; // segment starts on membrane at P+Euler(acoords)
-      acoords.set_X(X_misc.get_rand_range_real1(mintotlength,maxtotlength)); // initial segment length
-      if (isinputstructure) inputstructure.link_before(new postsynaptic_structure(*this,initseg,acoords,_typeid));
-      else outputstructure.link_before(new presynaptic_structure(*this,initseg,acoords,_typeid));
-    }
-    delete[] S1array;
+    Segment initseg(P,P);
+    initseg.set_by_angular_coordinates(acoords); // segment [P,P+Euler(acoords)]
+    initseg.P0 = initseg.P1; // segment starts on membrane at P+Euler(acoords)
+    acoords.set_X(X_misc.get_rand_range_real1(mintotlength,maxtotlength)); // initial segment length
+    if (isinputstructure) inputstructure.link_before(new postsynaptic_structure(*this,initseg,acoords,_typeid));
+    else outputstructure.link_before(new presynaptic_structure(*this,initseg,acoords,_typeid));
+  }
+  delete[] S1array;
 }
 
 void multipolar_nonpyramidal::forced_drift_basal_force_model() {

@@ -73,6 +73,7 @@ double rall_power_law_ndm::fibre_diameter(fibre_segment * fs) {
       double e_power = PDF_e_power->random_positive();
       double d_epower = exp(e_power*log(d_1)) + exp(e_power*log(d_2));
       double d = exp(log(d_epower)/e_power);
+      if ((d_max>0.0) && (d>d_max)) d = d_max; // R.K. 20240718 - We added an optional diameter width limit that was not in the PELT:VARIABILITY paper.
       fs->set_diameter(d);
       return d;
     } else { // this is between bifurcations
@@ -103,11 +104,12 @@ void rall_power_law_ndm::diameters() {
 }
 
 void rall_power_law_ndm::parse_CLP(Command_Line_Parameters & clp) {
-  //  int n;
   PDF_e_power = pdfselection("ndm.e_power",clp,X_branch);
   if (!PDF_e_power) PDF_e_power = defaultrallepowerpdf.clone();
   PDF_d_term = pdfselection("ndm.d_term",clp,X_branch);
   if (!PDF_d_term) PDF_d_term = defaultralldtermpdf.clone();
+  int n;
+  if ((n=clp.Specifies_Parameter("ndm.d_max"))>=0) d_max = atof(clp.ParValue(n)); // R.K. 20240718
 }
 
 String rall_power_law_ndm::report_parameters() {

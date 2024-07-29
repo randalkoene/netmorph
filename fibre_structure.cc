@@ -33,6 +33,7 @@
 //#include "branching_models.hh"
 #include "Network_Generated_Statistics.hh"
 #include "Sampled_Output.hh"
+#include "neuron.hh"
 #include "network.hh"
 
 #define POINTER_TO_ID(pointer) String(std::to_string((int64_t) pointer).c_str())
@@ -793,7 +794,39 @@ double Distribute_Elongation(terminal_segment & ts1, terminal_segment & ts2, dou
   return prop;
 }
 
- bool terminal_segment::branch(PLLRoot<terminal_segment> * prevts) {
+terminal_segment::terminal_segment(int reuse_attractor, bool possibly_rotate_attractors, fibre_structure & a, fibre_segment & ts, int corder):
+    arbor(&a), terminalsegment(&ts), centrifugalorder(corder),
+    dirmodel(NULL), elmodel(NULL), erimodel(NULL), tsbmodel(NULL)
+#ifdef ENABLE_FIXED_STEP_SIMULATION
+          , fixedstepelongation(0.0)
+#endif
+{
+  if (ts.get_fstype()==axon_fs) {
+    single_attractor = ts.N()->NextAttractor(reuse_attractor, possibly_rotate_attractors);
+    //std::cout << ts.N()->numerical_ID() << '(';
+    //if (possibly_rotate_attractors) std::cout << 'R';
+    //std::cout << single_attractor << ") ";
+  }
+}
+
+terminal_segment::terminal_segment(int reuse_attractor, bool possibly_rotate_attractors, fibre_structure & a, fibre_segment & ts, spatial & acoords, int corder):
+    arbor(&a), terminalsegment(&ts), centrifugalorder(corder), angularcoords(acoords),
+    dirmodel(NULL), elmodel(NULL), erimodel(NULL), tsbmodel(NULL)
+#ifdef ENABLE_FIXED_STEP_SIMULATION
+          , fixedstepelongation(0.0)
+#endif
+{
+  if (ts.get_fstype()==axon_fs) {
+    single_attractor = ts.N()->NextAttractor(reuse_attractor, possibly_rotate_attractors);
+    //std::cout << ts.N()->numerical_ID() << '(';
+    //if (possibly_rotate_attractors) std::cout << 'R';
+    //std::cout << single_attractor << ") ";
+  }
+  pb.direction_boundary_effect(terminalsegment->P0,angularcoords); // [***NOTE] Environmental Pressures are applied here.
+  update_segment_vector();
+}
+
+bool terminal_segment::branch(PLLRoot<terminal_segment> * prevts) {
   // If prevts!=NULL then the terminal_segment object is maintained for
   // possible further branches and is linked to prevts for clean-up
   // outside the fibre_structure object.
@@ -841,8 +874,8 @@ double Distribute_Elongation(terminal_segment & ts1, terminal_segment & ts2, dou
 #endif
   // 4. Add daughter terminal_segment objects to the set of terminal segments
   DIAGNOSTIC_BEFORE_ALLOCATION(new_fibre_segment);
-  terminal_segment * t1 = new terminal_segment(*arbor,*(terminalsegment->Branch1()),centrifugalorder+1); //,acoords1);
-  terminal_segment * t2 = new terminal_segment(*arbor,*(terminalsegment->Branch2()),centrifugalorder+1); //,acoords2);
+  terminal_segment * t1 = new terminal_segment(single_attractor, false, *arbor,*(terminalsegment->Branch1()),centrifugalorder+1); //,acoords1);
+  terminal_segment * t2 = new terminal_segment(single_attractor, true, *arbor,*(terminalsegment->Branch2()),centrifugalorder+1); //,acoords2);
   Root()->link_after(t1);
   Root()->link_after(t2);
   most_recent_branch1_ts = t1;
@@ -943,7 +976,7 @@ bool terminal_segment::turn_without_update_of_segment_vector(spatial & acoords) 
   // segments so that they are not processed as previously existing
   // terminal segments when created during a looping growth function.
   DIAGNOSTIC_BEFORE_ALLOCATION(new_fibre_segment);
-  terminal_segment * ts = new terminal_segment(*arbor,*(terminalsegment->Branch1()),acoords,centrifugalorder);
+  terminal_segment * ts = new terminal_segment(single_attractor, false, *arbor,*(terminalsegment->Branch1()),acoords,centrifugalorder);
   Root()->link_after(ts);
   // ALL HANDLERS FOR MODEL PROPAGATION SHOULD BE CALLED HERE (Look for similar notes such as this elsewhere, e.g. in Delayed_Branching_Model::continuation_node_to_branch().)
   if (dirmodel) dirmodel->handle_turning(*ts);

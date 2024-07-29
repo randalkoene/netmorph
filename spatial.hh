@@ -98,6 +98,7 @@ extern unsigned long int zerocoordinateconversions;
 class spatial: public Vector {
 public:
   spatial() {}
+  spatial(const Vector& v): Vector(v) {}
   spatial(const spatial & s): Vector(s) {}
 #ifdef VECTOR3D
   spatial(double X, double Y, double Z = 0.0): Vector(X,Y,Z) {}

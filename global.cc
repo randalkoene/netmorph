@@ -51,6 +51,11 @@ bool outattr_Txt_sequence = false;
 bool outattr_Txt_separate_files = false;
 bool outattr_make_full_X3D = false;
 bool outattr_make_full_Catacomb = false;
+bool outattr_make_full_OBJ = false;
+double outattr_OBJ_bevdepth_axon = 0.1;
+double outattr_OBJ_bevdepth_dendrite = 0.1;
+bool outattr_make_full_blend = false;
+String blender_exec_path;
 fibre_structure_class_id statsattr_fan_in_analysis = NUM_fs; // default, implies "none"
 bool outattr_synapse_distance_frequency = false;
 bool outattr_connection_distance_frequency = false;

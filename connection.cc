@@ -98,6 +98,15 @@ Fig_Object * connection::net_Fig() {
   return new Fig_Line(0,1,_figvar_connection_color,7,_figvar_connection_depth,-1,0.0,0,0,_figvar_connection_axon_x,_figvar_connection_axon_y,X,Y);
 }
 
+/**
+ * Traverse the set of synapses, and apply the operation
+ * specified by the synapse_tree_op object.
+ */
+void connection::synapse_op(synapse_tree_op& op) {
+  op.connection_op(this);
+  PLL_LOOP_FORWARD(synapse, synapses.head(), 1) e->synapse_op(op);
+}
+
 // functions
 
 connection * connection_exists(neuron * presyn, neuron * postsyn) {

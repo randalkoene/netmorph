@@ -324,16 +324,23 @@ public:
   virtual String report_parameters_specific();
 };
 
+struct cell_attraction_dm_parameters {
+  double attraction_moderation_base = 1.0;
+  bool neuron_specific_attraction_switch = false;
+  bool single_attractor_per_growthcone = false;
+};
+
 class cell_attraction_direction_model: public direction_model_base {
   // This is a very simple direction model that uses attraction associations
   // beteween specific cells to predict the direction of growth.
   // This model can be used in conjunction with the axon_direction_model.
 protected:
-  void predict_direction(spatial & predicted, neuron * n, spatial & growthcone);
+  struct cell_attraction_dm_parameters cell_attraction_parameters;
+  void predict_direction(spatial & predicted, neuron * n, terminal_segment * ts);
 public:
   //cell_attraction_direction_model() {}
   cell_attraction_direction_model(direction_model_base * dmbcontrib, double & dmbweight, cell_attraction_direction_model & schema);
-  cell_attraction_direction_model(String & thislabel, String & label, Command_Line_Parameters & clp): direction_model_base(thislabel,label,clp) {}
+  cell_attraction_direction_model(String & thislabel, String & label, Command_Line_Parameters & clp);
   virtual direction_model_base * clone();
   virtual void handle_branching(terminal_segment & ts1, terminal_segment & ts2);
   virtual void handle_turning(terminal_segment & ts);

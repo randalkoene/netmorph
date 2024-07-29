@@ -158,6 +158,8 @@ all_axons.axondm.dm_weight=0.2;
 #all_axons.axondm.dm_weight=0.05;
 all_axons.axondm.direction_model=cell_attraction;
 
+detailed_chemical_factors=true;
+
 In.attractedto=NGF_A;
 
 Mid.attractors=NGF_A;

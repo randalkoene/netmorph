@@ -563,8 +563,17 @@ void vector_direction_model::direction(terminal_segment * ts, neuron * e, double
   turn(ts,predicted,initlen);
 }
 
-cell_attraction_direction_model::cell_attraction_direction_model(direction_model_base * dmbcontrib, double & dmbweight, cell_attraction_direction_model & schema): direction_model_base(dmbcontrib,dmbweight,schema) {
+cell_attraction_direction_model::cell_attraction_direction_model(direction_model_base * dmbcontrib, double & dmbweight, cell_attraction_direction_model & schema): direction_model_base(dmbcontrib,dmbweight,schema), cell_attraction_parameters(schema.cell_attraction_parameters) {
 }
+
+cell_attraction_direction_model::cell_attraction_direction_model(String & thislabel, String & label, Command_Line_Parameters & clp): direction_model_base(thislabel,label,clp) {
+  int n;
+  if ((n=clp.Specifies_Parameter(thislabel+"attraction_moderation_base"))>=0) cell_attraction_parameters.attraction_moderation_base = atof(clp.ParValue(n));
+  if ((n=clp.Specifies_Parameter(thislabel+"neuron_specific_attraction_switch"))>=0) cell_attraction_parameters.neuron_specific_attraction_switch = (downcase(clp.ParValue(n))==String("true"));
+  if ((n=clp.Specifies_Parameter(thislabel+"single_attractor_per_growthcone"))>=0) cell_attraction_parameters.single_attractor_per_growthcone = (downcase(clp.ParValue(n))==String("true"));
+  // Chaining of models is taken care of in the base constructor.
+}
+
 
 String cell_attraction_direction_model::report_parameters_specific() {
   String res(" cell attraction");
@@ -585,76 +594,139 @@ void cell_attraction_direction_model::handle_turning(terminal_segment & ts) {
 }
 
 /**
+ * Optionally (based on 'attraction_moderation_base'), decrease attraction
+ * by a moderation factor that depends on how many neurons the target neuron
+ * is already receiving input from.
+ */
+void attraction_moderation_by_target_connectedness(double attraction_moderation_base, neuron* target, spatial& d) {
+  if (attraction_moderation_base>1.0) {
+    int attraction_moderation_exponent = target->num_input_connections();
+    if (attraction_moderation_exponent>0) {
+      // *** The following may be optimized be tracking a cache of precalculated pow() results.
+      double moderation = pow(attraction_moderation_base, double(-attraction_moderation_exponent));
+      d *= moderation;
+    }
+  }
+}
+
+#ifdef TESTING_SIMPLE_ATTRACTION
+/**
+ * This was only used to test cell attraction and only
+ * works between two adjacent regions.
+ */
+void test_cell_attraction_2regions(spatial& predicted, neuron* n, spatial& growthcone) {
+  PLL_LOOP_FORWARD(neuron,n->Root()->head(),1) if (e!=n) if (n->attractedto==e->attracts) {
+    spatial d(e->Pos());
+    d -= growthcone;
+    double SQdistance = d.len2();
+    d /= SQdistance; // square distance gravitational analogy
+    d /= sqrt(SQdistance); // working with weighted unit vectors
+    predicted += d;
+  }
+}
+#endif
+
+struct cell_attraction_calculation {
+  cell_attraction_dm_parameters& cell_attraction_parameters;
+  network& net;
+  spatial& growthcone;
+  neuron* n;
+  cell_attraction_calculation(cell_attraction_dm_parameters& _cell_attraction_parameters, network& _net, spatial& _growthcone, neuron* _n):
+    cell_attraction_parameters(_cell_attraction_parameters), net(_net), growthcone(_growthcone), n(_n) {}
+
+  spatial cell_attraction_vector_calculation(spatial d, neuron* target) {
+    d -= growthcone; // direction vector
+    double SQdistance = d.len2();
+
+    if (net.Track_Approach()) net.target_approach_samples(n, target, SQdistance);
+
+    d /= SQdistance; // square distance gravitational analogy
+    d /= sqrt(SQdistance); // working with weighted unit vectors
+
+    attraction_moderation_by_target_connectedness(cell_attraction_parameters.attraction_moderation_base, target, d);
+
+    return d;
+  }
+
+  void predict_direction_for_soma_attractor(int attractor, spatial & predicted) {
+    if (attractor<0) return;
+    // Find all the somata that are attractive:
+    if (net.chemdata.attractor_somata.find(attractor)==net.chemdata.attractor_somata.end()) {
+      error("Missing attractor somata for "+net.chemindex_to_label.at(attractor)+'\n');
+      return;
+    }
+    std::set<neuron*>& neuronptr_set = net.chemdata.attractor_somata.at(attractor);
+    for (auto & n_ptr : neuronptr_set) {
+      if (n != n_ptr) {
+
+        if ((!cell_attraction_parameters.neuron_specific_attraction_switch) ||
+            (!n->is_connected_to(n_ptr))) {
+
+          spatial d = cell_attraction_vector_calculation(n_ptr->Pos(), n_ptr);
+
+          d *= net.chemdata.soma_attraction_weight;
+
+          predicted += d;
+        }
+      }
+    }
+  }
+
+  void predict_direction_for_dendrite_attractor(int attractor, spatial & predicted) {
+    if (attractor<0) return;
+//std::cout << attractor << ' ';
+    auto it = net.chemdata.attractor_segments.find(attractor);
+    if (it != net.chemdata.attractor_segments.end()) {
+      std::set<fibre_segment*>& segmentptr_set = it->second;
+      for (auto& fs_ptr : segmentptr_set) {
+        neuron* target = fs_ptr->N();
+        if (n != target) {
+
+          if ((!cell_attraction_parameters.neuron_specific_attraction_switch) ||
+              (!n->is_connected_to(target))) {
+
+            predicted += cell_attraction_vector_calculation(fs_ptr->P1, target);
+          }
+        }
+      }
+    }
+  }
+};
+
+/**
  * Predicted direction is influenced by the combined vectors resulting from
  * direction and distance to the soma of neurons marked as being attractive
  * to the neuron of this growthcone.
+ * 
+ * If the 'single_attractor_per_growthcone' option is on then the prediction
+ * for each growth cone will use only one growth-cone-specific attractor
+ * chemical. Otherwise, contributions for all of the neuron's attractor
+ * chemicals will be combined.
  */
-void cell_attraction_direction_model::predict_direction(spatial & predicted, neuron * n, spatial & growthcone) {
+void cell_attraction_direction_model::predict_direction(spatial & predicted, neuron * n, terminal_segment * ts) {
 #ifdef TESTING_SIMPLE_ATTRACTION
   if (eq) {
-    network * net_ptr = eq->Net();
+    cell_attraction_calculation ca_calc(cell_attraction_parameters, *(eq->Net()), ts->TerminalSegment()->P1, n);
 
     // Calculate predicted direction based on attraction.
-    if (net_ptr->chemdata.has_specified_factors) {
-      if (net_ptr->chemdata.soma_attraction_weight>0.0) {
-        // For all the chemical factors this neuron is attracted to:
-        for (auto & attractor : n->chemdata.attractedto) {
-          // Find all the somata that are attractive:
-          if (net_ptr->chemdata.attractor_somata.find(attractor)==net_ptr->chemdata.attractor_somata.end()) {
-            error("Missing attractor somata for "+net_ptr->chemindex_to_label.at(attractor)+'\n');
-            return;
-          }
-          std::set<neuron*>& neuronptr_set = net_ptr->chemdata.attractor_somata.at(attractor);
-          for (auto & n_ptr : neuronptr_set) {
-            if (n != n_ptr) {
-              spatial d(n_ptr->Pos());
-              d -= growthcone;
-              double SQdistance = d.len2();
+    if (ca_calc.net.chemdata.has_specified_factors) { // Neuron-to-neuron attraction (not the test case)
 
-              if (net_ptr->Track_Approach()) net_ptr->target_approach_samples(n, n_ptr, SQdistance);
+      if (ca_calc.net.chemdata.soma_attraction_weight>0.0) { // Attraction to Soma
 
-              d /= SQdistance; // square distance gravitational analogy
-              d /= sqrt(SQdistance); // working with weighted unit vectors
-              d *= net_ptr->chemdata.soma_attraction_weight;
-              predicted += d;
-            }
-          }
-        }
+        if (cell_attraction_parameters.single_attractor_per_growthcone) ca_calc.predict_direction_for_soma_attractor(ts->SingleAttractor(), predicted);
+        else for (auto & attractor : n->chemdata.attractedto) ca_calc.predict_direction_for_soma_attractor(attractor, predicted);
+
       }
 
-      if (net_ptr->chemdata.detailed_chemical_factors) {
-        // Influence of points on dendrites, for all the chemical factors this neuron is attracted to:
-        std::map<int, std::set<fibre_segment*>>& attractor_segments_map = net_ptr->chemdata.attractor_segments;
-        for (auto & attractor : n->chemdata.attractedto) {
-          auto it = attractor_segments_map.find(attractor);
-          if (it != attractor_segments_map.end()) {
-            std::set<fibre_segment*>& segmentptr_set = it->second;
-            for (auto& fs_ptr : segmentptr_set) {
-              if (n != fs_ptr->N()) {
-                spatial d(fs_ptr->P1);
-                d -= growthcone;
-                double SQdistance = d.len2();
+      if (ca_calc.net.chemdata.detailed_chemical_factors) { // Attraction to Dendrite Points
 
-                if (net_ptr->Track_Approach()) net_ptr->target_approach_samples(n, fs_ptr->N(), SQdistance);
-
-                d /= SQdistance; // square distance gravitational analogy
-                d /= sqrt(SQdistance); // working with weighted unit vectors
-                predicted += d;
-              }
-            }
-          }
-        }
+        if (cell_attraction_parameters.single_attractor_per_growthcone) ca_calc.predict_direction_for_dendrite_attractor(ts->SingleAttractor(), predicted);
+        else for (auto & attractor : n->chemdata.attractedto) ca_calc.predict_direction_for_dendrite_attractor(attractor, predicted);
+        
       }
 
-    } else { // Simpler cell attraction model, only works between 2 layers
-      PLL_LOOP_FORWARD(neuron,n->Root()->head(),1) if (e!=n) if (n->attractedto==e->attracts) {
-        spatial d(e->Pos());
-        d -= growthcone;
-        double SQdistance = d.len2();
-        d /= SQdistance; // square distance gravitational analogy
-        d /= sqrt(SQdistance); // working with weighted unit vectors
-        predicted += d;
-      }
+    } else {
+      test_cell_attraction_2regions(predicted, n, ts->TerminalSegment()->P1);
     }
   }
 #endif
@@ -665,9 +737,10 @@ spatial cell_attraction_direction_model::predict(double weight, terminal_segment
   // in the chain is automatically assigned the weight 1.0 and the weighting
   // of other direction models is proportional to that (i.e. it can be > 1.0).
   spatial predicted;
-  predict_direction(predicted,e,ts->TerminalSegment()->P1);
+  predict_direction(predicted,e,ts);
   predicted.normalize();
   predicted *= weight;
+  // Continnue through the chain of direction models
   if (contributing) predicted += contributing->predict(contributingweight,ts,e);
   return predicted;
 }
@@ -682,7 +755,7 @@ void cell_attraction_direction_model::direction(terminal_segment * ts, neuron * 
   // 1. predict the direction based on the sum of (chemical) attractions
   //    in a gravitational analogy
   spatial predicted;
-  predict_direction(predicted,e,ts->TerminalSegment()->P1);
+  predict_direction(predicted,e,ts);
   if (contributing) {
     predicted.normalize(); // only necessary here
     predicted += contributing->predict(contributingweight,ts,e);

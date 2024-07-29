@@ -57,6 +57,7 @@ extern bool numneurons_is_default; // flag to indicate that numneurons was set b
 // classes
 
 class network_statistics_data;
+class network;
 
 #ifndef __NETWORK_GENERATED_STATISTICS_HH
 class network_statistics_base;
@@ -84,6 +85,20 @@ struct neuron_pair_approach {
 
 struct neuron_pair_comp {
   bool operator() (const neuron_pair& lhs, const neuron_pair& rhs) const {
+    if (lhs.from < rhs.from) return true;
+    if (lhs.from > rhs.from) return false;
+    return lhs.to < rhs.to;
+  }
+};
+
+struct region_number_pair {
+  int from;
+  int to;
+  region_number_pair(int _from, int _to): from(_from), to(_to) {}
+};
+
+struct region_pair_comp {
+  bool operator() (const region_number_pair& lhs, const region_number_pair& rhs) const {
     if (lhs.from < rhs.from) return true;
     if (lhs.from > rhs.from) return false;
     return lhs.to < rhs.to;
@@ -123,6 +138,7 @@ public:
     return *head();
   }
   int find(neuron & n);
+  int find_by_name(const String& _name);
 };
 
 std::vector<String> get_chem_factors(String factorsstr);
@@ -165,20 +181,27 @@ struct chemical_factor_data {
  */
 struct completion_requirements {
   std::map<neuron_pair, bool, neuron_pair_comp> target_connections;
+  std::map<region_number_pair, size_t, region_pair_comp> region_target_connections;
 
   bool enable_completion_requirements = false;
 
   void update_connection(neuron* presyn, neuron* postsyn);
+
   String report_completion_criteria();
-  String report_criteria_completed();
+  String report_criteria_completed(network* net);
+
   void criteria_numbers(long& totnum, long& completed);
   double completion_percentage();
   bool is_complete();
+
+  void region_criteria_numbers(long& totnum, long& completed);
+  double region_completion_percentage();
 };
 
 class network: public PLLRoot<neuron>, public Event_Queue {
 protected:
   String netinfo;
+  String outputdirectory; // Copied from global.hh.
   bool edges; // if false, functional edge effects are avoided by looping connections around, e.g. turning a rectangle into a torus
   bool candidate_synapses;
   bool synapses_during_development;
@@ -190,7 +213,7 @@ protected:
   regionslist regions;
 
   bool NES_output = false;
-  bool track_approach = true;
+  bool track_approach = false;
 
 public:
   std::map<String, int> chemlabel_to_index;
@@ -201,6 +224,8 @@ public:
   std::map<neuron_pair, neuron_pair_approach, neuron_pair_comp> neuron_pair_map; // used for distance tracking
 
   completion_requirements completion;
+
+  std::vector<neuron*> input_neurons; // neurons specified or identified as receiving input and used for I/O path discovery
 
 protected:
   void add_typed_neuron(neuron_type nt, neuron * psmin, neuron * psmax);
@@ -216,7 +241,11 @@ public:
   network(int numneurons, neuron * psmin, neuron * psmax, double principalprobability, bool e = true); // (see nibr.cc)
   network(int numneurons, neuron * psmin, neuron * psmax, Network_Statistics_Root & netstats, bool _edges = true); // (see nibr.cc)
   virtual ~network() { delete sss; }
+  void set_outputdirectory(const String& _outputdirectory) { outputdirectory=_outputdirectory; }
+  const String& get_outputdirectory() const { return outputdirectory; }
   regionslist & Regions() { return regions; }
+  region* Region_by_idx(int idx) { return regions.el(idx); }
+  int Region_by_name(const String& _name) { return regions.find_by_name(_name); }
   spatial & Center() { return center; }
   double Time() { return t; }
   bool Track_Approach() const { return track_approach; }
@@ -280,12 +309,20 @@ public:
   void set_figattr(int fattr); // (see nibr.cc)
   void visible_pre_and_target_post(neuron & n); // (see nibr.cc)
   virtual void parse_CLP(Command_Line_Parameters & clp);
+  void explicit_input_neurons(Command_Line_Parameters & clp);
   void neuron_specific_configurator(Command_Line_Parameters & clp);
   virtual String report_parameters();
   String neuron_specific_reports();
   void setup_completion_requirements();
+  std::vector<neuron*> deduce_input_neurons_by_chemattraction();
+  double compare_region_connection_requirements(std::vector<neuron*> input_neurons);
 
   void tree_op(fibre_tree_op& op); // Fiber tree traversal operation, applied over all neurons.
+  void neuron_op(neuron_list_op& op); // Neuron list traversal operation, applied over all neurons.
+  void synapse_op(synapse_tree_op& op); // Synapse tree traversal operation, applied over all neurons and connections.
+
+  bool Obj_Output(String objpath, double axonbevdepth, double dendritebevdepth);
+  bool Blend_Output(String objpath);
 
   void set_NES_Output(bool _NESoutput) { NES_output = _NESoutput; }
   bool NES_Output() const { return NES_output; }

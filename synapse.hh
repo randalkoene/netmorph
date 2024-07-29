@@ -53,6 +53,9 @@ class synapse_structure;
 class neuron;
 #endif
 
+// Forward declaration:
+class synapse;
+
 enum synapse_type { syntype_AMPAR, syntype_NMDAR, syntype_GABAR, syntype_candidate, syntype_GluR, syntype_iGluR, syntype_mGluR, syntype_IDs }; // To avoid base classes that are not used directly, syntype_candidate acts as the maximum type index, otherwise syntype_IDs indicates the number of valid IDs
 
 extern const char synapse_type_name[syntype_IDs][10];
@@ -70,6 +73,23 @@ extern long unsigned int candidates_conversion_attempted;
 #define INITIAL_STRENGTH_AMPA 10.0
 #define INITIAL_STRENGTH_NMDA  2.0
 #define INITIAL_STRENGTH_GABA 10.0
+
+/**
+ * Base class for operators that should be applied to the whole set of
+ * synapses from a connection (or a specified synapse).
+ * See for example how this is used by BuildFromNetmorphNetwork when
+ * Netmorph is embedded in NES.
+ * (RK 20240713)
+ */
+class synapse_tree_op {
+public:
+  // This is run whenever entering a new neuron, if started there or above.
+  virtual void neuron_op(neuron* n) {}
+  // This is run whenever entering a new connection, if started there or above.
+  virtual void connection_op(connection * c) {}
+  // This is run whenever entering a new synapse.
+  virtual void op(synapse* s) = 0;
+};
 
 class synapse: public PLLHandle<synapse>, public state_storable {
 protected:
@@ -95,6 +115,7 @@ public:
   Fig_Object * net_Fig();
   Txt_Object * net_Txt();
   bool net_NES(NetData& netdata);
+  void synapse_op(synapse_tree_op& op);
 };
 
 typedef synapse * synapseptr;

@@ -61,7 +61,7 @@ In.shape=disc;
 In.neurons=0;
 In.pyramidal=2;
 In.interneuron=0;
-In.minneuronseparation=100;
+In.minneuronseparation=10;
 In.centerZ=-100;
 In.shape.radius=50;
 In.shape.thickness=20;
@@ -70,7 +70,7 @@ Mid.shape=disc;
 Mid.neurons=0;
 Mid.pyramidal=2;
 Mid.interneuron=2;
-Mid.minneuronseparation=100;
+Mid.minneuronseparation=10;
 Mid.centerZ=-200;
 Mid.shape.radius=50;
 Mid.shape.thickness=20;
@@ -79,7 +79,7 @@ Out.shape=disc;
 Out.neurons=0;
 Out.pyramidal=1;
 Out.interneuron=0;
-Out.minneuronseparation=100;
+Out.minneuronseparation=10;
 Out.centerZ=-300;
 Out.shape.radius=50;
 Out.shape.thickness=20;
@@ -154,16 +154,30 @@ dirhistory_selection=none;
 # here from In to Mid and from Mid to Out.
 all_axons.direction_model=segment_history_tension;
 all_axons.dm_label=axondm;
-all_axons.axondm.dm_weight=0.2;
+all_axons.axondm.dm_weight=0.5;
 #all_axons.axondm.dm_weight=0.05;
 all_axons.axondm.direction_model=cell_attraction;
 
-In.attractedto=NGF_A;
+detailed_chemical_factors=true;
 
-Mid.attractors=NGF_A;
-Mid.attractedto=NGF_B;
+#In.attractedto=NGF_A;
+#Mid.attractors=NGF_A;
+#Mid.attractedto=NGF_B;
+#Out.attractors=NGF_B;
 
-Out.attractors=NGF_B;
+idx.In.pyramidal.0.attractedto=NGF_A;
+idx.Mid.pyramidal.0.attractors=NGF_A;
+idx.Mid.interneuron.1.attractors=NGF_A;
+
+idx.In.pyramidal.1.attractedto=NGF_B;
+idx.Mid.pyramidal.1.attractors=NGF_B;
+idx.Mid.interneuron.0.attractors=NGF_B;
+
+idx.Mid.pyramidal.0.attractedto=NGF_C;
+idx.Mid.pyramidal.1.attractedto=NGF_C;
+idx.Mid.interneuron.0.attractedto=NGF_C;
+idx.Mid.interneuron.1.attractedto=NGF_C;
+idx.Out.pyramidal.0.attractors=NGF_C;
 
 # AXONS ELONGATION MODEL PARAMETERS
 # Note that the specifications here do not apply to Mid interneuron
