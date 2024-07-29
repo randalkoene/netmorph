@@ -1,0 +1,10 @@
+# Include this to produce OBJ and Blend output
+# To override the Blender executable path in this script
+# simply add a "blender-exec-path=..." statement to the
+# Netmorph call.
+
+outattr_make_full_OBJ=true;
+outattr_OBJ_bevdepth_axon=0.1;
+outattr_OBJ_bevdepth_dendrite=0.1;
+outattr_make_full_blend=true;
+blender_exec_path=/home/rkoene/Downloads/blender-4.1.1-linux-x64/blender;
